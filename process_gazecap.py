@@ -9,6 +9,8 @@ import shutil
 
 import cv2
 
+import numpy as np
+
 
 def extract_crop_data(crop_info):
   """ Extracts the crop bounding data from the raw structure.
@@ -22,6 +24,12 @@ def extract_crop_data(crop_info):
   w_crop = crop_info["W"]
   h_crop = crop_info["H"]
   crop_valid = crop_info["IsValid"]
+
+  x_crop = np.asarray(x_crop, dtype=np.float32)
+  y_crop = np.asarray(y_crop, dtype=np.float32)
+  w_crop = np.asarray(w_crop, dtype=np.float32)
+  h_crop = np.asarray(h_crop, dtype=np.float32)
+  crop_valid = np.asarray(crop_valid)
 
   return x_crop, y_crop, w_crop, h_crop, crop_valid
 
@@ -157,8 +165,8 @@ def reshape_image(image, shape, offset=(0, 0)):
 
   return image
 
-def generate_names(dot_info, grid_info, left_eye_info, right_eye_info,
-                   session):
+def generate_names(dot_info, grid_info, face_info, left_eye_info,
+                   right_eye_info, session):
   """ Generates names for a set of images that match our existing data from Zac.
   Args:
     dot_info: The loaded dot information.
@@ -174,23 +182,44 @@ def generate_names(dot_info, grid_info, left_eye_info, right_eye_info,
   y_cam = dot_info["YCam"]
 
   # Crop coordinates and sizes.
+  _, _, w_face, h_face, _ = extract_crop_data(face_info)
   x_leye, y_leye, w_leye, h_leye, leye_valid = extract_crop_data(left_eye_info)
   x_reye, y_reye, w_reye, h_reye, reye_valid = extract_crop_data(right_eye_info)
   # Face grid coordinates and sizes.
-  x_face, y_face, w_face, h_face, face_valid = extract_crop_data(grid_info)
+  x_grid, y_grid, w_grid, h_grid, grid_valid = extract_crop_data(grid_info)
 
+  # Coerce face sizes to not have zeros for the invalid images so that division
+  # works.
+  w_face = np.clip(w_face, 1, None)
+  h_face = np.clip(h_face, 1, None)
+
+  # Convert everything to frame fractions.
+  x_leye /= w_face
+  y_leye /= h_face
+  w_leye /= w_face
+  h_leye /= h_face
+
+  x_reye /= w_face
+  y_reye /= h_face
+  w_reye /= w_face
+  h_reye /= h_face
+
+  x_grid /= 25.0
+  y_grid /= 25.0
+  w_grid /= 25.0
+  h_grid /= 25.0
 
   names = []
   for i in range(0, len(x_cam)):
     # Check if the frame is valid.
-    if not (face_valid[i] and leye_valid[i] and reye_valid[i]):
+    if not (grid_valid[i] and leye_valid[i] and reye_valid[i]):
       names.append(None)
       continue
 
     # Generate a name for the frame.
-    name = "gazecap_%s_f%d_%f_%f_%d_%d_%d_%d_%f_%f_%f_%f_%f_%f_%f_%f.jpg" % \
-            (session, i, x_cam[i], y_cam[i], x_face[i], y_face[i], w_face[i],
-             h_face[i], x_leye[i], y_leye[i], w_leye[i], h_leye[i], x_reye[i],
+    name = "gazecap_%s_f%d_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f.jpg" % \
+            (session, i, x_cam[i], y_cam[i], x_grid[i], y_grid[i], w_grid[i],
+             h_grid[i], x_leye[i], y_leye[i], w_leye[i], h_leye[i], x_reye[i],
              y_reye[i], w_reye[i], h_reye[i])
     names.append(name)
 
@@ -264,7 +293,7 @@ def process_session(session_dir, out_dir):
   frame_file.close()
 
   # Generate image names.
-  names = generate_names(dot_info, grid_info, leye_info, reye_info,
+  names = generate_names(dot_info, grid_info, face_info, leye_info, reye_info,
                          session_name)
 
   # Load images and crop faces.
