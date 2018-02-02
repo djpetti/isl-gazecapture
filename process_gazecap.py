@@ -12,6 +12,11 @@ import cv2
 import numpy as np
 
 
+# Number of testing and validation sessions.
+NUM_TEST_SESSIONS = 150
+NUM_VAL_SESSIONS = 50
+
+
 def extract_crop_data(crop_info):
   """ Extracts the crop bounding data from the raw structure.
   Args:
@@ -79,12 +84,12 @@ def extract_face_crops(images, face_data):
   Returns:
     A cropped version of the images, in the same order. A None value in this
     list indicates a face crop that was not valid. """
-  face_x, face_y, face_w, face_h, face_valid = extract_crop_data(face_data)
+  face_x, face_y, face_w, face_h, _ = extract_crop_data(face_data)
   crops = []
 
   for i in range(0, len(images)):
-    if not face_valid[i]:
-      # Face crop is invalid.
+    if images[i] is None:
+      # Frame is invalid.
       crops.append(None)
       continue
 
@@ -92,6 +97,11 @@ def extract_face_crops(images, face_data):
     end_x = start_x + int(face_w[i])
     start_y = int(face_y[i])
     end_y = start_y + int(face_h[i])
+
+    start_x = max(0, start_x)
+    end_x = min(images[i].shape[1], end_x)
+    start_y = max(0, start_y)
+    end_y = min(images[i].shape[0], end_y)
 
     # Crop the image.
     crop = images[i][start_y:end_y, start_x:end_x]
@@ -238,16 +248,26 @@ def save_images(frames, names, outdir):
       continue
 
     out_path = os.path.join(outdir, new_name)
-    cv2.imwrite(out_path, frame)
+    if not cv2.imwrite(out_path, frame):
+      raise RuntimeError("Failed to write image %s." % (out_path))
 
-def load_images(frame_dir, frame_info):
+def load_images(frame_dir, frame_info, names):
   """ Loads images from the frame directory.
   Args:
     frame_dir: The directory to load images from.
-    frame_info: The list of frame names. """
+    frame_info: The list of frame names.
+    names: The new names to give to the loaded frames.
+  Returns:
+    A list of the loaded frames. Frames that are None aren't valid, and weren't
+    loaded. """
   images = []
 
-  for frame in frame_info:
+  for i, frame in enumerate(frame_info):
+    if names[i] is None:
+      # Frame is invalid anyway, don't bother loading it.
+      images.append(None)
+      continue
+
     frame_path = os.path.join(frame_dir, frame)
 
     image = cv2.imread(frame_path)
@@ -263,9 +283,8 @@ def process_session(session_dir, out_dir):
     session_dir: The directory of the session.
     out_dir: The output directory to copy the images to.
   Returns:
-    The eye crops for the session, along with the corresponding names. """
+    True if it saved some valid data, false if there was no valid data. """
   session_name = session_dir.split("/")[-1]
-  print "Processing session %s..." % (session_name)
 
   # Load all the relevant metadata.
   leye_file = file(os.path.join(session_dir, "appleLeftEye.json"))
@@ -296,13 +315,23 @@ def process_session(session_dir, out_dir):
   names = generate_names(dot_info, grid_info, face_info, leye_info, reye_info,
                          session_name)
 
+  # Check if we have any valid data from this session.
+  for name in names:
+    if name is not None:
+      break
+  else:
+    # No valid data, no point in continuing.
+    return False
+
   # Load images and crop faces.
   frame_dir = os.path.join(session_dir, "frames")
-  frames = load_images(frame_dir, frame_info)
+  frames = load_images(frame_dir, frame_info, names)
   face_crops = extract_face_crops(frames, face_info)
 
   # Copy images.
   save_images(face_crops, names, out_dir)
+
+  return True
 
 def process_dataset(dataset_dir, output_dir, start_at=None):
   """ Processes an entire dataset, one session at a time.
@@ -311,27 +340,64 @@ def process_dataset(dataset_dir, output_dir, start_at=None):
     output_dir: Where to write the output images.
     start_at: Session to start at. """
   # Create output directory.
-  if os.path.exists(output_dir):
-    # Remove existing direcory if it exists.
-    print "Removing existing directory '%s'." % (output_dir)
-    shutil.rmtree(output_dir)
-  os.mkdir(output_dir)
+  if not start_at:
+    if os.path.exists(output_dir):
+      # Remove existing direcory if it exists.
+      print "Removing existing directory '%s'." % (output_dir)
+      shutil.rmtree(output_dir)
+    os.mkdir(output_dir)
+
+    # Make split directories.
+    os.mkdir(os.path.join(output_dir, "train"))
+    os.mkdir(os.path.join(output_dir, "test"))
+    os.mkdir(os.path.join(output_dir, "val"))
+
+  num_test = 0
+  num_val = 0
+
+  sessions = os.listdir(dataset_dir)
 
   # Process each session one by one.
   process = False
-  for item in os.listdir(dataset_dir):
-    if (start_at and item == start_at):
-      # We can start here.
-      process = True
-    if (start_at and not process):
-      continue
-
+  for i, item in enumerate(sessions):
     item_path = os.path.join(dataset_dir, item)
     if not os.path.isdir(item_path):
       # This is some extraneous file.
       continue
 
-    process_session(item_path, output_dir)
+    if (start_at and item == start_at):
+      # We can start here.
+      process = True
+    if (start_at and not process):
+      if num_test < NUM_TEST_SESSIONS:
+        num_test += 1
+      elif num_val < NUM_VAL_SESSIONS:
+        num_val += 1
+
+      continue
+
+    # Calculate percentage complete.
+    percent = float(i) / len(sessions) * 100
+    print "(%.2f%%) Processing session %s..." % (percent, item)
+
+    # Determine which split this belongs in.
+    split_dir = None
+    used_test = False
+    used_val = False
+    if num_test < NUM_TEST_SESSIONS:
+      split_dir = os.path.join(output_dir, "test")
+      used_test = True
+    elif num_val < NUM_VAL_SESSIONS:
+      split_dir = os.path.join(output_dir, "val")
+      used_val = True
+    else:
+      split_dir = os.path.join(output_dir, "train")
+
+    if process_session(item_path, split_dir):
+      if used_test:
+        num_test += 1
+      elif used_val:
+        num_val += 1
 
 def main():
   parser = argparse.ArgumentParser("Convert the GazeCapture dataset.")
