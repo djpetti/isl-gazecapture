@@ -42,6 +42,7 @@ class Server(object):
     Args:
       port: The port to listen on. """
     self.__init_buffers()
+
     # A list of complete frames that we have received.
     self.__received_frames = deque()
 
@@ -62,8 +63,6 @@ class Server(object):
     self.__size_remaining = -1
     # Current byte we are reading for the image size.
     self.__image_size_index = 0
-    # The sequence number of the current image we are reading.
-    self.__image_sequence_num = -1
 
   def __listen(self, port):
     """ Builds the socket and starts listening for connections.
@@ -77,17 +76,19 @@ class Server(object):
 
     logger.info("Now listening on port %d." % (port))
 
-  def __extract_frame(self):
+  def __extract_frame(self, sequence_num):
     """ Extracts the compressed frame stored in __current_frame,
     and adds it to the __received_frames list. It also clears the
-    __current_frame array. """
+    current_frame array.
+    Args:
+      sequence_num: The sequence number of the new frame. """
     image = cv2.imdecode(np.asarray(self.__current_frame), cv2.IMREAD_COLOR)
     if image is None:
       # Failed to decode the image.
       logger.warning("Failed to read frame.")
 
     logger.debug("Got new frame.")
-    self.__received_frames.appendleft(image)
+    self.__received_frames.appendleft((image, sequence_num))
 
     self.__current_frame = bytearray([])
 
@@ -149,14 +150,12 @@ class Server(object):
 
       elif self.__state == self.State.READ_IMAGE_SEQ:
         # Read the sequence number of the image.
-        self.__image_sequence_num = byte
-        logger.debug("Sequence number: %d" % (byte))
-
         self.__state = self.State.READ_IMAGE_SIZE
 
         # Since we read the sequence number, we can go ahead and extract the
         # image.
-        self.__extract_frame()
+        logger.debug("Sequence number: %d" % (byte))
+        self.__extract_frame(byte)
 
       elif self.__state == self.State.READ_IMAGE_SIZE:
         # Read the current size byte of the next image.
@@ -194,7 +193,8 @@ class Server(object):
   def read_next_frame(self):
     """ Gets and returns the next complete JPEG frame from the client.
     Returns:
-      The next frame, or None if the client disconnected. """
+      The next frame and sequence number, or a None tuple if the client
+      disconnected. """
     # Read data from the socket until we have at least one new frame.
     while len(self.__received_frames) == 0:
       logger.debug("Waiting for new data...")
@@ -207,7 +207,7 @@ class Server(object):
         # Clear the buffers.
         self.__init_buffers()
 
-        return None
+        return (None, None)
 
       self.__process_new_data(bytes_read)
 

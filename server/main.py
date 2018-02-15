@@ -20,12 +20,14 @@ def demo():
   my_server.wait_for_client()
 
   while True:
-    frame = my_server.read_next_frame()
+    frame, sequence_num = my_server.read_next_frame()
     if frame is None:
       # Connection closed, wait for another.
       cv2.destroyAllWindows()
       my_server.wait_for_client()
       continue
+
+    logging.info("Sequence number: %d" % (sequence_num))
 
     cv2.imshow("test", frame)
     cv2.waitKey(1)
