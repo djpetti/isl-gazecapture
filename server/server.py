@@ -1,4 +1,6 @@
 from collections import deque
+from multiprocessing import Process
+import json
 import logging
 import socket
 import struct
@@ -6,6 +8,8 @@ import struct
 import cv2
 
 import numpy as np
+
+from gaze_predictor import GazePredictor
 
 
 # Length of the buffer we use for reading data.
@@ -212,3 +216,117 @@ class Server(object):
       self.__process_new_data(bytes_read)
 
     return self.__received_frames.pop()
+
+  def send_response(self, prediction, seq_num):
+    """ Sends a response for a particular image prediction.
+    Args:
+      prediction: The prediction, as a tuple, in cm.
+      seq_num: The sequence number of the image that the prediction is for. """
+    logger.debug("Sending prediction %s for %d." % (str(prediction), seq_num))
+
+    # Create JSON data to send.
+    response = {"PredictX": prediction[0], "PredictY": prediction[1],
+                "SequenceNumber": seq_num}
+    response = json.dumps(response)
+
+    # Add a delimiter sequence to the start.
+    response = "RESP_START" + response
+
+    # Send the response on the socket.
+    self.__client.sendall(response)
+
+
+class ReceiveProcess(object):
+  """ Process that handles receiving data from the server and passing it to the
+  gaze predictor. """
+
+  def __init__(self, server, gaze_predictor):
+    """
+    Args:
+      server: The server instance to receive data on. It expects a client to
+              already be connected.
+      gaze_predictor: The gaze predictor to send images to. """
+    self.__server = server
+    self.__predictor = gaze_predictor
+
+    # The underlying process to run.
+    self.__process = Process(target=ReceiveProcess.run_forever, args=(self,))
+    self.__process.start()
+
+  def release(self):
+    """ Cleans up and terminates the internal process. """
+    self.__process.terminate()
+
+  def __run_once(self):
+    """ Runs one iteration of the receiver process.
+    Returns:
+      True if it got a new frame, false if the client disconnected. """
+    frame, sequence_num = self.__server.read_next_frame()
+
+    # Now, send it to the gaze predictor.
+    self.__predictor.process_image(frame, sequence_num)
+    return frame is not None
+
+  def run_forever(self):
+    """ Runs the process forever. """
+    # Run iterations.
+    while self.__run_once():
+      pass
+
+    logger.info("Detected client disconnect, exiting receive process.")
+
+  def wait_for_disconnect(self):
+    """ Waits until the client disconnects. """
+    self.__process.join()
+
+class SendProcess(object):
+  """ Process that handles reading results from the gaze predictor and sending
+  them out with the server. """
+  def __init__(self, server, gaze_predictor):
+    """
+    Args:
+      server: The server instance to send data on. It expects a client to
+              already be conneted.
+      gaze_predictor: The gaze predictor to read results from. """
+    self.__server = server
+    self.__predictor = gaze_predictor
+
+    # The underlying process to run.
+    self.__process = Process(target=SendProcess.run_forever, args=(self,))
+    self.__process.start()
+
+  def release(self):
+    """ Cleans up and terminates the internal process. """
+    self.__process.terminate()
+
+  def __run_once(self):
+    """ Runs one interation of the sender process.
+    Returns:
+      True if it sent new data, false if the sequence end was reached. """
+    gaze_point, seq_num = self.__predictor.predict_gaze()
+    if gaze_point is None:
+      # A None tuple means the end of the sequence, so we'll want to join this
+      # process.
+      return False
+
+    # Send it to the client.
+    try:
+      self.__server.send_response(gaze_point, seq_num)
+    except socket.error:
+      # The client has diconnected. We're going to wait to exit though until we
+      # see the end of the sequence propagated through the pipeline.
+      logger.debug("Send socket disconnected, waiting for sequence end.")
+
+    return True
+
+  def run_forever(self):
+    """ Runs the process forever. """
+    # Run iterations.
+    while self.__run_once():
+      pass
+
+    logger.info("Detected client disconnect, exiting send process.")
+
+  def wait_for_disconnect(self):
+    """ Waits until the client disconnects. """
+    self.__process.join()

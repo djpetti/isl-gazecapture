@@ -21,7 +21,7 @@ def main():
   sock.connect(("", PORT))
 
   seq = 0
-  while True:
+  for i in range(0, 10):
     # Capture and encode an image.
     ret, image = cam.read()
     if not ret:
@@ -39,6 +39,12 @@ def main():
     sock.sendall(sequence_num)
 
     time.sleep(0.03)
+
+  while True:
+    # Wait for a response.
+    resp = sock.recv(1)
+    print resp
+
 
   sock.close()
 

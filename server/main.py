@@ -6,6 +6,8 @@ import logging
 
 import cv2
 
+from gaze_predictor import GazePredictor
+import config
 import server
 
 
@@ -14,9 +16,11 @@ logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s",
                     level=logging.INFO)
 
 
-def demo():
-  """ A demo version of the server that displays received images on-screen. """
-  my_server = server.Server(6219)
+def demo(port):
+  """ A demo version of the server that displays received images on-screen.
+  Args:
+    port: The port to run the demo server on. """
+  my_server = server.Server(port)
   my_server.wait_for_client()
 
   while True:
@@ -32,6 +36,26 @@ def demo():
     cv2.imshow("test", frame)
     cv2.waitKey(1)
 
+def predict_forever(model_file, port):
+  """ Runs the server process and prediction pipeline forever.
+  Args:
+    model_file: The model file to use for predictions.
+    port: The port for the server to listen on. """
+  predictor = GazePredictor(model_file)
+  my_server = server.Server(port)
+
+  while True:
+    # Wait for a client to connect.
+    my_server.wait_for_client()
+
+    # Start server-handling processes.
+    receive_process = server.ReceiveProcess(my_server, predictor)
+    send_process = server.SendProcess(my_server, predictor)
+
+    # Wait for the client to diconnect.
+    receive_process.wait_for_disconnect()
+    send_process.wait_for_disconnect()
+
 def main():
   parser = argparse.ArgumentParser( \
       description="Run the gaze estimation server.")
@@ -41,9 +65,9 @@ def main():
 
   if args.demo:
     # Run the demo.
-    demo()
+    demo(config.SERVER_PORT)
   else:
-    raise NotImplementedError("Full server is not yet implemented.")
+    predict_forever(config.MODEL_FILE, config.SERVER_PORT)
 
 
 if __name__ == "__main__":
