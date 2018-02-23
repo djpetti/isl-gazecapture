@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 
+import json
 import socket
 import struct
 import time
@@ -21,7 +22,7 @@ def main():
   sock.connect(("", PORT))
 
   seq = 0
-  for i in range(0, 10):
+  while True:
     # Capture and encode an image.
     ret, image = cam.read()
     if not ret:
@@ -33,17 +34,30 @@ def main():
     seq += 1
     seq = seq % 255
 
+    start_time = time.time()
+
     # Send the image.
     sock.sendall(size)
     sock.sendall(encoded)
     sock.sendall(sequence_num)
 
-    time.sleep(0.03)
+    response = ""
+    while True:
+      # Wait for a response.
+      char = sock.recv(1)
+      response += char
 
-  while True:
-    # Wait for a response.
-    resp = sock.recv(1)
-    print resp
+      if char == "{":
+        # Start of JSON message.
+        response = char
+      elif char == "}":
+        # End of JSON message.
+        break
+
+    turnaround_time = time.time() - start_time
+    print "Turnaround time: %f" % (turnaround_time)
+
+    print json.loads(response)
 
 
   sock.close()
