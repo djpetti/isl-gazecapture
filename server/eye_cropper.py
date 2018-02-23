@@ -46,6 +46,9 @@ class EyeCropper:
 
       return new_bbox
 
+    eye_corner_l = [int(x) for x in eye_corner_l]
+    eye_corner_r = [int(x) for x in eye_corner_r]
+
     # Convert to x, y, w, h form.
     eye_w = eye_corner_l[0] - eye_corner_r[0]
     # We want the box to be square, so make the height the same as the width.
