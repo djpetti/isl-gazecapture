@@ -17,7 +17,8 @@ logging.basicConfig(format="%(asctime)s %(levelname)s: %(message)s",
 
 
 def demo(port):
-  """ A demo version of the server that displays received images on-screen.
+  """ A demo version of the server that displays received images on-screen, and
+  sends fake results back.
   Args:
     port: The port to run the demo server on. """
   my_server = server.Server(port)
@@ -32,6 +33,9 @@ def demo(port):
       continue
 
     logging.info("Sequence number: %d" % (sequence_num))
+
+    # Send a response for a fake prediction.
+    my_server.send_response((0.0, 0.0), sequence_num)
 
     cv2.imshow("test", frame)
     cv2.waitKey(1)
