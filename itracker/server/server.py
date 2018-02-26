@@ -173,6 +173,7 @@ class Server(object):
 
           # Unpack as an uint32.
           self.__size_remaining = struct.unpack("I", self.__image_size)[0]
+          self.__size_remaining = socket.ntohl(self.__size_remaining)
           # Subtract 2, because we want to land of the first ending byte.
           self.__size_remaining -= 2
           # Assume that the next image starts directly after this.
@@ -202,7 +203,14 @@ class Server(object):
     # Read data from the socket until we have at least one new frame.
     while len(self.__received_frames) == 0:
       logger.debug("Waiting for new data...")
-      bytes_read = self.__client.recv_into(self.__read_buffer)
+
+      try:
+        bytes_read = self.__client.recv_into(self.__read_buffer)
+      except socket.error:
+        # Client disconnected not-nicely.
+        logger.info("Client %s disconnected (forced)." % (str(self.__addr)))
+        return (None, None)
+
       if bytes_read == 0:
         # Assume client disconnect.
         logger.info("Client %s disconnected." % (str(self.__addr)))

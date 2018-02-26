@@ -4,9 +4,9 @@ import time
 
 import cv2
 
-from keras.models import load_model
-
 import numpy as np
+
+from ..common import network
 
 from face_tracking import landmark_detection as ld
 from face_tracking import misc
@@ -73,7 +73,8 @@ class _CnnProcess(object):
   def predict_forever(self):
     """ Generates predictions indefinitely. """
     # Load the model we trained.
-    #self.__predictor = load_model(self.__model_file)
+    self.__predictor = network.build_network()
+    self.__predictor.load_weights(self.__model_file)
 
     while True:
       self.__predict_once()
@@ -93,10 +94,17 @@ class _CnnProcess(object):
     right_eye = right_eye.astype(np.float32)
     face = face.astype(np.float32)
 
+    # Add the batch dimension.
+    left_eye = np.expand_dims(left_eye, axis=0)
+    right_eye = np.expand_dims(right_eye, axis=0)
+    face = np.expand_dims(face, axis=0)
+    grid = np.expand_dims(grid, axis=0)
+
     # Generate a prediction.
-    #pred = self.__predictor.predict([left_eye, right_eye, face, grid],
-    #                                batch_size=1)
-    pred = (0.0, 0.0)
+    pred = self.__predictor.predict([left_eye, right_eye, face, grid],
+                                    batch_size=1)
+    # Remove the batch dimension, and convert to Python floats.
+    pred = [float(x) for x in pred[0]]
 
     self.__output_queue.put((pred, seq_num))
 
@@ -160,6 +168,10 @@ class _LandmarkProcess(object):
 
     # Produce face mask.
     mask = self.__cropper.face_grid()
+
+    combined = np.concatenate((left_eye, right_eye, face), axis=1)
+    cv2.imshow("test", combined)
+    cv2.waitKey(1)
 
     # Send it along.
     self.__cnn_process.add_new_input(left_eye, right_eye, face, mask,

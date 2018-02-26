@@ -1,3 +1,6 @@
+import logging
+
+
 import numpy as np
 
 from face_tracking import landmark_detection as ld
@@ -6,6 +9,9 @@ from face_tracking import misc
 import cv2
 
 import config
+
+
+logger = logging.getLogger(__name__)
 
 
 class EyeCropper:
@@ -38,8 +44,8 @@ class EyeCropper:
         increase_fraction: The fraction by which to increase by.
       Returns:
         A new bounding box with a wider margin. """
-      abs_change_x = int(bbox[2] * increase_fraction / 2)
-      abs_change_y = int(bbox[3] * increase_fraction / 2)
+      abs_change_x = int(bbox[2] * increase_fraction / 2.0)
+      abs_change_y = int(bbox[3] * increase_fraction / 2.0)
 
       new_bbox = [bbox[0] - abs_change_x, bbox[1] - abs_change_y,
                   bbox[2] + abs_change_x * 2, bbox[3] + abs_change_y * 2]
@@ -60,8 +66,8 @@ class EyeCropper:
     eye_bbox = increase_margin(eye_bbox, 1.5)
 
     # Crop the eye.
-    eye_crop = image[eye_bbox[0]:(eye_bbox[0] + eye_bbox[2]),
-                     eye_bbox[1]:(eye_bbox[1] + eye_bbox[3])]
+    eye_crop = image[eye_bbox[1]:(eye_bbox[1] + eye_bbox[3]),
+                     eye_bbox[0]:(eye_bbox[0] + eye_bbox[2])]
     # Resize.
     eye_crop = cv2.resize(eye_crop, (224, 224))
 
@@ -74,8 +80,8 @@ class EyeCropper:
       pts: The landmark points for that image.
     Returns:
       The left and right eye crops, scaled to 224x224. """
-    left_crop = self.__crop_eye(pts[29], pts[26], image)
-    right_crop = self.__crop_eye(pts[23], pts[20], image)
+    left_crop = self.__crop_eye(pts[28], pts[25], image)
+    right_crop = self.__crop_eye(pts[22], pts[19], image)
 
     return (left_crop, right_crop)
 
@@ -105,8 +111,6 @@ class EyeCropper:
     Returns:
       The left eye, right eye, and face cropped from the image and rescaled to
       224x224, or None if it failed to crop them. """
-    # Flip it to be compatible with other data.
-    image = np.fliplr(image)
     self.__image_shape = image.shape
 
     confidence = 0
@@ -119,16 +123,21 @@ class EyeCropper:
       self.__points, self.__detect_flag, confidence = \
           self.__detector.ffp_track(image, self.__points)
 
-    if confidence < config.MIN_CONFIDENCE:
+    if (confidence < config.MIN_CONFIDENCE or self.__detect_flag == 2):
       # Not a good detection.
       return (None, None, None)
+
+    logger.debug("Confidence, detection flag: %f, %d" % (confidence,
+                                                         self.__detect_flag))
 
     # Crop the eyes.
     left_eye, right_eye = self.__crop_eyes(image, self.__points)
 
     # Crop the face.
     p1, p2 = self.__get_face_box(self.__points)
-    face = image[p1[0]:p2[0], p1[1]:p2[1]]
+    face = image[p1[1]:p2[1], p1[0]:p2[0]]
+    # Resize the face image.
+    face = cv2.resize(face, (224, 224))
 
     return (left_eye, right_eye, face)
 

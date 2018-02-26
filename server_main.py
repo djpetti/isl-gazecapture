@@ -6,9 +6,9 @@ import logging
 
 import cv2
 
-from gaze_predictor import GazePredictor
-import config
-import server
+from itracker.server.gaze_predictor import GazePredictor
+from itracker.server import config
+from itracker.server import server
 
 
 # TODO (daniel) Logging to a file eventually.

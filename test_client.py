@@ -12,7 +12,7 @@ import cv2
 
 
 # Port to connect to the server on.
-PORT = 6219
+PORT = 6218
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
     if not ret:
       raise RuntimeError("Image capture failed.")
     ret, encoded = cv2.imencode(".jpg", image)
-    size = struct.pack("I", len(encoded))
+    size = struct.pack("I", socket.htonl(len(encoded)))
     sequence_num = struct.pack("B", seq)
 
     seq += 1
