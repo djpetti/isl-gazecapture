@@ -237,8 +237,8 @@ class Server(object):
                 "SequenceNumber": seq_num}
     response = json.dumps(response)
 
-    # Add a delimiter sequence to the start.
-    response = "RESP_START" + response
+    # Add a delimiter to the end.
+    response += "\n"
 
     # Send the response on the socket.
     self.__client.sendall(response)
@@ -320,6 +320,7 @@ class SendProcess(object):
     # Send it to the client.
     try:
       self.__server.send_response(gaze_point, seq_num)
+      print gaze_point
     except socket.error:
       # The client has diconnected. We're going to wait to exit though until we
       # see the end of the sequence propagated through the pipeline.
