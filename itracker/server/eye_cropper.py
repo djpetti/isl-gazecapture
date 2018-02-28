@@ -36,7 +36,8 @@ class EyeCropper:
       eye_corner_r: The right corner point of the eye.
       image: The raw image to crop the eye from.
     Returns:
-      The eye crop image, scaled to 224x224. """
+      The eye crop image, scaled to 224x224, or None if the detection was
+      invalid. """
     def increase_margin(bbox, increase_fraction):
       """ Increases the margin around a bounding box.
       Args:
@@ -65,6 +66,10 @@ class EyeCropper:
     # Increase the margin around the eye a little.
     eye_bbox = increase_margin(eye_bbox, 1.5)
 
+    if (eye_bbox[2] == 0 or eye_bbox[3] == 0):
+      # If the height or width is zero, this is not a useful detection.
+      return None
+
     # Crop the eye.
     eye_crop = image[eye_bbox[1]:(eye_bbox[1] + eye_bbox[3]),
                      eye_bbox[0]:(eye_bbox[0] + eye_bbox[2])]
@@ -79,7 +84,8 @@ class EyeCropper:
       image: The image to crop.
       pts: The landmark points for that image.
     Returns:
-      The left and right eye crops, scaled to 224x224. """
+      The left and right eye crops, scaled to 224x224. Either can be
+      None if the detections were invalid. """
     left_crop = self.__crop_eye(pts[28], pts[25], image)
     right_crop = self.__crop_eye(pts[22], pts[19], image)
 
@@ -132,6 +138,9 @@ class EyeCropper:
 
     # Crop the eyes.
     left_eye, right_eye = self.__crop_eyes(image, self.__points)
+    if (left_eye is None or right_eye is None):
+      # Failed to crop because of a bad detection.
+      return (None, None, None)
 
     # Crop the face.
     p1, p2 = self.__get_face_box(self.__points)
