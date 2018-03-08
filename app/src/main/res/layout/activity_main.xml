@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context="com.iai.mdf.Activities.MainActivity">
+
+
+    <TextView
+        android:id="@+id/main_activity_txt_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="115dp"
+        android:text="@string/main_activity_txt_title"
+        android:textSize="30sp"
+        android:textColor="@android:color/black"
+        android:textAlignment="center" />
+
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/main_activity_btn_data_collection"
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="50dp"
+                android:layout_marginRight="50dp"
+                android:text="@string/main_activity_btn_data_collection"
+                android:textSize="20sp"
+                android:textAllCaps="false"/>
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/main_activity_btn_data_process"
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="50dp"
+                android:layout_marginRight="50dp"
+                android:text="@string/main_activity_btn_data_process"
+                android:textSize="20sp"
+                android:textAllCaps="false"/>
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/main_activity_btn_classification"
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="50dp"
+                android:layout_marginRight="50dp"
+                android:text="@string/main_activity_btn_classification"
+                android:textSize="20sp"
+                android:textAllCaps="false"
+                android:visibility="gone"/>
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/main_activity_btn_regression"
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="50dp"
+                android:layout_marginRight="50dp"
+                android:text="@string/main_activity_btn_regression"
+                android:textSize="20sp"
+                android:textAllCaps="false"
+                android:visibility="gone"/>
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/main_activity_btn_iTracker"
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="50dp"
+                android:layout_marginRight="50dp"
+                android:text="@string/main_activity_btn_iTracker"
+                android:textSize="20sp"
+                android:textAllCaps="false"
+                android:visibility="gone"/>
+
+
+            <!--<Button-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:layout_height="wrap_content"-->
+                <!--android:id="@+id/main_activity_btn_opencv_demo"-->
+                <!--android:layout_marginTop="20dp"-->
+                <!--android:layout_marginLeft="50dp"-->
+                <!--android:layout_marginRight="50dp"-->
+                <!--android:text="OpenCV Demo"-->
+                <!--android:textSize="20sp"-->
+                <!--android:textAllCaps="false"/>-->
+
+            <!--<Button-->
+                <!--android:layout_width="match_parent"-->
+                <!--android:layout_height="wrap_content"-->
+                <!--android:id="@+id/main_activity_btn_tensorflow_speed_test"-->
+                <!--android:layout_marginTop="20dp"-->
+                <!--android:layout_marginLeft="50dp"-->
+                <!--android:layout_marginRight="50dp"-->
+                <!--android:text="Speed Test"-->
+                <!--android:textSize="20sp"-->
+                <!--android:textAllCaps="false"/>-->
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/main_activity_btn_tensorflow_isl_server2"
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="50dp"
+                android:layout_marginRight="50dp"
+                android:text="ISL Server 2.0"
+                android:textSize="20sp"
+                android:textAllCaps="false" />
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/main_activity_btn_tensorflow_isl_server1"
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="50dp"
+                android:layout_marginRight="50dp"
+                android:text="ISL Server 1.0"
+                android:textSize="20sp"
+                android:textAllCaps="false" />
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/main_activity_btn_tensorflow_pb_test"
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="50dp"
+                android:layout_marginRight="50dp"
+                android:text="PB Test"
+                android:textSize="20sp"
+                android:textAllCaps="false"
+                android:visibility="gone"/>
+
+            <Button
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:id="@+id/main_activity_btn_exit"
+                android:layout_marginTop="20dp"
+                android:layout_marginLeft="50dp"
+                android:layout_marginRight="50dp"
+                android:text="@string/main_activity_btn_exit"
+                android:textSize="20sp"
+                android:textAllCaps="false"/>
+
+            <Space
+                android:layout_width="match_parent"
+                android:layout_height="40dp" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

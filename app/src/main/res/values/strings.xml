@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">ISL_Android_Gaze</string>
+
+    <string name="main_activity_txt_title">ISL\nMobile Gaze Tracking</string>
+    <string name="main_activity_btn_data_collection">Data Collection</string>
+    <string name="main_activity_btn_data_process">Data Process</string>
+    <string name="main_activity_btn_regression">Regression Model</string>
+    <string name="main_activity_btn_classification">Classification Model</string>
+    <string name="main_activity_btn_iTracker">iTracker Model</string>
+    <string name="main_activity_btn_exit">Exit</string>
+
+    <string name="server_dialog_txt_ip">ipv4</string>
+    <string name="server_dialog_txt_port">port</string>
+
+    <string name="tensor_activity_btn_detect">Detect</string>
+
+
+
+</resources>

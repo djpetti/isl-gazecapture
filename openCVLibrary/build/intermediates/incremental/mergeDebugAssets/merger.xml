@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merger version="3"><dataSet config="main"><source path="D:\Mou\ISL_Android_Gaze\openCVLibrary\src\main\assets"/><source path="D:\Mou\ISL_Android_Gaze\openCVLibrary\build\generated\assets\shaders\debug"/></dataSet><dataSet config="debug"><source path="D:\Mou\ISL_Android_Gaze\openCVLibrary\src\debug\assets"/></dataSet></merger>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<devices>
+    <device>
+        <name>BLU Studio Touch</name>
+        <camera_location_x_in_cm>1.85</camera_location_x_in_cm>
+        <camera_location_y_in_cm>-1.05</camera_location_y_in_cm>
+        <screen_size_x_in_cm>6.25</screen_size_x_in_cm>
+        <screen_size_y_in_cm>11.05</screen_size_y_in_cm>
+        <capture_delay>300</capture_delay>
+    </device>
+    <device>
+        <name>Nexus 6P</name>
+        <camera_location_x_in_cm>1.25</camera_location_x_in_cm>
+        <camera_location_y_in_cm>-0.95</camera_location_y_in_cm>
+        <screen_size_x_in_cm>7.1</screen_size_x_in_cm>
+        <screen_size_y_in_cm>12.55</screen_size_y_in_cm>
+        <capture_delay>550</capture_delay>
+        <camera_rotation></camera_rotation>
+    </device>
+</devices>

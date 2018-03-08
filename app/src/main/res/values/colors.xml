@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#3F51B5</color>
+    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorAccent">#FF4081</color>
+
+
+    <color name="red_dot">#ff8080</color>
+    <color name="red_ring">#ff8080</color>
+    <color name="green_dot">#1f7a1f</color>
+    <color name="translucent_green">#661f7a1f</color>
+    <color name="orange_arc">#bbff6600</color>
+    <color name="desired_square_color">#ff3333</color>
+    <color name="estimated_square_color">#0099ff</color>
+
+</resources>

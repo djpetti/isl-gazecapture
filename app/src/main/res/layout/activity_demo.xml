@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center">
+
+    <TextureView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/activity_demo_preview_textureview"
+        android:layout_alignParentTop="true"
+        android:visibility="visible"/>
+
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/activity_demo_layout_background_grid"
+        android:layout_centerInParent="true"
+        >
+        <!--<include layout="@layout/grid4_for_demo" />-->
+    </FrameLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/activity_demo_txtview_result"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true"
+        android:textSize="25dp"
+        android:text="test" />
+
+
+    <Spinner
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/activity_demo_spinner_class_number"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentRight="true"
+        android:layout_marginRight="30dp"
+        android:layout_marginBottom="45dp"
+        android:textSize="40dp" />
+
+    <ToggleButton
+        android:layout_width="50dp"
+        android:layout_height="35dp"
+        android:id="@+id/activity_demo_toggle_show_dot"
+        android:layout_alignParentBottom="true"
+        android:layout_alignParentLeft="true"
+        android:layout_marginLeft="30dp"
+        android:layout_marginBottom="45dp"
+        android:text="Dot"
+        android:textSize="5dp" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/activity_demo_layout_dotHolder_background"
+        android:layout_centerInParent="true"
+        android:background="@android:color/transparent"/>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/activity_demo_layout_dotHolder_result"
+        android:layout_centerInParent="true"
+        android:background="@android:color/transparent" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/activity_demo_layout_bounding_box"
+        android:layout_centerInParent="true"
+        android:background="@android:color/transparent" />
+
+
+</RelativeLayout>
