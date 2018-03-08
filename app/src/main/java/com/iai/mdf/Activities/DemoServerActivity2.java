@@ -37,6 +37,7 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
+import org.opencv.core.Point;
 import org.opencv.imgproc.Imgproc;
 
 import java.nio.ByteBuffer;
@@ -87,6 +88,7 @@ public class DemoServerActivity2 extends AppCompatActivity {
     private String  socketIp = null;
     private int     socketPort;
     private DeviceProfile deviceProfile;
+    private ArrayList<Point> estimationList = new ArrayList<>();
 
 
     @Override
@@ -211,7 +213,10 @@ public class DemoServerActivity2 extends AppCompatActivity {
             public void run() {
                 drawHandler.clear(view_dot_container);
                 drawHandler.drawRandomBlockInCandidates(80,80, view_dot_container, true);
-                autoDetectionHandler.postDelayed(this, 1500);
+                autoDetectionHandler.postDelayed(this, 2000);
+                if( toggleButton.isChecked() ) {
+                    estimationList.clear();
+                }
             }
         };
 
@@ -429,6 +434,9 @@ public class DemoServerActivity2 extends AppCompatActivity {
                 float[] loc = new float[2];
                 loc[0] = (float)((portraitHori + deviceProfile.getCameraOffsetX())/deviceProfile.getScreenSizeX());
                 loc[1] = (float)((portraitVert + deviceProfile.getCameraOffsetY())/deviceProfile.getScreenSizeY());
+                if (toggleButton.isChecked()){
+                    loc = adjustEstimation(loc);
+                }
                 drawExactResult(loc);
 //                drawClassifiedResult(loc, toggleButton.isChecked());
             }
@@ -456,7 +464,17 @@ public class DemoServerActivity2 extends AppCompatActivity {
         drawHandler.fillRect(portraitX, portraitY, 80,80, frame_gaze_result, R.color.estimated_square_color, false);
     }
 
-
+    private float[] adjustEstimation(float[] newPoint){
+        float[] average = new float[2];
+        estimationList.add(new Point(newPoint[0], newPoint[1]));
+        for (Point each : estimationList){
+            average[0] += each.x;
+            average[1] += each.y;
+        }
+        average[0] = average[0] / estimationList.size();
+        average[1] = average[1] / estimationList.size();
+        return average;
+    }
 
 
 
