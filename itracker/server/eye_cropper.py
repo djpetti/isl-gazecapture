@@ -66,7 +66,9 @@ class EyeCropper:
     # Increase the margin around the eye a little.
     eye_bbox = increase_margin(eye_bbox, 1.5)
 
-    if (eye_bbox[2] == 0 or eye_bbox[3] == 0):
+    eye_bbox[0] = max(0, eye_bbox[0])
+    eye_bbox[1] = max(0, eye_bbox[1])
+    if (eye_bbox[2] <= 0 or eye_bbox[3] <= 0):
       # If the height or width is zero, this is not a useful detection.
       return None
 
@@ -94,7 +96,10 @@ class EyeCropper:
   def __get_face_box(self, points):
     """ Quick-and-dirty face bbox estimation based on detected points.
     Args:
-      points: The detected facial landmark points. """
+      points: The detected facial landmark points.
+    Returns:
+      Points representing two corners of the face box, or (None, None) if the
+      points it got were invalid. """
     # These points represent the extremeties.
     left = points[0]
     right = points[9]
@@ -107,6 +112,14 @@ class EyeCropper:
     high_x = int(right[0])
     low_y = int(min(top_1[1], top_2[1]))
     high_y = int(bot[1])
+
+    # Make sure coordinates are in range.
+    low_x = max(0.0, low_x)
+    low_y = max(0.0, low_y)
+
+    if (high_x - low_x < 1 or high_y - low_y < 1):
+      # This is just a bad detection.
+      return (None, None)
 
     return ((low_x, low_y), (high_x, high_y))
 
@@ -144,6 +157,10 @@ class EyeCropper:
 
     # Crop the face.
     p1, p2 = self.__get_face_box(self.__points)
+    if (p1 is None or p2 is None):
+      # Failed because of a bad detection.
+      return (None, None, None)
+
     face = image[p1[1]:p2[1], p1[0]:p2[0]]
     # Resize the face image.
     face = cv2.resize(face, (224, 224))
