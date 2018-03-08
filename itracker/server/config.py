@@ -1,7 +1,7 @@
 # Model to use for prediction.
-MODEL_FILE = "models/eye_model.hd5"
+MODEL_FILE = "models/eye_model_finetuned_empac.hd5"
 # Port to listen on for the server.
-SERVER_PORT = 6218
+SERVER_PORT = 6219
 
 # Minimum confidence before we ignore detections.
-MIN_CONFIDENCE = 0.10
+MIN_CONFIDENCE = 0.20
