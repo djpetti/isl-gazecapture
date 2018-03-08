@@ -7,10 +7,38 @@ import shutil
 
 import cv2
 
+class BluePhone(object):
+  """ Specifications for BluePhone. """
 
-# Phone screen dimensions in cm.
-SCREEN_LONG_CM = 11.05
-SCREEN_SHORT_CM = 6.25
+  # Phone screen dimensions in cm.
+  SCREEN_LONG_CM = 11.05
+  SCREEN_SHORT_CM = 6.25
+
+  # Screen resolution, in pixels.
+  RES_LONG = 1280
+  RES_SHORT = 720
+
+  # Camera positioning, in cm.
+  CAMERA_LONG_OFFSET = 1.05
+  CAMERA_SHORT_OFFSET = -1.85
+
+class Nexus6P(object):
+  """ Specifications for Nexus 6P. """
+
+  # Phone screen dimensions in cm.
+  SCREEN_LONG_CM = 12.55
+  SCREEN_SHORT_CM = 7.10
+
+  # Screen resolution, in pixels.
+  RES_LONG = 2560
+  RES_SHORT = 1440
+
+  # Camera positioning, in cm.
+  CAMERA_LONG_OFFSET = 0.95
+  CAMERA_SHORT_OFFSET = -1.25
+
+# Which phone specs to use.
+PHONE = BluePhone
 
 
 def load_image_and_data(session_dir, image_name):
@@ -187,8 +215,8 @@ def dot_to_cm(dot_x, dot_y):
   Returns:
     The x and y coordinates of the dot in cm. """
   # Convert to cm directly.
-  dot_x = float(dot_x) / 720.0 * SCREEN_SHORT_CM
-  dot_y = float(dot_y) / 1280.0 * SCREEN_LONG_CM
+  dot_x = float(dot_x) / PHONE.RES_SHORT * PHONE.SCREEN_SHORT_CM
+  dot_y = float(dot_y) / PHONE_RES_LONG * PHONE.SCREEN_LONG_CM
 
   # The x and y values are actually flipped because we're working in landscape
   # mode.
@@ -197,8 +225,8 @@ def dot_to_cm(dot_x, dot_y):
   dot_y = tmp
 
   # Account for the camera positioning.
-  dot_x += 1.05
-  dot_y -= 1.85
+  dot_x += PHONE.CAMERA_LONG_OFFSET
+  dot_y += PHONE.CAMERA_SHORT_OFFSET
 
   return (dot_x, dot_y)
 
