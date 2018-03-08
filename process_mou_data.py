@@ -38,7 +38,7 @@ class Nexus6P(object):
   CAMERA_SHORT_OFFSET = -1.25
 
 # Which phone specs to use.
-PHONE = BluePhone
+PHONE = Nexus6P
 
 
 def load_image_and_data(session_dir, image_name):
@@ -216,7 +216,7 @@ def dot_to_cm(dot_x, dot_y):
     The x and y coordinates of the dot in cm. """
   # Convert to cm directly.
   dot_x = float(dot_x) / PHONE.RES_SHORT * PHONE.SCREEN_SHORT_CM
-  dot_y = float(dot_y) / PHONE_RES_LONG * PHONE.SCREEN_LONG_CM
+  dot_y = float(dot_y) / PHONE.RES_LONG * PHONE.SCREEN_LONG_CM
 
   # The x and y values are actually flipped because we're working in landscape
   # mode.

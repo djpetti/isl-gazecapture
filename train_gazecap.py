@@ -51,7 +51,7 @@ import numpy as np
 
 batch_size = 256
 # How many batches to have loaded into VRAM at once.
-load_batches = 4
+load_batches = 1
 # Shape of the input images.
 image_shape = (400, 400, 3)
 # Shape of the extracted patches.
@@ -60,7 +60,7 @@ patch_shape = (390, 390)
 input_shape = (224, 224, 3)
 
 # Learning rates to set.
-learning_rates = [0.001, 0.0001]
+learning_rates = [0.0001, 0.0001]
 # How many iterations to train for at each learning rate.
 iterations = [59076, 75000]
 
@@ -68,12 +68,12 @@ iterations = [59076, 75000]
 momentum = 0.9
 
 # Where to save the network.
-save_file = "eye_model.hd5"
+save_file = "eye_model_finetuned.hd5"
 synsets_save_file = "synsets.pkl"
 # Location of the dataset files.
-dataset_files = "/training_data/gazecap_myelin/dataset"
+dataset_files = "/training_data/daniel/mou_myelin_nexus/dataset"
 # Location of the cache files.
-cache_dir = "/training_data/gazecap_myelin"
+cache_dir = "/training_data/daniel/mou_myelin_nexus"
 
 # L2 regularizer for weight decay.
 l2_reg = regularizers.l2(0.0005)
@@ -230,10 +230,15 @@ def distance_metric(y_true, y_pred):
   total = K.sum(sqr, axis=1)
   return K.sqrt(total)
 
-def build_network():
+def build_network(fine_tune=False):
   """ Builds the network.
+  Args:
+    fine_tune: Whether we are fine-tuning the model. If so, only the last layer
+               will be trainable.
   Returns:
     The built network, ready to train. """
+  trainable = not fine_tune
+
   left_eye_input = layers.Input(shape=input_shape, name="left_eye_input")
   right_eye_input = layers.Input(shape=input_shape, name="right_eye_input")
   # The face crop gets resized on-the-fly.
@@ -252,22 +257,22 @@ def build_network():
 
   # Shared eye layers.
   conv_e1 = layers.Conv2D(96, (11, 11), strides=(4, 4), activation="relu",
-                          kernel_regularizer=l2_reg)
+                          kernel_regularizer=l2_reg, trainable=trainable)
   pool_e1 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
-  norm_e1 = layers.BatchNormalization()
+  norm_e1 = layers.BatchNormalization(trainable=trainable)
 
   pad_e2 = layers.ZeroPadding2D(padding=(2, 2))
   conv_e2 = layers.Conv2D(256, (5, 5), activation="relu",
-                          kernel_regularizer=l2_reg)
+                          kernel_regularizer=l2_reg, trainable=trainable)
   pool_e2 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
-  norm_e2 = layers.BatchNormalization()
+  norm_e2 = layers.BatchNormalization(trainable=trainable)
 
   pad_e3 = layers.ZeroPadding2D(padding=(1, 1))
   conv_e3 = layers.Conv2D(384, (3, 3), activation="relu",
-                          kernel_regularizer=l2_reg)
+                          kernel_regularizer=l2_reg, trainable=trainable)
 
   conv_e4 = layers.Conv2D(64, (1, 1), activation="relu",
-                          kernel_regularizer=l2_reg)
+                          kernel_regularizer=l2_reg, trainable=trainable)
   flatten_e4 = layers.Flatten()
 
   # Left eye stack.
@@ -305,47 +310,57 @@ def build_network():
   # Concatenate eyes and put through a shared FC layer.
   eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
   fc_e1 = layers.Dense(128, activation="relu",
-                       kernel_regularizer=l2_reg)(eye_combined)
+                       kernel_regularizer=l2_reg,
+                       trainable=trainable)(eye_combined)
 
   # Face layers.
   face_conv_f1 = layers.Conv2D(96, (11, 11), strides=(4, 4),
                                activation="relu",
-                               kernel_regularizer=l2_reg)(face_scaled)
+                               kernel_regularizer=l2_reg,
+                               trainable=trainable)(face_scaled)
   face_pool_f1 = layers.MaxPooling2D(pool_size=(3, 3),
                                      strides=(2, 2))(face_conv_f1)
-  face_norm_f1 = layers.BatchNormalization()(face_pool_f1)
+  face_norm_f1 = layers.BatchNormalization(trainable=trainable)(face_pool_f1)
 
   face_pad_f2 = layers.ZeroPadding2D(padding=(2, 2))(face_norm_f1)
   face_conv_f2 = layers.Conv2D(256, (5, 5), activation="relu",
-                               kernel_regularizer=l2_reg)(face_pad_f2)
+                               kernel_regularizer=l2_reg,
+                               trainable=trainable)(face_pad_f2)
   face_pool_f2 = layers.MaxPooling2D(pool_size=(3, 3),
                                      strides=(2, 2))(face_conv_f2)
-  face_norm_f2 = layers.BatchNormalization()(face_pool_f2)
+  face_norm_f2 = layers.BatchNormalization(trainable=trainable)(face_pool_f2)
 
   face_pad_f3 = layers.ZeroPadding2D(padding=(1, 1))(face_norm_f2)
   face_conv_f3 = layers.Conv2D(384, (3, 3), activation="relu",
-                               kernel_regularizer=l2_reg)(face_pad_f3)
+                               kernel_regularizer=l2_reg,
+                               trainable=trainable)(face_pad_f3)
 
   face_conv_f4 = layers.Conv2D(64, (1, 1), activation="relu",
-                               kernel_regularizer=l2_reg)(face_conv_f3)
+                               kernel_regularizer=l2_reg,
+                               trainable=trainable)(face_conv_f3)
   face_flatten_f4 = layers.Flatten()(face_conv_f4)
 
   face_fc1 = layers.Dense(128, activation="relu",
-                          kernel_regularizer=l2_reg)(face_flatten_f4)
+                          kernel_regularizer=l2_reg,
+                          trainable=trainable)(face_flatten_f4)
   face_fc2 = layers.Dense(64, activation="relu",
-                          kernel_regularizer=l2_reg)(face_fc1)
+                          kernel_regularizer=l2_reg,
+                          trainable=trainable)(face_fc1)
 
   # Face grid.
   grid_flat = layers.Flatten()(grid_floats)
   grid_fc1 = layers.Dense(256, activation="relu",
-                          kernel_regularizer=l2_reg)(grid_flat)
+                          kernel_regularizer=l2_reg,
+                          trainable=trainable)(grid_flat)
   grid_fc2 = layers.Dense(128, activation="relu",
-                          kernel_regularizer=l2_reg)(grid_fc1)
+                          kernel_regularizer=l2_reg,
+                          trainable=trainable)(grid_fc1)
 
   # Concat everything and put through a final FF layer.
   all_concat = layers.Concatenate()([fc_e1, face_fc2, grid_fc2])
   all_fc1 = layers.Dense(128, activation="relu",
-                         kernel_regularizer=l2_reg)(all_concat)
+                         kernel_regularizer=l2_reg,
+                         trainable=trainable)(all_concat)
   all_fc2 = layers.Dense(2, kernel_regularizer=l2_reg)(all_fc1)
 
   # Build the model.
@@ -420,12 +435,18 @@ def train_section(model, data, learning_rate, iters):
       testing_acc.append(accuracy)
 
       # Save the trained model.
-      model.save_weights(save_file)
+      model.save_weights(save_file + ".%d" % (i))
 
   return (training_loss, testing_acc)
 
-def main():
-  model = build_network()
+def main(load_model=None):
+  """
+  Args:
+    load_model: A pretrained model to load, if specified. """
+  model = build_network(fine_tune=True)
+  if load_model:
+    logging.info("Loading pretrained model '%s'." % (load_model))
+    model.load_weights(load_model)
 
   data = data_loader.DataManagerLoader(batch_size, load_batches, image_shape,
                                        cache_dir, dataset_files,
@@ -459,4 +480,4 @@ def main():
 
 
 if __name__ == "__main__":
-  main()
+  main(load_model="models/eye_model.hd5")
