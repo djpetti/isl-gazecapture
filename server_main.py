@@ -40,12 +40,14 @@ def demo(port):
     cv2.imshow("test", frame)
     cv2.waitKey(1)
 
-def predict_forever(model_file, port):
+def predict_forever(model_file, port, display_crops=False):
   """ Runs the server process and prediction pipeline forever.
   Args:
     model_file: The model file to use for predictions.
-    port: The port for the server to listen on. """
-  predictor = GazePredictor(model_file)
+    port: The port for the server to listen on.
+    display_crops: If true, it will display the crops for the images it
+                   receives. Useful for debugging. """
+  predictor = GazePredictor(model_file, display=display_crops)
   my_server = server.Server(port)
 
   while True:
@@ -65,13 +67,16 @@ def main():
       description="Run the gaze estimation server.")
   parser.add_argument("-d", "--demo", action="store_true",
                       help="Run a demo server that displays received images.")
+  parser.add_argument("-c", "--display_crops", action="store_true",
+                      help="Displays crops for the images it receives.")
   args = parser.parse_args()
 
   if args.demo:
     # Run the demo.
     demo(config.SERVER_PORT)
   else:
-    predict_forever(config.MODEL_FILE, config.SERVER_PORT)
+    predict_forever(config.MODEL_FILE, config.SERVER_PORT,
+                    display_crops=args.display_crops)
 
 
 if __name__ == "__main__":

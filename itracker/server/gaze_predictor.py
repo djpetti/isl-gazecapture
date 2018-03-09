@@ -20,13 +20,16 @@ logger = logging.getLogger(__name__)
 class GazePredictor(object):
   """ Handles capturing eye images, and uses the model to predict gaze. """
 
-  def __init__(self, model_file):
+  def __init__(self, model_file, display=False):
     """
     Args:
-      model_file: The saved model to load for predictions. """
+      model_file: The saved model to load for predictions.
+      display: If true, it will enable a debug display that shows the image
+               crops. """
     # Initialize capture and prediction processes.
     self.__prediction_process = _CnnProcess(model_file)
-    self.__landmark_process = _LandmarkProcess(self.__prediction_process)
+    self.__landmark_process = _LandmarkProcess(self.__prediction_process,
+                                               display=display)
 
   def __del__(self):
     # Make sure internal processes have terminated.
@@ -129,11 +132,14 @@ class _LandmarkProcess(object):
   """ Reads images from a queue, and runs landmark detection in a separate
   process. """
 
-  def __init__(self, cnn_process):
+  def __init__(self, cnn_process, display=False):
     """
     Args:
-      cnn_process: The _CnnProcess to send captured images to. """
+      cnn_process: The _CnnProcess to send captured images to.
+      display: If true, it will enable a debugging display that shows the
+               detected crops on-screen. """
     self.__cnn_process = cnn_process
+    self.__display = display
 
     # Create the queues.
     self.__input_queue = Queue()
@@ -169,9 +175,11 @@ class _LandmarkProcess(object):
     # Produce face mask.
     mask = self.__cropper.face_grid()
 
-    combined = np.concatenate((left_eye, right_eye, face), axis=1)
-    cv2.imshow("test", combined)
-    cv2.waitKey(1)
+    if self.__display:
+      # Show the debugging display.
+      combined = np.concatenate((left_eye, right_eye, face), axis=1)
+      cv2.imshow("Server Detections", combined)
+      cv2.waitKey(1)
 
     # Send it along.
     self.__cnn_process.add_new_input(left_eye, right_eye, face, mask,
