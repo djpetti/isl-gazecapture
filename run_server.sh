@@ -1,6 +1,7 @@
 #!/bin/bash
 
-docker pull djpetti/docker-keras
+docker pull djpetti/isl-gazecapture
 
 nvidia-docker run --rm -v `pwd`:/server_dir -p 6219:6219 \
-    docker-keras /usr/bin/python /server_dir/server_main.py
+    djpetti/isl-gazecapture bash -c \
+    "cd /server_dir && /usr/bin/python server_main.py"
