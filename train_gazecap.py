@@ -60,9 +60,9 @@ patch_shape = (390, 390)
 input_shape = (224, 224, 3)
 
 # Learning rates to set.
-learning_rates = [0.0001, 0.0001]
+learning_rates = [0.001, 0.0001]
 # How many iterations to train for at each learning rate.
-iterations = [59076, 75000]
+iterations = [75000, 75000]
 
 # Learning rate hyperparameters.
 momentum = 0.9
@@ -216,6 +216,20 @@ def rescale_face(face_crops):
 
   return output
 
+def rgb_to_grayscale(image_tensor):
+  """ Converts a tensor of RGB images to grayscale. This is meant to be used in
+  a Keras Lambda layer.
+  Args:
+    image_tensor: The tensor of images to convert.
+  Returns:
+    The same tensor, with all images converted to grayscale. """
+  # Weight each channel before averaging.
+  luma_weights = tf.constant([[0.21], [0.72], [0.07]])
+  # Average using a single contraction operation.
+  grayscale = tf.tensordot(image_tensor, luma_weights, axes=[[3], [0]])
+
+  return grayscale
+
 def distance_metric(y_true, y_pred):
   """ Calculates the euclidean distance between the two labels and the
   predictions.
@@ -255,6 +269,12 @@ def build_network(fine_tune=False):
   scale_layer = layers.Lambda(lambda x: tf.image.resize_images(x, (224, 224)))
   face_scaled = scale_layer(face_floats)
 
+  # Convert everything to grayscale.
+  gray_layer = layers.Lambda(lambda x: rgb_to_grayscale(x))
+  left_eye_gray = gray_layer(left_eye_floats)
+  right_eye_gray = gray_layer(right_eye_floats)
+  face_gray = gray_layer(face_scaled)
+
   # Shared eye layers.
   conv_e1 = layers.Conv2D(96, (11, 11), strides=(4, 4), activation="relu",
                           kernel_regularizer=l2_reg, trainable=trainable)
@@ -276,7 +296,7 @@ def build_network(fine_tune=False):
   flatten_e4 = layers.Flatten()
 
   # Left eye stack.
-  leye_conv_e1 = conv_e1(left_eye_floats)
+  leye_conv_e1 = conv_e1(left_eye_gray)
   leye_pool_e1 = pool_e1(leye_conv_e1)
   leye_norm_e1 = norm_e1(leye_pool_e1)
 
@@ -292,7 +312,7 @@ def build_network(fine_tune=False):
   leye_flatten_e4 = flatten_e4(leye_conv_e4)
 
   # Right eye stack.
-  reye_conv_e1 = conv_e1(right_eye_floats)
+  reye_conv_e1 = conv_e1(right_eye_gray)
   reye_pool_e1 = pool_e1(reye_conv_e1)
   reye_norm_e1 = norm_e1(reye_pool_e1)
 
@@ -317,7 +337,7 @@ def build_network(fine_tune=False):
   face_conv_f1 = layers.Conv2D(96, (11, 11), strides=(4, 4),
                                activation="relu",
                                kernel_regularizer=l2_reg,
-                               trainable=trainable)(face_scaled)
+                               trainable=trainable)(face_gray)
   face_pool_f1 = layers.MaxPooling2D(pool_size=(3, 3),
                                      strides=(2, 2))(face_conv_f1)
   face_norm_f1 = layers.BatchNormalization(trainable=trainable)(face_pool_f1)
@@ -383,8 +403,6 @@ def process_data(face_data, labels):
   dot_data, leye_data, reye_data, mask_data = convert_labels(labels)
   # Extract left and right eye crops.
   leye_crops, reye_crops = extract_eye_crops(face_data, leye_data, reye_data)
-  # Resize face crops, which should be a simple rescaling operation.
-  #face_crops = rescale_face(face_data)
 
   return (leye_crops, reye_crops, face_data, mask_data, dot_data)
 
@@ -443,7 +461,7 @@ def main(load_model=None):
   """
   Args:
     load_model: A pretrained model to load, if specified. """
-  model = build_network(fine_tune=True)
+  model = build_network()
   if load_model:
     logging.info("Loading pretrained model '%s'." % (load_model))
     model.load_weights(load_model)
@@ -480,4 +498,4 @@ def main(load_model=None):
 
 
 if __name__ == "__main__":
-  main(load_model="models/eye_model.hd5")
+  main()
