@@ -177,7 +177,12 @@ class _LandmarkProcess(object):
 
     if self.__display:
       # Show the debugging display.
-      combined = np.concatenate((left_eye, right_eye, face), axis=1)
+      mask_sized = cv2.resize(mask, (224, 224))
+      mask_sized = np.expand_dims(mask_sized, axis=2)
+      mask_sized = np.tile(mask_sized, [1, 1, 3]) * 225.0
+      mask_sized = mask_sized.astype(np.uint8)
+
+      combined = np.concatenate((left_eye, right_eye, face, mask_sized), axis=1)
       cv2.imshow("Server Detections", combined)
       cv2.waitKey(1)
 
