@@ -7,11 +7,7 @@ import cv2
 import numpy as np
 
 from ..common import network
-
-from face_tracking import landmark_detection as ld
-from face_tracking import misc
-
-from eye_cropper import EyeCropper
+from ..common.eye_cropper import EyeCropper
 
 
 logger = logging.getLogger(__name__)

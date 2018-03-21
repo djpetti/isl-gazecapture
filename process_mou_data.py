@@ -7,6 +7,8 @@ import shutil
 
 import cv2
 
+from itracker.common import eye_cropper
+
 class BluePhone(object):
   """ Specifications for BluePhone. """
 
@@ -40,15 +42,18 @@ class Nexus6P(object):
 # Which phone specs to use.
 PHONE = Nexus6P
 
+# Eye cropper that will be used if needed.
+cropper = eye_cropper.EyeCropper()
 
-def load_image_and_data(session_dir, image_name):
-  """ Loads an image and corresponding data for that image.
+def load_image_data(session_dir, image_name, image):
+  """ Loads metadata for an image.
   Args:
     session_dir: The base session directory that the image is in.
     image_name: The name of the image to load data for, without the extension.
+    image: The actual image data.
   Returns:
-    The loaded image, the face bbox coordinates, the left eye bbox coordinates,
-    and the right eye bbox coordinates. """
+    The face bbox coordinates, the left eye bbox coordinates, and the right
+    eye bbox coordinates. """
   def to_ints(coord_string):
     """ Helper function that converts a space-delimited string of numbers to a
     list of ints.
@@ -75,17 +80,11 @@ def load_image_and_data(session_dir, image_name):
     return new_bbox
 
   # Paths to the image, and the data file.
-  image_path = os.path.join(session_dir, "raw", image_name + ".jpg")
   data_path = os.path.join(session_dir, "detectionResult", image_name + ".dat")
   if not os.path.exists(image_path):
     raise RuntimeError("Image path '%s' does not exist!" % (image_path))
   if not os.path.exists(data_path):
     raise RuntimeError("Data path '%s' does not exist!" % (data_path))
-
-  # Load the raw image.
-  image = cv2.imread(image_path)
-  if image is None:
-    raise RuntimeError("Failed to load image '%s'." % (image_path))
 
   # Read the data file.
   data_file = file(data_path)
@@ -115,7 +114,7 @@ def load_image_and_data(session_dir, image_name):
   # Increase the margin around the eye a little.
   reye_bbox = increase_margin(reye_bbox, 1.5)
 
-  return (image, face_bbox, leye_bbox, reye_bbox)
+  return (face_bbox, leye_bbox, reye_bbox)
 
 def convert_to_face_coords(face_bbox, leye_bbox, reye_bbox):
   """ Convert the left and right eye bounding boxes to be referenced relative to
@@ -169,18 +168,33 @@ def extract_crop(image, bbox):
   x, y, w, h = bbox
   return image[y:y + h, x:x + w]
 
-def load_face_and_data(session_dir, image_name):
+def load_face_and_data(session_dir, image_name, pre_detected=False):
   """ Loads an image and corresponding data for that image, and extracts the
   face.
   Args:
     session_dir: The base session directory that the image is in.
     image_name: The name of the image to load data for, without the extension.
+    pre_detected: If this is true, than it will assume the legacy data format
+                  with detections already performed. Otherwise, it will perform
+                  its own detections.
   Returns:
     The loaded face crop, the left eye bbox coordinates, the right eye bbox
     coordinates, and the face grid fractional coordinates. """
+  # Load image.
+  image_path = os.path.join(session_dir, "raw", image_name + ".jpg")
+  # Load the raw image.
+  image = cv2.imread(image_path)
+  if image is None:
+    raise RuntimeError("Failed to load image '%s'." % (image_path))
+
   # Load the image and data.
-  image, face_bbox, leye_bbox, reye_bbox = load_image_and_data(session_dir,
-                                                               image_name)
+  if pre_detected:
+    # Use existing detections.
+    face_bbox, leye_bbox, reye_bbox = load_image_data(session_dir, image_name,
+                                                      image)
+  else:
+    # Generate new detections.
+    face_bbox, leye_bbox, reye_bbox = cropper.get_bboxes(image)
 
   face_grid = get_face_grid(image.shape, face_bbox)
   face_crop = extract_crop(image, face_bbox)
@@ -267,10 +281,12 @@ def read_dot_data(session_dir):
 
   return ret
 
-def load_session(session_dir):
+def load_session(session_dir, pre_detected=False):
   """ Loads an entire session worth of data.
   Args:
     session_dir: The directory where the session data is located.
+    pre_detected: If true, assume we are operating on a legacy pre-detected
+                  dataset.
   Returns:
     A dictionary mapping the image name to a list containing the face crop,
     dot location, left eye bbox, right eye bbox, and face grid. """
@@ -281,7 +297,8 @@ def load_session(session_dir):
   for image_name, dot_coords in dot_data.iteritems():
     # Load face and calculate bbox data.
     face_crop, leye_bbox, reye_bbox, grid = load_face_and_data(session_dir,
-                                                               image_name)
+                                                               image_name,
+                                                               pre_detected)
     data_list = [face_crop, dot_coords, leye_bbox, reye_bbox, grid]
 
     image_data[image_name] = data_list
@@ -343,13 +360,15 @@ def save_images(named_images, out_dir):
     if not cv2.imwrite(image_path, image):
       raise RuntimeError("Failed to write image %s" % (image_path))
 
-def process_session(session_dir, out_dir):
+def process_session(session_dir, out_dir, pre_detected=False):
   """ Process one session worth of data.
   Args:
     session_dir: The directory of the session.
-    out_dir: The output directory to copy the images to. """
+    out_dir: The output directory to copy the images to.
+    pre_detected: If true, assume we are operating on a legacy pre-detected
+                  dataset. """
   # Load the session data.
-  session_data = load_session(session_dir)
+  session_data = load_session(session_dir, pre_detected)
 
   # Generate names for the images.
   session_name = session_dir.split("/")[-1]
@@ -361,11 +380,13 @@ def process_session(session_dir, out_dir):
   # Write the images to the output directory.
   save_images(name_data, out_dir)
 
-def process_dataset(dataset_dir, output_dir):
+def process_dataset(dataset_dir, output_dir, pre_detected=False):
   """ Processes an entire dataset, one session at a time.
   Args:
     dataset_dir: The root dataset directory.
-    output_dir: Where to write the output images. """
+    output_dir: Where to write the output images.
+    pre_detected: If true, assume we are operating on a legacy pre-detected
+                  dataset. """
   # Create output directory.
   if os.path.exists(output_dir):
     # Remove existing direcory if it exists.
@@ -386,16 +407,18 @@ def process_dataset(dataset_dir, output_dir):
     percent = float(i) / len(sessions) * 100
     print "(%.2f%%) Processing session %s..." % (percent, item)
 
-    process_session(item_path, output_dir)
+    process_session(item_path, output_dir, pre_detected)
 
 def main():
   parser = argparse.ArgumentParser("Convert Mou's dataset.")
   parser.add_argument("dataset_dir", help="The root dataset directory.")
   parser.add_argument("output_dir",
                       help="The directory to write output images.")
+  parser.add_argument("-l", "--legacy", action="store_true",
+                      help="Use legacy pre-detected data format.")
   args = parser.parse_args()
 
-  process_dataset(args.dataset_dir, args.output_dir)
+  process_dataset(args.dataset_dir, args.output_dir, args.legacy)
 
 if __name__ == "__main__":
   main()

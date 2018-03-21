@@ -12,7 +12,7 @@ import cv2
 
 
 # Port to connect to the server on.
-PORT = 6218
+PORT = 6219
 
 
 def main():

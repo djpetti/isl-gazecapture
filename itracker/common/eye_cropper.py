@@ -29,15 +29,14 @@ class EyeCropper:
 
     self.__image_shape = None
 
-  def __crop_eye(self, eye_corner_l, eye_corner_r, image):
-    """ Crops an eye image.
+  def __get_eye_bbox(self, eye_corner_l, eye_corner_r, image):
+    """ Gets the bounding box for an eye image.
     Args:
       eye_corner_l: The left corner point of the eye.
       eye_corner_r: The right corner point of the eye.
       image: The raw image to crop the eye from.
     Returns:
-      The eye crop image, scaled to 224x224, or None if the detection was
-      invalid. """
+      The bounding box of the eye crop. """
     def increase_margin(bbox, increase_fraction):
       """ Increases the margin around a bounding box.
       Args:
@@ -72,34 +71,29 @@ class EyeCropper:
       # If the height or width is zero, this is not a useful detection.
       return None
 
-    # Crop the eye.
-    eye_crop = image[eye_bbox[1]:(eye_bbox[1] + eye_bbox[3]),
-                     eye_bbox[0]:(eye_bbox[0] + eye_bbox[2])]
-    # Resize.
-    eye_crop = cv2.resize(eye_crop, (224, 224))
+    return eye_bbox
 
-    return eye_crop
-
-  def __crop_eyes(self, image, pts):
-    """ Crops both eyes using the landmark points.
+  def __get_eye_bboxes(self, image, pts):
+    """ Gets both eye bounding boxes using the landmark points.
     Args:
       image: The image to crop.
       pts: The landmark points for that image.
     Returns:
-      The left and right eye crops, scaled to 224x224. Either can be
+      The bounding boxes for each eye. Either can be
       None if the detections were invalid. """
-    left_crop = self.__crop_eye(pts[28], pts[25], image)
-    right_crop = self.__crop_eye(pts[22], pts[19], image)
+    left_bbox = self.__get_eye_bbox(pts[28], pts[25], image)
+    right_bbox = self.__get_eye_bbox(pts[22], pts[19], image)
 
-    return (left_crop, right_crop)
+    return (left_bbox, right_bbox)
 
-  def __get_face_box(self, points):
+  def __get_face_bbox(self, points):
     """ Quick-and-dirty face bbox estimation based on detected points.
     Args:
       points: The detected facial landmark points.
     Returns:
-      Points representing two corners of the face box, or (None, None) if the
-      points it got were invalid. """
+      A four-element tuple with the first two elements representing a corner
+      point, and the second two representing the width and height. It can also
+      return None if the detection was bad. """
     # These points represent the extremeties.
     left = points[0]
     right = points[9]
@@ -119,17 +113,32 @@ class EyeCropper:
 
     if (high_x - low_x < 1 or high_y - low_y < 1):
       # This is just a bad detection.
-      return (None, None)
+      return (None, None, None, None)
 
-    return ((low_x, low_y), (high_x, high_y))
+    return (low_x, low_y, high_x - low_x, high_y - low_y)
 
-  def crop_image(self, image):
-    """ Crops a single image.
+  def __extract_crop(self, image, bbox):
+    """ Extracts a crop from the image defined by the bounding box.
     Args:
-      image: The image to crop.
+      image: The image to extract the crop from.
+      bbox: The bounding box defining the crop.
     Returns:
-      The left eye, right eye, and face cropped from the image and rescaled to
-      224x224, or None if it failed to crop them. """
+      The extracted crop. """
+    # Crop the image.
+    crop = image[bbox[1]:(bbox[1] + bbox[3]),
+                 bbox[0]:(bbox[0] + bbox[2])]
+    # Resize.
+    crop = cv2.resize(crop, (224, 224))
+
+    return crop
+
+  def get_bboxes(self, image):
+    """ Takes an image, and gets the bounding boxes of the eyes and face.
+    Args:
+      image: The image to get bouncing boxes for.
+    Returns:
+      The left eye, right eye, and face bounding boxes, or None if the detection
+      failed. """
     self.__image_shape = image.shape
 
     confidence = 0
@@ -149,23 +158,40 @@ class EyeCropper:
     logger.debug("Confidence, detection flag: %f, %d" % (confidence,
                                                          self.__detect_flag))
 
-    # Crop the eyes.
-    left_eye, right_eye = self.__crop_eyes(image, self.__points)
+    # Get the eyes.
+    left_eye, right_eye = self.__get_eye_bboxes(image, self.__points)
     if (left_eye is None or right_eye is None):
       # Failed to crop because of a bad detection.
       return (None, None, None)
 
-    # Crop the face.
-    p1, p2 = self.__get_face_box(self.__points)
-    if (p1 is None or p2 is None):
+    # Get the face.
+    face = self.__get_face_bbox(self.__points)
+    if face is None:
       # Failed because of a bad detection.
       return (None, None, None)
 
-    face = image[p1[1]:p2[1], p1[0]:p2[0]]
-    # Resize the face image.
-    face = cv2.resize(face, (224, 224))
-
     return (left_eye, right_eye, face)
+
+
+  def crop_image(self, image):
+    """ Crops a single image.
+    Args:
+      image: The image to crop.
+    Returns:
+      The left eye, right eye, and face cropped from the image and rescaled to
+      224x224, or None if it failed to crop them. """
+    # Get the bounding boxes.
+    left_bbox, right_bbox, face_bbox = self.get_bboxes(image)
+    if left_bbox is None:
+      # Crop failure.
+      return (None, None, None)
+
+    # Crop.
+    left_eye_crop = self.__extract_crop(image, left_bbox)
+    right_eye_crop = self.__extract_crop(image, right_bbox)
+    face_crop = self.__extract_crop(image, face_bbox)
+
+    return (left_eye_crop, right_eye_crop, face_crop)
 
   def estimate_pose(self):
     """ Returns the head pose estimate for the last image it cropped.
@@ -177,10 +203,11 @@ class EyeCropper:
     """ Constructs the face grid input for the last image it cropped.
     Returns:
       A 25x25 matrix, where 1s represent the location of the face, and 0s
-      represent the backgroud. """
-    point1, point2 = self.__get_face_box(self.__points)
-    p1_x, p1_y = point1
-    p2_x, p2_y = point2
+      represent the background. """
+    bbox = self.__get_face_bbox(self.__points)
+    p1_x, p1_y = bbox[0:2]
+    p2_x = p1_x + bbox[2]
+    p2_y = p1_y + bbox[3]
 
     # Scale to the image shape.
     image_y, image_x, _ = self.__image_shape

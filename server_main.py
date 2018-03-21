@@ -6,8 +6,8 @@ import logging
 
 import cv2
 
+from itracker.common import config
 from itracker.server.gaze_predictor import GazePredictor
-from itracker.server import config
 from itracker.server import server
 
 
