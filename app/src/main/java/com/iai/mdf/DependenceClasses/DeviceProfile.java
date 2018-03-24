@@ -4,18 +4,11 @@ import android.content.Context;
 
 import com.iai.mdf.R;
 
-import org.json.JSONException;
-import org.json.JSONObject;
 import org.xmlpull.v1.XmlPullParser;
 import org.xmlpull.v1.XmlPullParserException;
 
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.util.ArrayList;
-
-import fr.arnaudguyon.xmltojsonlib.XmlToJson;
 
 /**
  * Created by Mou on 3/2/2018.
@@ -24,16 +17,19 @@ import fr.arnaudguyon.xmltojsonlib.XmlToJson;
 public class DeviceProfile {
 
     /**
-     * positve X is from left to right along short side;
-     * positve Y is from left to right along long side;
+     * positve X is from left to right along short edge;
+     * positve Y is from left to right along long edge;
      */
 
-    private String DeviceName;
-    private double cameraOffsetX;
-    private double cameraOffsetY;
-    private double screenSizeX;
-    private double screenSizeY;
-    private int     captureDelayTime;
+    private String  DeviceName;
+    private double  cameraOffsetX;
+    private double  cameraOffsetY;
+    private double  screenSizeX;
+    private double  screenSizeY;
+    private int     collectionCaptureDelayTime;
+    private int     demoCaptureDelayTime;
+    private int     imageRotation;
+
 
 
 
@@ -70,7 +66,7 @@ public class DeviceProfile {
                             profile.setScreenSizeY(Double.parseDouble(parser.getText()));
                         } else if (parser.getName().equalsIgnoreCase("capture_delay")) {
                             parser.next();
-                            profile.setCaptureDelayTime(Integer.parseInt(parser.getText()));
+                            profile.setCollectionCaptureDelayTime(Integer.parseInt(parser.getText()));
                         }
                     }
                     devices.add(profile);
@@ -137,11 +133,11 @@ public class DeviceProfile {
         this.screenSizeY = screenSizeY;
     }
 
-    public int getCaptureDelayTime() {
-        return captureDelayTime;
+    public int getCollectionCaptureDelayTime() {
+        return collectionCaptureDelayTime;
     }
 
-    public void setCaptureDelayTime(int captureDelayTime) {
-        this.captureDelayTime = captureDelayTime;
+    public void setCollectionCaptureDelayTime(int collectionCaptureDelayTime) {
+        this.collectionCaptureDelayTime = collectionCaptureDelayTime;
     }
 }

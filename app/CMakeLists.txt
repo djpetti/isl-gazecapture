@@ -35,8 +35,8 @@ add_library( # Sets the name of the library.
 ###############  for OpenCV JNI Development #################
 
 #Added 2 path definitions to support 20160825 additions
-set(pathToProject D:/Mou/ISL_Android_Gaze)
-set(pathToOpenCv D:/360downloads/OpenCV-android-sdk)
+set(pathToProject /Users/mou/Documents/AndroidStudioProjects/ISL_Android_Gaze)
+set(pathToOpenCv /Users/mou/Downloads/OpenCV-android-sdk)
 
 set(CMAKE_VERBOSE_MAKEFILE on)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")

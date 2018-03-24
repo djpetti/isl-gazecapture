@@ -1,5 +1,6 @@
 package com.iai.mdf.Activities;
 
+import android.content.pm.ActivityInfo;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Build;
@@ -22,6 +23,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
+import com.iai.mdf.DependenceClasses.Configuration;
 import com.iai.mdf.DependenceClasses.DeviceProfile;
 import com.iai.mdf.FaceDetectionAPI;
 import com.iai.mdf.Handlers.CameraHandler;
@@ -75,12 +77,10 @@ public class DemoServerActivity1 extends AppCompatActivity {
     private TextView    result_board;
     private int[]       SCREEN_SIZE;
     private int[]       TEXTURE_SIZE;
-    private FaceDetectionAPI detectionAPI;
     private BaseLoaderCallback openCVLoaderCallback;
     private boolean isRealTimeDetection = false;
     private Handler autoDetectionHandler = new Handler();
     private Runnable autoDetectionRunnable;
-    private int     captureInterval = 400;
     private TensorFlowHandler tensorFlowHandler;
     private int         mFrameIndex = 0;
     private int         currentClassNum = 4;
@@ -88,13 +88,14 @@ public class DemoServerActivity1 extends AppCompatActivity {
     private int         prevReceivedGazeIndex = 0;
     private String  socketIp = null;
     private int     socketPort;
-    private DeviceProfile deviceProfile;
+    private Configuration confHandler = Configuration.getInstance(this);
 
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_demo);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         getSupportActionBar().hide();
         Bundle extras = getIntent().getExtras();
         socketIp = extras.getString(BUNDLE_KEY_IP);
@@ -203,7 +204,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
                 cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_STILL_CAPTURE);
 //                drawHandler.clear(frame_bounding_box);
                 drawHandler.clear(frame_gaze_result);
-                autoDetectionHandler.postDelayed(this, captureInterval);
+                autoDetectionHandler.postDelayed(this, confHandler.getDemoCaptureDelayTime());
             }
         };
 
@@ -213,9 +214,9 @@ public class DemoServerActivity1 extends AppCompatActivity {
 
 
         // load device profile
-        ArrayList<DeviceProfile> allDevices = DeviceProfile.loadDeviceProfileList(this);
-        deviceProfile = DeviceProfile.getProfileByName(allDevices, Build.MODEL);
-        Log.d(LOG_TAG, String.valueOf(deviceProfile.getCaptureDelayTime()));
+//        ArrayList<DeviceProfile> allDevices = DeviceProfile.loadDeviceProfileList(this);
+//        deviceProfile = DeviceProfile.getProfileByName(allDevices, Build.MODEL);
+//        Log.d(LOG_TAG, String.valueOf(deviceProfile.getCollectionCaptureDelayTime()));
 
     }
 
@@ -416,8 +417,10 @@ public class DemoServerActivity1 extends AppCompatActivity {
                 double portraitHori = object.getDouble(JSON_KEY_PREDICT_Y);
                 double portraitVert = object.getDouble(JSON_KEY_PREDICT_X);
                 float[] loc = new float[2];
-                loc[0] = (float)((portraitHori + deviceProfile.getCameraOffsetX())/deviceProfile.getScreenSizeX());
-                loc[1] = (float)((portraitVert + deviceProfile.getCameraOffsetY())/deviceProfile.getScreenSizeY());
+//                loc[0] = (float)((portraitHori + deviceProfile.getCameraOffsetX())/deviceProfile.getScreenSizeX());
+//                loc[1] = (float)((portraitVert + deviceProfile.getCameraOffsetY())/deviceProfile.getScreenSizeY());
+                loc[0] = (float) (portraitHori + confHandler.getCameraOffsetX())/confHandler.getScreenSizeX();
+                loc[1] = (float) (portraitVert + confHandler.getCameraOffsetY())/confHandler.getScreenSizeY();
                 drawClassifiedResult(loc, toggleButton.isChecked());
             }
         } catch (JSONException e) {

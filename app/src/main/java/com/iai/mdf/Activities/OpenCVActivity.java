@@ -2,6 +2,7 @@ package com.iai.mdf.Activities;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.pm.ActivityInfo;
 import android.os.Bundle;
 import android.os.Environment;
 import android.support.annotation.Nullable;
@@ -52,6 +53,7 @@ public class OpenCVActivity extends Activity implements CameraBridgeViewBase.CvC
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_opencv);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         mOpenCvCameraView = (CameraBridgeViewBase) findViewById(R.id.activity_opencv_view_HelloOpenCvView);
         mOpenCvCameraView.setCameraIndex(1);    //front camera

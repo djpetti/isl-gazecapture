@@ -19,7 +19,9 @@ import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
+import android.media.MediaRecorder;
 import android.os.Build;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.support.annotation.NonNull;
@@ -28,13 +30,18 @@ import android.support.v4.content.PermissionChecker;
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
-import android.util.SparseIntArray;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.Toast;
 
 import com.iai.mdf.Activities.DataCollectionActivity;
+import com.iai.mdf.DependenceClasses.Configuration;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -64,6 +71,7 @@ public class CameraHandler {
     private ImageFileHandler imageFileHandler;
     private int             cameraState;
     Range<Integer> controlAECompensationRange;
+    private Semaphore cameraOpenCloseLock = new Semaphore(1);
 
 
 
@@ -122,11 +130,11 @@ public class CameraHandler {
 //        ORIENTATIONS.append(Surface.ROTATION_90, 180);
 //        ORIENTATIONS.append(Surface.ROTATION_180, 90);
 //        ORIENTATIONS.append(Surface.ROTATION_270, 0);
-        int degree = 0;
-        if(Build.MODEL.equalsIgnoreCase("Nexus 6P")){
-            degree = 180;
-        }
-        return degree;
+//        int degree = 0;
+//        if(Build.MODEL.equalsIgnoreCase("Nexus 6P")){
+//            degree = 180;
+//        }
+        return Configuration.getInstance(ctxt).getImageRotation();
     }
 
 
@@ -137,7 +145,6 @@ public class CameraHandler {
     private Size                        savedImageSize;
     private CameraDevice.StateCallback  stateCallbackForImage;
     private CaptureRequest.Builder      captureBuilderForImage;
-    private Semaphore                   cameraOpenCloseLockForImage = new Semaphore(1);
 
 
     public void openFrontCameraForDataCollection() {
@@ -147,7 +154,7 @@ public class CameraHandler {
             public void onOpened(@NonNull CameraDevice camera) {
                 //when camera is open, initilize imageFileHandler for saving the pic
                 Log.d(LOG_TAG, "Camera " + camera.getId() + " is opened");
-                cameraOpenCloseLockForImage.release();
+                cameraOpenCloseLock.release();
                 frontCamera = camera;
             }
 
@@ -175,7 +182,7 @@ public class CameraHandler {
             if (Build.VERSION.SDK_INT > 22) {
                 if (this.ctxt.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
                         && this.ctxt.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-                    if( !cameraOpenCloseLockForImage.tryAcquire(2500, TimeUnit.MICROSECONDS) ){
+                    if( !cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MICROSECONDS) ){
                         throw new RuntimeException("Time out waiting to lock opening");
                     }
                     this.cameraManager.openCamera(frontCameraId, this.stateCallbackForImage, new Handler());
@@ -186,7 +193,7 @@ public class CameraHandler {
             } else {
                 if (PermissionChecker.checkCallingOrSelfPermission(this.ctxt, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
                         && PermissionChecker.checkCallingOrSelfPermission(this.ctxt, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
-                    if( !cameraOpenCloseLockForImage.tryAcquire(2500, TimeUnit.MICROSECONDS) ){
+                    if( !cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MICROSECONDS) ){
                         throw new RuntimeException("Time out waiting to lock opening");
                     }
                     this.cameraManager.openCamera(frontCameraId, this.stateCallbackForImage, null);
@@ -205,11 +212,11 @@ public class CameraHandler {
     public void closeFrontCameraForDataCollection() {
         Log.d(LOG_TAG, "Try to close front camera");
         try {
-            cameraOpenCloseLockForImage.acquire();
+            cameraOpenCloseLock.acquire();
         } catch (InterruptedException e) {
             e.printStackTrace();
         } finally {
-            cameraOpenCloseLockForImage.release();
+            cameraOpenCloseLock.release();
         }
         if (null != frontCamera) {
             frontCamera.close();
@@ -515,6 +522,224 @@ public class CameraHandler {
             }
         });
     }
+
+
+
+
+    /******************* Video ********************/
+
+    private CameraDevice.StateCallback stateCallbackForVideo;
+    private CaptureRequest.Builder  captureBuilderForVideo;
+    private static final String APP_FOLDER_NAME = "Android_Gaze_Data";
+    private int         VIDEO_FPS = 30;
+    private MediaRecorder mediaRecorder;
+    private boolean     isVideoing = false;
+    private String      subFolderName;
+    private String      videoName;
+
+
+    public CameraHandler(Context context) {
+        this.ctxt = context;
+        cameraManager = (CameraManager) ctxt.getSystemService(Context.CAMERA_SERVICE);
+        frontCamera = null;
+    }
+
+
+    public void openFrontCameraForVideo() {
+        Log.d(LOG_TAG, "Try to open local camera");
+        stateCallbackForVideo = new CameraDevice.StateCallback() {
+            @Override
+            public void onOpened(@NonNull CameraDevice camera) {
+                //when camera is open, initilize imageFileHandler for saving the pic
+                Log.d(LOG_TAG, "Camera " + camera.getId() + " is opened");
+                cameraOpenCloseLock.release();
+                frontCamera = camera;
+                initMediaRecorder();
+            }
+
+            @Override
+            public void onClosed(@NonNull CameraDevice camera) {
+                Log.d(LOG_TAG, "Camera " + camera.getId() + " is closed");
+                frontCamera = null;
+            }
+
+            @Override
+            public void onDisconnected(@NonNull CameraDevice camera) {
+                Log.d(LOG_TAG, "Camera " + camera.getId() + " is disconnected");
+                camera.close();
+                frontCamera = null;
+            }
+
+            @Override
+            public void onError(@NonNull CameraDevice camera, int error) {
+                Log.d(LOG_TAG, "Camera " + camera.getId() + " can\'t be opened with the error number " + error);
+                frontCamera = null;
+            }
+        };
+        try {
+            String frontCameraId = getFrontCameraId();
+            if (Build.VERSION.SDK_INT > 22) {
+                if (this.ctxt.checkSelfPermission(Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                        && this.ctxt.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                    if( !cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MICROSECONDS) ){
+                        throw new RuntimeException("Time out waiting to lock opening");
+                    }
+                    this.cameraManager.openCamera(frontCameraId, this.stateCallbackForVideo, new Handler());
+                } else {
+                    Log.d(LOG_TAG, "Can\'t open camera because of no permission");
+                    Toast.makeText(this.ctxt, "Can't open camera because of no permission", Toast.LENGTH_SHORT);
+                }
+            } else {
+                if (PermissionChecker.checkCallingOrSelfPermission(this.ctxt, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                        && PermissionChecker.checkCallingOrSelfPermission(this.ctxt, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) {
+                    if( !cameraOpenCloseLock.tryAcquire(2500, TimeUnit.MICROSECONDS) ){
+                        throw new RuntimeException("Time out waiting to lock opening");
+                    }
+                    this.cameraManager.openCamera(frontCameraId, this.stateCallbackForVideo, null);
+                } else {
+                    Log.d(LOG_TAG, "Can\'t open camera because of no permission");
+                    Toast.makeText(this.ctxt, "Can't open camera because of no permission", Toast.LENGTH_SHORT);
+                }
+            }
+        } catch (final CameraAccessException e) {
+            Log.e(LOG_TAG, "exception occurred while opening camera with errors: ", e);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void closeFrontCameraForVideo() {
+        Log.d(LOG_TAG, "Try to close front camera");
+        try {
+            cameraOpenCloseLock.acquire();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        } finally {
+            cameraOpenCloseLock.release();
+        }
+        if (null != frontCamera) {
+            frontCamera.close();
+            Log.d(LOG_TAG, "Camera " + frontCamera.getId() + " is closed");
+            frontCamera = null;
+            savedImageSize = null;
+        }
+    }
+
+    public void initMediaRecorder(){
+        if( frontCamera==null ){
+            Log.d(LOG_TAG, "Front Camera is Null");
+            return;
+        }
+        mediaRecorder = new MediaRecorder();
+//        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
+//        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
+        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+        mediaRecorder.setVideoSize(640, 480);// resolution
+        mediaRecorder.setVideoFrameRate(30);    //frame rate
+        mediaRecorder.setVideoEncodingBitRate(24 * 1024 * 1024);//  ~70kb/frame
+        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);//视频编码格式
+        mediaRecorder.setOrientationHint(Configuration.getInstance(ctxt).getImageRotation());//输出视频播放的方向提示
+//        //设置记录会话的最大持续时间（毫秒）
+//        mediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_480P));
+    }
+
+    public boolean isVideoing(){
+        return  isVideoing;
+    }
+
+    public void startVideo(){
+        SimpleDateFormat sdf = new SimpleDateFormat("yyyy_MM_dd");
+        String timeDate = sdf.format(new Date());
+        subFolderName = timeDate;
+        File videoFolder = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_PICTURES), APP_FOLDER_NAME + File.separator + subFolderName);
+        if (!videoFolder.exists()) {
+            if (!videoFolder.mkdirs()) {
+                Log.d(LOG_TAG, "failed to create directory");
+            }
+        }
+        sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
+        videoName = sdf.format(new Date());
+        mediaRecorder.setOutputFile(videoFolder.getAbsoluteFile() + File.separator + videoName + ".mp4");
+        try {
+            mediaRecorder.prepare();
+            List<Surface> list = new ArrayList<>();
+            list.add(mediaRecorder.getSurface());
+            captureBuilderForVideo = frontCamera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            frontCamera.createCaptureSession(list, new CameraCaptureSession.StateCallback() {
+                @Override
+                public void onConfigured(CameraCaptureSession session) {
+                    try {
+                        captureBuilderForVideo.addTarget(mediaRecorder.getSurface());
+                        captureBuilderForVideo.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                        captureBuilderForVideo.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_VIDEO);
+                        captureBuilderForVideo.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON);
+//                        captureBuilderForVideo.set(CaptureRequest.CONTROL_AE_ANTIBANDING_MODE, CameraMetadata.CONTROL_AE_ANTIBANDING_MODE_60HZ);
+                        captureBuilderForVideo.set(CaptureRequest.CONTROL_SCENE_MODE, CameraMetadata.CONTROL_SCENE_MODE_HDR);
+                        session.setRepeatingRequest(captureBuilderForVideo.build(), null, null);
+                    } catch (CameraAccessException e) {
+                        Log.e(LOG_TAG, " exception occurred while accessing " + frontCamera.getId(), e);
+                    }
+                }
+
+                @Override
+                public void onConfigureFailed(CameraCaptureSession session) {
+                    Log.d(LOG_TAG, "Create CaptureSession failed when trying to take video");
+                }
+            }, null);
+            mediaRecorder.start();
+            isVideoing = true;
+        } catch (CameraAccessException e){
+            e.printStackTrace();
+        } catch (IllegalStateException e) {
+            e.printStackTrace();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void stopVideo(){
+        Toast.makeText(ctxt, "Video is Saved in " + videoName + ".mp4", Toast.LENGTH_SHORT).show();
+        if( mediaRecorder!=null ) {
+            isVideoing = false;
+            mediaRecorder.stop();
+            mediaRecorder.reset();
+        }
+    }
+
+    public void releaseResource(){
+        closeFrontCameraForVideo();
+        if( mediaRecorder!=null ) {
+            mediaRecorder.reset();
+            mediaRecorder.release();
+            mediaRecorder = null;
+        }
+    }
+
+    public void recordDotPosition(Point point){
+        File dotRecordFile = new File(Environment.getExternalStoragePublicDirectory(
+                Environment.DIRECTORY_PICTURES),
+                CameraHandler.APP_FOLDER_NAME + File.separator + subFolderName + File.separator + videoName + ".dat");
+        try {
+            FileOutputStream outputStream = new FileOutputStream(dotRecordFile, true);
+            OutputStreamWriter outputStreamWriter = new OutputStreamWriter(outputStream);
+            if( point==null ) {
+                outputStreamWriter.append(String.valueOf(VIDEO_FPS) + "\n");
+            } else {
+                outputStreamWriter.append(String.valueOf(point.x) + " " + String.valueOf(point.y) + "\n");
+            }
+            outputStreamWriter.close();
+            outputStream.flush();
+            outputStream.close();
+        } catch (IOException e) {
+            Log.e(LOG_TAG, "Exception occurred while recording the dots", e);
+        }
+    }
+
+
+
+
 
 
 }

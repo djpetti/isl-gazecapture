@@ -1,9 +1,12 @@
 package com.iai.mdf.Handlers;
 
 import android.content.Context;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Point;
+import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ShapeDrawable;
 import android.graphics.drawable.shapes.RectShape;
 import android.support.v4.content.ContextCompat;
@@ -119,9 +122,17 @@ public class DrawHandler {
     private void showDot(){
         dotHolderLayout.removeAllViews();
         dotTextView = new TextView(ctxt);
-        dotTextView.setBackgroundResource(R.drawable.dot_r20);
-        dotTextView.setText( currDotType ==POINT_TYPE_LEFT ? "L":"R" );
-        dotTextView.setTextAlignment( TextView.TEXT_ALIGNMENT_CENTER );
+//        dotTextView.setBackgroundResource(R.drawable.dot_r20);
+        Bitmap redDot = Bitmap.createBitmap(90,90, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(redDot);
+        Paint paint = new Paint();
+        paint.setColor(ContextCompat.getColor(ctxt, R.color.red_dot));
+        canvas.translate(redDot.getWidth()/2f,redDot.getHeight()/2f);
+        canvas.drawCircle(0,0, 40, paint);
+        BitmapDrawable ob = new BitmapDrawable(ctxt.getResources(), redDot);
+        dotTextView.setBackground(ob);
+//        dotTextView.setText( currDotType ==POINT_TYPE_LEFT ? "L":"R" );
+//        dotTextView.setTextAlignment( TextView.TEXT_ALIGNMENT_CENTER );
         //setting image position
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT);

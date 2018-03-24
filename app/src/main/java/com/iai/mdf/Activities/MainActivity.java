@@ -6,8 +6,10 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
@@ -20,6 +22,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 
+import com.iai.mdf.DependenceClasses.Configuration;
 import com.iai.mdf.R;
 
 import java.util.ArrayList;
@@ -38,8 +41,8 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         getSupportActionBar().hide();
         checkPermissions();
-        String myDeviceModel = android.os.Build.MODEL;
-        Log.d(LOG_TAG, myDeviceModel);
+        Configuration.getInstance(this).loadConfiguration();
+
 
         Button btn_data_collection =  (Button) findViewById(R.id.main_activity_btn_data_collection);
         btn_data_collection.setOnClickListener(new View.OnClickListener() {
@@ -173,7 +176,7 @@ public class MainActivity extends AppCompatActivity {
                         .show();
             }
         });
-        Button btn_test_pb = (Button) findViewById(R.id.main_activity_btn_tensorflow_pb_test);
+        Button btn_test_pb = findViewById(R.id.main_activity_btn_tensorflow_pb_test);
         btn_test_pb.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -181,7 +184,15 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
-        Button btn_exit =  (Button) findViewById(R.id.main_activity_btn_exit);
+        Button btn_setting = findViewById(R.id.main_activity_btn_setting);
+        btn_setting.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(MainActivity.this, SettingActivity.class);
+                startActivity(intent);
+            }
+        });
+        Button btn_exit =  findViewById(R.id.main_activity_btn_exit);
         btn_exit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -213,7 +224,7 @@ public class MainActivity extends AppCompatActivity {
     private void checkPermissions() {
         final String[] requiredPermissions = {
                 Manifest.permission.WRITE_EXTERNAL_STORAGE,
-                Manifest.permission.CAMERA,
+                Manifest.permission.CAMERA
         };
         final List<String> neededPermissions = new ArrayList<>();
         for (final String permission : requiredPermissions) {

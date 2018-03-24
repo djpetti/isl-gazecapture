@@ -3,6 +3,8 @@
     package="com.iai.mdf">
 
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" />
+    <uses-feature android:name="android.hardware.camera.autofocus"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.INTERNET" />
@@ -21,6 +23,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity android:name="com.iai.mdf.Activities.SettingActivity" />
         <activity android:name="com.iai.mdf.Activities.DataCollectionActivity" />
         <activity android:name="com.iai.mdf.Activities.DataProcessActivity" />
         <activity android:name="com.iai.mdf.Activities.DemoRegrsActivity" />
@@ -31,6 +34,7 @@
         <activity android:name="com.iai.mdf.Activities.TestPBActivity" />
         <activity android:name="com.iai.mdf.Activities.OpenCVActivity" />
         <activity android:name="com.iai.mdf.Activities.CloudActivity" />
+
     </application>
 
 </manifest>

@@ -1,5 +1,6 @@
 package com.iai.mdf.Activities;
 
+import android.content.pm.ActivityInfo;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Build;
@@ -19,6 +20,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
+import com.iai.mdf.DependenceClasses.Configuration;
 import com.iai.mdf.DependenceClasses.DeviceProfile;
 import com.iai.mdf.FaceDetectionAPI;
 import com.iai.mdf.Handlers.CameraHandler;
@@ -64,7 +66,6 @@ public class DemoServerActivity2 extends AppCompatActivity {
     private CameraHandler cameraHandler;
     private DrawHandler drawHandler;
     private TextureView textureView;
-//    private Spinner     spinnerView;
     private ToggleButton toggleButton;
     private FrameLayout frame_background_grid;
     private FrameLayout view_dot_container;
@@ -73,13 +74,11 @@ public class DemoServerActivity2 extends AppCompatActivity {
     private TextView    result_board;
     private int[]       SCREEN_SIZE;
     private int[]       TEXTURE_SIZE;
-    private FaceDetectionAPI detectionAPI;
     private BaseLoaderCallback openCVLoaderCallback;
     private boolean isRealTimeDetection = false;
     private Handler autoDetectionHandler = new Handler();
     private Runnable autoDetectionRunnable;
     private Runnable autoDotGenerationRunnable;
-    private int     captureInterval = 333;
     private TensorFlowHandler tensorFlowHandler;
     private int         mFrameIndex = 0;
     private int         currentClassNum = 4;
@@ -87,14 +86,15 @@ public class DemoServerActivity2 extends AppCompatActivity {
     private int         prevReceivedGazeIndex = 0;
     private String  socketIp = null;
     private int     socketPort;
-    private DeviceProfile deviceProfile;
     private ArrayList<Point> estimationList = new ArrayList<>();
+    private Configuration confHandler = Configuration.getInstance(this);
 
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_demo_2);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         getSupportActionBar().hide();
         Bundle extras = getIntent().getExtras();
         socketIp = extras.getString(BUNDLE_KEY_IP);
@@ -136,6 +136,10 @@ public class DemoServerActivity2 extends AppCompatActivity {
                 drawHandler.clear(frame_gaze_result);
                 drawHandler.clear(view_dot_container);
                 Log.d(LOG_TAG, "pressed");  //cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_STILL_CAPTURE);
+                if ( !socketHandler.isConnected() ){
+                    Toast.makeText(DemoServerActivity2.this, "Not connected.\nRestart the activity please", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 isRealTimeDetection = !isRealTimeDetection;
                 if(isRealTimeDetection){
                     frame_background_grid.setBackgroundColor(0xFFFFFFFF);   // cover texture with white
@@ -152,47 +156,6 @@ public class DemoServerActivity2 extends AppCompatActivity {
             }
         });
 
-
-//        spinnerView = (Spinner) findViewById(R.id.activity_demo_spinner_class_number);
-//        ArrayList<String> classNumOptions = new ArrayList<>();
-//        classNumOptions.add("2x2");
-//        classNumOptions.add("2x3");
-//        classNumOptions.add("3x3");
-//        ArrayAdapter<String> spinnerAdapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_item, classNumOptions);
-//        spinnerAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-//        spinnerView.setAdapter(spinnerAdapter);
-//        spinnerView.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-//            @Override
-//            public void onItemSelected(AdapterView<?> adapterView, View view, int i, long l) {
-//                if(!isRealTimeDetection){
-//                    String selectedLabel = (String)adapterView.getSelectedItem();
-//                    switch (selectedLabel){
-//                        case "2x2":
-//                            currentClassNum = 4;
-//                            switchBackground(frame_background_grid, R.layout.grid4_for_demo);
-//                            Log.d(LOG_TAG, "Selected: 2x2");
-//                            break;
-//                        case "2x3":
-//                            currentClassNum = 6;
-//                            switchBackground(frame_background_grid, R.layout.grid6_for_demo);
-//                            Log.d(LOG_TAG, "Selected: 2x3");
-//                            break;
-//                        case "3x3":
-//                            currentClassNum = 9;
-//                            switchBackground(frame_background_grid, R.layout.grid9_for_demo);
-//                            Log.d(LOG_TAG, "Selected: 3x3");
-//                            break;
-//                    }
-//                }
-//            }
-//
-//            @Override
-//            public void onNothingSelected(AdapterView<?> adapterView) {
-//                Log.d(LOG_TAG, "Selected Nothing ");
-//            }
-//        });
-//        spinnerView.bringToFront();
-
         toggleButton = (ToggleButton) findViewById(R.id.activity_demo_toggle_show_dot);
         toggleButton.setChecked(false);
 
@@ -205,7 +168,7 @@ public class DemoServerActivity2 extends AppCompatActivity {
                 cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_STILL_CAPTURE);
 //                drawHandler.clear(frame_bounding_box);
 //                drawHandler.clear(view_dot_container);
-                autoDetectionHandler.postDelayed(this, captureInterval);
+                autoDetectionHandler.postDelayed(this, confHandler.getDemoCaptureDelayTime());
             }
         };
         autoDotGenerationRunnable = new Runnable() {
@@ -223,12 +186,6 @@ public class DemoServerActivity2 extends AppCompatActivity {
 
         tensorFlowHandler = new TensorFlowHandler(this);
         tensorFlowHandler.pickModel(TensorFlowHandler.MODEL_ISL_FILE_NAME);
-
-
-        // load device profile
-        ArrayList<DeviceProfile> allDevices = DeviceProfile.loadDeviceProfileList(this);
-        deviceProfile = DeviceProfile.getProfileByName(allDevices, android.os.Build.MODEL);
-        Log.d(LOG_TAG, String.valueOf(deviceProfile.getCaptureDelayTime()));
 
     }
 
@@ -384,13 +341,29 @@ public class DemoServerActivity2 extends AppCompatActivity {
                 DataCollectionActivity.Image_Size.getHeight(),
                 CvType.CV_8UC3);
         Imgproc.cvtColor(yuvMat, colorImg, Imgproc.COLOR_YUV2BGR_I420);
+//        File picFolder = new File(Environment.getExternalStoragePublicDirectory(
+//                Environment.DIRECTORY_PICTURES), FOLDER_NAME + File.separator + subFolderName);
 //        Imgcodecs.imwrite("/storage/emulated/0/Download/step1.jpg", colorImg);
-        if( Build.MODEL.equalsIgnoreCase("Nexus 6P")){
-            Core.rotate(colorImg, colorImg, Core.ROTATE_180);
+        switch (confHandler.getImageRotation()){
+            case 0:
+                break;
+            case 90:
+                Core.rotate(colorImg, colorImg, Core.ROTATE_90_CLOCKWISE);
+                break;
+            case 180:
+                Core.rotate(colorImg, colorImg, Core.ROTATE_180);
+                break;
+            case 270:
+                Core.rotate(colorImg, colorImg, Core.ROTATE_90_COUNTERCLOCKWISE);
+                break;
+            default:
+                break;
         }
+//        if( Build.MODEL.equalsIgnoreCase("Nexus 6P")){
+//            Core.rotate(colorImg, colorImg, Core.ROTATE_180);
+//        }
 
         byte[] jpegBytes = ImageProcessHandler.fromMatToJpegByte(colorImg);
-//        byte[] imageBytes = ImageProcessHandler.fromMatToJpegByte2(colorImg);
         Log.d(LOG_TAG, "Image Format Conversion: " + String.valueOf(TimerHandler.getInstance().toc()));
         byte[] sizeBytes = ByteBuffer.allocate(4).putInt(jpegBytes.length).order(ByteOrder.nativeOrder()).array();
         byte[] seqBytes = new byte[2];
@@ -432,8 +405,10 @@ public class DemoServerActivity2 extends AppCompatActivity {
                 double portraitHori = object.getDouble(JSON_KEY_PREDICT_Y);
                 double portraitVert = object.getDouble(JSON_KEY_PREDICT_X);
                 float[] loc = new float[2];
-                loc[0] = (float)((portraitHori + deviceProfile.getCameraOffsetX())/deviceProfile.getScreenSizeX());
-                loc[1] = (float)((portraitVert + deviceProfile.getCameraOffsetY())/deviceProfile.getScreenSizeY());
+//                loc[0] = (float)((portraitHori + deviceProfile.getCameraOffsetX())/deviceProfile.getScreenSizeX());
+//                loc[1] = (float)((portraitVert + deviceProfile.getCameraOffsetY())/deviceProfile.getScreenSizeY());
+                loc[0] = (float)((portraitHori + confHandler.getCameraOffsetX())/confHandler.getScreenSizeX());
+                loc[1] = (float)((portraitVert + confHandler.getCameraOffsetY())/confHandler.getScreenSizeY());
                 if (toggleButton.isChecked()){
                     loc = adjustEstimation(loc);
                 }

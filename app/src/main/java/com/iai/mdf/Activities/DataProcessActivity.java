@@ -138,51 +138,6 @@ public class DataProcessActivity extends AppCompatActivity {
         initOpenCV();
 
 
-
-
-//        // check missing files
-//        File detectionResultFolder = new File("/"+ base + "/Pictures/Android_Gaze_Data/2017_12_25/processedFolder/detectionResult");
-//        File leftFolder = new File("/"+ base + "/Pictures/Android_Gaze_Data/2017_12_25/processedFolder/leftEye");
-//        File rightFolder = new File("/"+ base + "/Pictures/Android_Gaze_Data/2017_12_25/processedFolder/rightEye");
-//        File[] detFiles = detectionResultFolder.listFiles();
-//        File[] leftFiles = leftFolder.listFiles();
-//        File[] rightFiles = rightFolder.listFiles();
-//        ArrayList<String> missNames = new ArrayList<>();
-//        for (int i = 0; i < detFiles.length; ++i) {
-//            String targetName = detFiles[i].getName().substring(0, detFiles[i].getName().indexOf("."));
-//            int j = 0;
-//            for (; j < leftFiles.length; ++j) {
-//                int dotPos = leftFiles[j].getName().indexOf(".");
-//                String name = leftFiles[j].getName().substring(0, dotPos);
-//                String ext = leftFiles[j].getName().substring(dotPos+1);
-//                if( ext.equalsIgnoreCase("jpg") && targetName.equalsIgnoreCase(name) ){
-//                    break;
-//                }
-//            }
-//            if( j==leftFiles.length ){
-//                missNames.add(detFiles[i].getName());
-//                Log.d(LOG_TAG, "LeftEye: " + detFiles[i].getName());
-//            }
-//        }
-//        missNames.clear();
-//        for (int i = 0; i < detFiles.length; ++i) {
-//            String targetName = detFiles[i].getName().substring(0, detFiles[i].getName().indexOf("."));
-//            int j = 0;
-//            for (; j < rightFiles.length; ++j) {
-//                int dotPos = rightFiles[j].getName().indexOf(".");
-//                String name = rightFiles[j].getName().substring(0, dotPos);
-//                String ext = rightFiles[j].getName().substring(dotPos+1);
-//                if( ext.equalsIgnoreCase("jpg") && targetName.equalsIgnoreCase(name) ){
-//                    break;
-//                }
-//            }
-//            if( j==rightFiles.length ){
-//                missNames.add(detFiles[i].getName());
-//                Log.d(LOG_TAG, "RightEye: " + detFiles[i].getName());
-//            }
-//        }
-
-
     }
 
 

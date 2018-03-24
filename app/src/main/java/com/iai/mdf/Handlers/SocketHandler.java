@@ -37,8 +37,10 @@ public class SocketHandler {
     private Socket mSocket = null;
     private OutputStream socketOutputStream;
     private DataOutputStream dos;
+    private boolean isConnected = false;
     private Handler uiThreadHandler = null;
     private int    missingResponse = 0;
+
 
 
 
@@ -60,6 +62,7 @@ public class SocketHandler {
                     mSocket.setSoTimeout(2000);
                     socketOutputStream = mSocket.getOutputStream();
                     dos = new DataOutputStream(socketOutputStream);
+                    isConnected = true;
                 } catch (IOException e) {
                     e.printStackTrace();
                 }
@@ -130,6 +133,7 @@ public class SocketHandler {
                 if (mSocket==null || !mSocket.isConnected()){
                     Message errorMessage = uiThreadHandler.obtainMessage(MESSAGE_OF_ERROR, ERROR_CONNECTION_FAIL);
                     errorMessage.sendToTarget();
+                    isConnected = false;
                 }
             }
         }, 1000);
@@ -155,6 +159,7 @@ public class SocketHandler {
     }
 
 
-
-
+    public boolean isConnected() {
+        return isConnected;
+    }
 }

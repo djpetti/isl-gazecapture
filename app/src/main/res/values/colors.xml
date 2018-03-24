@@ -12,5 +12,9 @@
     <color name="orange_arc">#bbff6600</color>
     <color name="desired_square_color">#ff3333</color>
     <color name="estimated_square_color">#0099ff</color>
+    <color name="editxt_enabled_bg">#f2f2f2</color>
+
+    <color name="setting_title_font_color">#cccccc</color>
+    <color name="setting_item_font_color">#4d4d4d</color>
 
 </resources>

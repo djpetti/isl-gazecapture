@@ -1,5 +1,6 @@
 package com.iai.mdf.Activities;
 
+import android.content.pm.ActivityInfo;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Bundle;
@@ -71,6 +72,7 @@ public class DemoiTrackerActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_demo);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         getSupportActionBar().hide();
 
         // init openCV

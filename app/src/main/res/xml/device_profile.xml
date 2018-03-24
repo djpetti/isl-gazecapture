@@ -17,4 +17,13 @@
         <capture_delay>550</capture_delay>
         <camera_rotation></camera_rotation>
     </device>
+    <device>
+        <name>Nexus 6P</name>
+        <camera_location_x_in_cm>8.57</camera_location_x_in_cm>
+        <camera_location_y_in_cm>-0.95</camera_location_y_in_cm>
+        <screen_size_x_in_cm>11.94</screen_size_x_in_cm>
+        <screen_size_y_in_cm>15.88</screen_size_y_in_cm>
+        <capture_delay>550</capture_delay>
+        <camera_rotation>0</camera_rotation>
+    </device>
 </devices>
