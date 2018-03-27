@@ -62,7 +62,7 @@ input_shape = (224, 224, 3)
 # Learning rates to set.
 learning_rates = [0.001, 0.0001]
 # How many iterations to train for at each learning rate.
-iterations = [75000, 75000]
+iterations = [100000, 100000]
 
 # Learning rate hyperparameters.
 momentum = 0.9
@@ -378,9 +378,10 @@ def build_network(fine_tune=False):
 
   # Concat everything and put through a final FF layer.
   all_concat = layers.Concatenate()([fc_e1, face_fc2, grid_fc2])
+  all_concat_drop = layers.Dropout(0.5)(all_concat)
   all_fc1 = layers.Dense(128, activation="relu",
                          kernel_regularizer=l2_reg,
-                         trainable=trainable)(all_concat)
+                         trainable=trainable)(all_concat_drop)
   all_fc2 = layers.Dense(2, kernel_regularizer=l2_reg)(all_fc1)
 
   # Build the model.
