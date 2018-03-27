@@ -453,7 +453,7 @@ def train_section(model, data, learning_rate, iters):
       testing_acc.append(accuracy)
 
       # Save the trained model.
-      model.save_weights(save_file + ".%d" % (i))
+      model.save_weights(save_file)
 
   return (training_loss, testing_acc)
 
