@@ -51,7 +51,7 @@ import numpy as np
 
 batch_size = 256
 # How many batches to have loaded into VRAM at once.
-load_batches = 1
+load_batches = 4
 # Shape of the input images.
 image_shape = (400, 400, 3)
 # Shape of the extracted patches.
@@ -62,7 +62,7 @@ input_shape = (224, 224, 3)
 # Learning rates to set.
 learning_rates = [0.001, 0.0001]
 # How many iterations to train for at each learning rate.
-iterations = [100000, 100000]
+iterations = [29676, 100000]
 
 # Learning rate hyperparameters.
 momentum = 0.9
@@ -71,16 +71,16 @@ momentum = 0.9
 save_file = "eye_model_finetuned.hd5"
 synsets_save_file = "synsets.pkl"
 # Location of the dataset files.
-dataset_files = "/training_data/daniel/mou_myelin_nexus/dataset"
+dataset_files = "/training_data/daniel/gazecap_myelin/dataset"
 # Location of the cache files.
-cache_dir = "/training_data/daniel/mou_myelin_nexus"
+cache_dir = "/training_data/daniel/gazecap_myelin"
 
 # L2 regularizer for weight decay.
 l2_reg = regularizers.l2(0.0005)
 
 # Configure GPU VRAM usage.
 config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.5
+config.gpu_options.per_process_gpu_memory_fraction = 0.6
 set_session(tf.Session(config=config))
 
 
@@ -329,9 +329,10 @@ def build_network(fine_tune=False):
 
   # Concatenate eyes and put through a shared FC layer.
   eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
+  eye_drop = layers.Dropout(0.5)(eye_combined)
   fc_e1 = layers.Dense(128, activation="relu",
                        kernel_regularizer=l2_reg,
-                       trainable=trainable)(eye_combined)
+                       trainable=trainable)(eye_drop)
 
   # Face layers.
   face_conv_f1 = layers.Conv2D(96, (11, 11), strides=(4, 4),
@@ -499,4 +500,4 @@ def main(load_model=None):
 
 
 if __name__ == "__main__":
-  main()
+  main(load_model="eye_model_finetuned.hd5")
