@@ -41,6 +41,8 @@ class Nexus6P(object):
 
 # Which phone specs to use.
 PHONE = Nexus6P
+# Number of frames to skip at the beginning of each dot.
+SKIP_FRAMES = 15
 
 # Eye cropper that will be used if needed.
 cropper = eye_cropper.EyeCropper()
@@ -168,37 +170,27 @@ def extract_crop(image, bbox):
   x, y, w, h = bbox
   return image[y:y + h, x:x + w]
 
-def load_face_and_data(session_dir, image_name, pre_detected=False):
+def load_face_and_data(image):
   """ Loads an image and corresponding data for that image, and extracts the
   face.
   Args:
-    session_dir: The base session directory that the image is in.
-    image_name: The name of the image to load data for, without the extension.
-    pre_detected: If this is true, than it will assume the legacy data format
-                  with detections already performed. Otherwise, it will perform
-                  its own detections.
+    image: The raw image that we want to process.
   Returns:
     The loaded face crop, the left eye bbox coordinates, the right eye bbox
-    coordinates, and the face grid fractional coordinates. """
-  # Load image.
-  image_path = os.path.join(session_dir, "raw", image_name + ".jpg")
-  # Load the raw image.
-  image = cv2.imread(image_path)
-  if image is None:
-    raise RuntimeError("Failed to load image '%s'." % (image_path))
-
-  # Load the image and data.
-  if pre_detected:
-    # Use existing detections.
-    face_bbox, leye_bbox, reye_bbox = load_image_data(session_dir, image_name,
-                                                      image)
-  else:
-    # Generate new detections.
-    face_bbox, leye_bbox, reye_bbox = cropper.get_bboxes(image)
+    coordinates, and the face grid fractional coordinates, or a tuple of None if
+    it failed to crop the image. """
+  # Generate new detections.
+  leye_bbox, reye_bbox, face_bbox = cropper.get_bboxes(image)
+  if face_bbox is None:
+    # Failed to crop the image.
+    print "WARNING: Failed to crop image."
+    return (None, None, None, None)
 
   face_grid = get_face_grid(image.shape, face_bbox)
   face_crop = extract_crop(image, face_bbox)
-  leye_bbox, reye_bbox = convert_to_face_coords(face_bbox, leye_bbox, reye_bbox)
+  leye_bbox, reye_bbox = convert_to_face_coords(list(face_bbox),
+                                                list(leye_bbox),
+                                                list(reye_bbox))
 
   return (face_crop, leye_bbox, reye_bbox, face_grid)
 
@@ -244,64 +236,73 @@ def dot_to_cm(dot_x, dot_y):
 
   return (dot_x, dot_y)
 
-def read_dot_data(session_dir):
+def read_dot_data(data_file):
   """ Reads the dot data for each image.
   Args:
-    session_dir: The directory where the session is located.
+    data_file: The data file for the session.
   Returns:
-    A dictionary that maps image names to the dot position in cm. """
-  # Paths to the order file and the dot file.
-  order_path = os.path.join(session_dir, "leftEye", "order.dat")
-  dot_path = os.path.join(session_dir, "leftEye", "XY.dat")
-
-  order_data = file(order_path).read()
-  dot_data = file(dot_path).read()
-
-  order_data = order_data.split("\n")
-  order_data = [x.rstrip(".dat") for x in order_data]
+    The number of frames for each dot, and a list of each dot position in cm, in
+    order. """
+  # Read the data file.
+  dot_data = file(data_file).read()
   dot_data = dot_data.split("\n")
 
+  # Extract the first item, which is the frames/dot.
+  frames_per_dot = int(dot_data[0])
   # Remove trailing newlines.
-  if order_data[-1] == "":
-    order_data.pop()
   if dot_data[-1] == "":
     dot_data.pop()
 
   # Convert dots to actual numbers.
   dot_converted = []
-  for pair in dot_data:
+  for pair in dot_data[1:]:
     x, y = pair.split()
     x, y = dot_to_cm(int(x), int(y))
     dot_converted.append((x, y))
 
-  # Put into a dictionary.
-  ret = {}
-  for i in range(0, len(order_data)):
-    ret[order_data[i]] = dot_converted[i]
+  return (frames_per_dot, dot_converted)
 
-  return ret
-
-def load_session(session_dir, pre_detected=False):
+def load_session(video_file, data_file):
   """ Loads an entire session worth of data.
   Args:
-    session_dir: The directory where the session data is located.
-    pre_detected: If true, assume we are operating on a legacy pre-detected
-                  dataset.
+    video_file: The video file for the session.
+    data_file: The data file for the session.
   Returns:
-    A dictionary mapping the image name to a list containing the face crop,
+    A list containing tuples of the face crop,
     dot location, left eye bbox, right eye bbox, and face grid. """
   # Load the total list of images and dot coordinates.
-  dot_data = read_dot_data(session_dir)
+  frames_per_dot, dot_data = read_dot_data(data_file)
 
-  image_data = {}
-  for image_name, dot_coords in dot_data.iteritems():
-    # Load face and calculate bbox data.
-    face_crop, leye_bbox, reye_bbox, grid = load_face_and_data(session_dir,
-                                                               image_name,
-                                                               pre_detected)
-    data_list = [face_crop, dot_coords, leye_bbox, reye_bbox, grid]
+  # Open the video file.
+  video_frames = cv2.VideoCapture(video_file)
 
-    image_data[image_name] = data_list
+  image_data = []
+  for dot_coords in dot_data:
+    # Pull the frames for each dot.
+    for i in range(0, frames_per_dot):
+      _, frame = video_frames.read()
+      if frame is None:
+        # Failed to read the frame
+        print "WARNING: Premature end of video file %s." % (video_file)
+        break
+
+      if i < SKIP_FRAMES:
+        # We want to skip frames at the beginning, because the user's eyes might
+        # still be moving.
+        continue
+
+      # Load face and calculate bbox data.
+      face_crop, leye_bbox, reye_bbox, grid = load_face_and_data(frame)
+      if face_crop is None:
+        # Detection failed.
+        continue
+      data_list = [face_crop, dot_coords, leye_bbox, reye_bbox, grid]
+
+      image_data.append(data_list)
+
+  _, frame = video_frames.read()
+  if frame is not None:
+    print "WARNING: Have extraneous frames in video: %s" % (video_file)
 
   return image_data
 
@@ -309,11 +310,11 @@ def generate_names(session, image_data):
   """ Generates names for the images that incorporate the label.
   Args:
     session: The name of the session.
-    image_data: The dictionary produced by load_session.
+    image_data: The list produced by load_session.
   Returns:
     A dictionary that maps generated image names to face crop images. """
   names = {}
-  for i, data in enumerate(image_data.itervalues()):
+  for i, data in enumerate(image_data):
     face_crop, dot_coords, leye_bbox, reye_bbox, grid = data
 
     dot_x, dot_y = dot_coords
@@ -360,18 +361,18 @@ def save_images(named_images, out_dir):
     if not cv2.imwrite(image_path, image):
       raise RuntimeError("Failed to write image %s" % (image_path))
 
-def process_session(session_dir, out_dir, pre_detected=False):
+def process_session(video_file, data_file, out_dir):
   """ Process one session worth of data.
   Args:
-    session_dir: The directory of the session.
-    out_dir: The output directory to copy the images to.
-    pre_detected: If true, assume we are operating on a legacy pre-detected
-                  dataset. """
+    video_file: Path to the session video file.
+    data_file: Path to the session data file.
+    out_dir: The output directory to copy the images to. """
   # Load the session data.
-  session_data = load_session(session_dir, pre_detected)
+  session_data = load_session(video_file, data_file)
 
   # Generate names for the images.
-  session_name = session_dir.split("/")[-1]
+  filename = os.path.basename(os.path.normpath(video_file))
+  session_name = os.path.splitext(filename)[0]
   # Remove underscores from the session name, since we use that as a separator
   # character.
   session_name = session_name.replace("_", "")
@@ -380,13 +381,33 @@ def process_session(session_dir, out_dir, pre_detected=False):
   # Write the images to the output directory.
   save_images(name_data, out_dir)
 
-def process_dataset(dataset_dir, output_dir, pre_detected=False):
+def process_day(day_dir, out_dir):
+  """ Processes one day's worth of data.
+  Args:
+    day_dir: The directory for that day's data.
+    out_dir: The output directory to write images to. """
+  for session_video in os.listdir(day_dir):
+    # We're going to look for the video files.
+    if not session_video.endswith(".mp4"):
+      continue
+
+    session_video = os.path.join(day_dir, session_video)
+
+    # Find the corresponding data file.
+    session_name = os.path.splitext(session_video)[0]
+    session_dat = session_name + ".dat"
+    if not os.path.exists(session_dat):
+      print "WARNING: Found video but no .dat file %s." % (session_dat)
+      continue
+
+    # Process the session.
+    process_session(session_video, session_dat, out_dir)
+
+def process_dataset(dataset_dir, output_dir):
   """ Processes an entire dataset, one session at a time.
   Args:
     dataset_dir: The root dataset directory.
-    output_dir: Where to write the output images.
-    pre_detected: If true, assume we are operating on a legacy pre-detected
-                  dataset. """
+    output_dir: Where to write the output images. """
   # Create output directory.
   if os.path.exists(output_dir):
     # Remove existing direcory if it exists.
@@ -394,31 +415,29 @@ def process_dataset(dataset_dir, output_dir, pre_detected=False):
     shutil.rmtree(output_dir)
   os.mkdir(output_dir)
 
-  sessions = os.listdir(dataset_dir)
+  days = os.listdir(dataset_dir)
 
-  # Process each session one by one.
-  for i, item in enumerate(sessions):
+  # Process each day one by one.
+  for i, item in enumerate(days):
     item_path = os.path.join(dataset_dir, item)
     if not os.path.isdir(item_path):
       # This is some extraneous file.
       continue
 
     # Calculate percentage complete.
-    percent = float(i) / len(sessions) * 100
+    percent = float(i) / len(days) * 100
     print "(%.2f%%) Processing session %s..." % (percent, item)
 
-    process_session(item_path, output_dir, pre_detected)
+    process_day(item_path, output_dir)
 
 def main():
   parser = argparse.ArgumentParser("Convert Mou's dataset.")
   parser.add_argument("dataset_dir", help="The root dataset directory.")
   parser.add_argument("output_dir",
                       help="The directory to write output images.")
-  parser.add_argument("-l", "--legacy", action="store_true",
-                      help="Use legacy pre-detected data format.")
   args = parser.parse_args()
 
-  process_dataset(args.dataset_dir, args.output_dir, args.legacy)
+  process_dataset(args.dataset_dir, args.output_dir)
 
 if __name__ == "__main__":
   main()
