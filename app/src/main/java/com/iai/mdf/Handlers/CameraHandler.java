@@ -1,5 +1,6 @@
 package com.iai.mdf.Handlers;
 
+
 import android.Manifest;
 import android.app.Activity;
 import android.content.Context;
@@ -36,6 +37,7 @@ import android.widget.Toast;
 
 import com.iai.mdf.Activities.DataCollectionActivity;
 import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.Fragments.FragmentDataCollectionByVideo;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -96,7 +98,7 @@ public class CameraHandler {
         cameraState = CAMERA_STATE_IDLE;
     }
 
-    // to create a CameraHandler Singleton
+    // to socketCreate a CameraHandler Singleton
     public static synchronized CameraHandler getInstance(Context context, boolean isUpload) {
         if (null == myInstance) {
             myInstance = new CameraHandler(context, isUpload);
@@ -636,8 +638,8 @@ public class CameraHandler {
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
         mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
         mediaRecorder.setVideoSize(640, 480);// resolution
-        mediaRecorder.setVideoFrameRate(30);    //frame rate
-        mediaRecorder.setVideoEncodingBitRate(24 * 1024 * 1024);//  ~70kb/frame
+        mediaRecorder.setVideoFrameRate(VIDEO_FPS);    //frame rate
+        mediaRecorder.setVideoEncodingBitRate(24 * 1024 * 1024);//
         mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);//视频编码格式
         mediaRecorder.setOrientationHint(Configuration.getInstance(ctxt).getImageRotation());//输出视频播放的方向提示
 //        //设置记录会话的最大持续时间（毫秒）
@@ -656,7 +658,7 @@ public class CameraHandler {
                 Environment.DIRECTORY_PICTURES), APP_FOLDER_NAME + File.separator + subFolderName);
         if (!videoFolder.exists()) {
             if (!videoFolder.mkdirs()) {
-                Log.d(LOG_TAG, "failed to create directory");
+                Log.d(LOG_TAG, "failed to socketCreate directory");
             }
         }
         sdf = new SimpleDateFormat("yyyyMMdd_HHmmss");
@@ -666,7 +668,7 @@ public class CameraHandler {
             mediaRecorder.prepare();
             List<Surface> list = new ArrayList<>();
             list.add(mediaRecorder.getSurface());
-            captureBuilderForVideo = frontCamera.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            captureBuilderForVideo = frontCamera.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
             frontCamera.createCaptureSession(list, new CameraCaptureSession.StateCallback() {
                 @Override
                 public void onConfigured(CameraCaptureSession session) {
@@ -725,7 +727,7 @@ public class CameraHandler {
             FileOutputStream outputStream = new FileOutputStream(dotRecordFile, true);
             OutputStreamWriter outputStreamWriter = new OutputStreamWriter(outputStream);
             if( point==null ) {
-                outputStreamWriter.append(String.valueOf(VIDEO_FPS) + "\n");
+                outputStreamWriter.append(String.valueOf(VIDEO_FPS * FragmentDataCollectionByVideo.DOT_DURATION_IN_SEC) + "\n");
             } else {
                 outputStreamWriter.append(String.valueOf(point.x) + " " + String.valueOf(point.y) + "\n");
             }

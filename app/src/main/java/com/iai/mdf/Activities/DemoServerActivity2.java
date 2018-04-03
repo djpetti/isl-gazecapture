@@ -104,7 +104,7 @@ public class DemoServerActivity2 extends AppCompatActivity {
         initOpenCV();
 
         SCREEN_SIZE = fetchScreenSize();
-        textureView = (TextureView) findViewById(R.id.activity_demo_preview_textureview);
+        textureView = findViewById(R.id.activity_demo_preview_textureview);
         // ensure texture fill the screen with a certain ratio
         TEXTURE_SIZE = SCREEN_SIZE;
         int expected_height = TEXTURE_SIZE[0]*DataCollectionActivity.Image_Size.getHeight()/DataCollectionActivity.Image_Size.getWidth();

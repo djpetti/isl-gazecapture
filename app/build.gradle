@@ -64,4 +64,6 @@ dependencies {
     //    compile files('src/main/jniLibs/libandroid_tensorflow_inference_java.jar')
     compile 'org.tensorflow:tensorflow-android:+'
     compile 'com.github.smart-fun:XmlToJson:1.4.4'
+    compile 'us.belka:androidtoggleswitch:1.2.2'    // game speed setting multi-choice
+    compile 'com.akexorcist:RoundCornerProgressBar:2.0.3'   // game timer bar
 }

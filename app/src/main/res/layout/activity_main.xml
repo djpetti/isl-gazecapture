@@ -10,9 +10,9 @@
     <TextView
         android:id="@+id/main_activity_txt_title"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:layout_marginBottom="115dp"
+        android:layout_height="0dp"
+        android:layout_weight="0.3"
+        android:gravity="center"
         android:text="@string/main_activity_txt_title"
         android:textSize="30sp"
         android:textColor="@android:color/black"
@@ -21,23 +21,103 @@
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
+        android:layout_height="0dp"
+        android:layout_weight="0.7"
+        android:paddingTop="40dp">
         <LinearLayout
             android:orientation="vertical"
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_horizontal">
+                    <Button
+                        android:layout_width="250dp"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/main_activity_btn_data_collection"
+                        android:text="@string/main_activity_btn_data_collection"
+                        android:textSize="20sp"
+                        android:textAllCaps="false"/>
+                    <View
+                        android:layout_width="60dp"
+                        android:layout_height="wrap_content" />
+                    <Button
+                        android:layout_width="250dp"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/main_activity_btn_game"
+                        android:text="@string/main_activity_btn_game"
+                        android:textSize="20sp"
+                        android:textAllCaps="false"
+                        android:visibility="visible"/>
+                </LinearLayout>
+            </RelativeLayout>
 
-            <Button
+
+            <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:id="@+id/main_activity_btn_data_collection"
-                android:layout_marginTop="20dp"
-                android:layout_marginLeft="50dp"
-                android:layout_marginRight="50dp"
-                android:text="@string/main_activity_btn_data_collection"
-                android:textSize="20sp"
-                android:textAllCaps="false"/>
+                android:layout_marginTop="20dp">
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_horizontal">
+                    <Button
+                        android:layout_width="250dp"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/main_activity_btn_tensorflow_isl_server2"
+                        android:text="ISL Server 2.0"
+                        android:textSize="20sp"
+                        android:textAllCaps="false" />
+                    <View
+                        android:layout_width="60dp"
+                        android:layout_height="wrap_content" />
+                    <Button
+                        android:layout_width="250dp"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/main_activity_btn_tensorflow_isl_server1"
+                        android:text="ISL Server 1.0"
+                        android:textSize="20sp"
+                        android:textAllCaps="false" />
+                </LinearLayout>
+            </RelativeLayout>
+
+
+            <RelativeLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp">
+                <LinearLayout
+                    android:orientation="horizontal"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:gravity="center_horizontal">
+                    <Button
+                        android:layout_width="250dp"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/main_activity_btn_setting"
+                        android:text="Setting"
+                        android:textSize="20sp"
+                        android:textAllCaps="false" />
+                    <View
+                        android:layout_width="60dp"
+                        android:layout_height="wrap_content" />
+                    <Button
+                        android:layout_width="250dp"
+                        android:layout_height="wrap_content"
+                        android:id="@+id/main_activity_btn_exit"
+                        android:text="@string/main_activity_btn_exit"
+                        android:textSize="20sp"
+                        android:textAllCaps="false"/>
+                </LinearLayout>
+            </RelativeLayout>
+
 
             <Button
                 android:layout_width="match_parent"
@@ -50,18 +130,6 @@
                 android:textSize="20sp"
                 android:textAllCaps="false"
                 android:visibility="gone"/>
-
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:id="@+id/main_activity_btn_game"
-                android:layout_marginTop="20dp"
-                android:layout_marginLeft="50dp"
-                android:layout_marginRight="50dp"
-                android:text="@string/main_activity_btn_game"
-                android:textSize="20sp"
-                android:textAllCaps="false"
-                android:visibility="visible"/>
 
             <Button
                 android:layout_width="match_parent"
@@ -121,27 +189,7 @@
                 <!--android:text="Speed Test"-->
                 <!--android:textSize="20sp"-->
                 <!--android:textAllCaps="false"/>-->
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:id="@+id/main_activity_btn_tensorflow_isl_server2"
-                android:layout_marginTop="20dp"
-                android:layout_marginLeft="50dp"
-                android:layout_marginRight="50dp"
-                android:text="ISL Server 2.0"
-                android:textSize="20sp"
-                android:textAllCaps="false" />
 
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:id="@+id/main_activity_btn_tensorflow_isl_server1"
-                android:layout_marginTop="20dp"
-                android:layout_marginLeft="50dp"
-                android:layout_marginRight="50dp"
-                android:text="ISL Server 1.0"
-                android:textSize="20sp"
-                android:textAllCaps="false" />
 
             <Button
                 android:layout_width="match_parent"
@@ -155,27 +203,6 @@
                 android:textAllCaps="false"
                 android:visibility="gone"/>
 
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:id="@+id/main_activity_btn_setting"
-                android:layout_marginTop="20dp"
-                android:layout_marginLeft="50dp"
-                android:layout_marginRight="50dp"
-                android:text="Setting"
-                android:textSize="20sp"
-                android:textAllCaps="false" />
-
-            <Button
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:id="@+id/main_activity_btn_exit"
-                android:layout_marginTop="20dp"
-                android:layout_marginLeft="50dp"
-                android:layout_marginRight="50dp"
-                android:text="@string/main_activity_btn_exit"
-                android:textSize="20sp"
-                android:textAllCaps="false"/>
 
             <Space
                 android:layout_width="match_parent"

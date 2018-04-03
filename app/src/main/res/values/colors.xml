@@ -17,4 +17,11 @@
     <color name="setting_title_font_color">#cccccc</color>
     <color name="setting_item_font_color">#4d4d4d</color>
 
+
+    <color name="game_background">#6db129</color>
+    <color name="game_menu_title">#ff9c00</color>
+    <color name="game_main_top">#ffbf00</color>
+    <color name="game_result_score_text_color">#F0421f</color>
+
+
 </resources>

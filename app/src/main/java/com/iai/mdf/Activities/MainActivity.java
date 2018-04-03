@@ -6,22 +6,20 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.os.Build;
-import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.support.v4.content.ContextCompat;
 import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 
+import com.iai.mdf.Activities.Game.GameMenuActivity;
 import com.iai.mdf.DependenceClasses.Configuration;
 import com.iai.mdf.R;
 
@@ -32,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
 
 
     public static final int MY_PERMISSIONS_REQUEST_ACCESS_CODE = 1;
-    private static final String PREFERENCE_NAME = "isl_mobile_eye_gaze";
+    public static final String PREFERENCE_NAME = "isl_mobile_eye_gaze";
     private static final String LOG_TAG = "MainActivity";
 
     @Override
@@ -52,11 +50,19 @@ public class MainActivity extends AppCompatActivity {
                 startActivity(intent);
             }
         });
-        Button btn_data_process = (Button) findViewById(R.id.main_activity_btn_data_process);
+//        Button btn_data_process = (Button) findViewById(R.id.main_activity_btn_data_process);
+//        btn_data_process.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//                Intent intent = new Intent(MainActivity.this, DataProcessActivity.class);
+//                startActivity(intent);
+//            }
+//        });
+        Button btn_data_process = (Button) findViewById(R.id.main_activity_btn_game);
         btn_data_process.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent intent = new Intent(MainActivity.this, DataProcessActivity.class);
+                Intent intent = new Intent(MainActivity.this, GameMenuActivity.class);
                 startActivity(intent);
             }
         });

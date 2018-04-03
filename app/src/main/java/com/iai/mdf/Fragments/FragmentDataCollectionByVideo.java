@@ -35,11 +35,13 @@ import java.util.Date;
 
 public class FragmentDataCollectionByVideo extends Fragment {
 
-
+    static public final int       DOT_DURATION_IN_SEC = 2;
     private final String LOG_TAG = "FragmentDataByVideo";
+
     private View dotHolderLayout;
     private CameraHandler cameraHandler;
     private DrawHandler drawHandler;
+    private Toast   toast;
     private int[] SCREEN_SIZE;
     private int         firstSeveralDots = 0;
     private int         dotCounter = 0;
@@ -56,6 +58,7 @@ public class FragmentDataCollectionByVideo extends Fragment {
     public void onViewCreated(View view, @Nullable Bundle savedInstanceState) {
         super.onViewCreated(view, savedInstanceState);
         dotHolderLayout = getActivity().findViewById(R.id.fragment_data_collection_layout_dotHolder);
+
         final Handler dotGeneratorHandler = new Handler();
         final Runnable dotGeneratorRunnable = new Runnable() {
             @Override
@@ -63,7 +66,7 @@ public class FragmentDataCollectionByVideo extends Fragment {
                 dotCounter++;
                 drawHandler.showNextPoint();
                 cameraHandler.recordDotPosition(drawHandler.getCurrDot());
-                dotGeneratorHandler.postDelayed(this,2000);
+                dotGeneratorHandler.postDelayed(this,DOT_DURATION_IN_SEC*1000);
             }
         };
         dotHolderLayout.setOnTouchListener(new View.OnTouchListener() {
@@ -72,10 +75,11 @@ public class FragmentDataCollectionByVideo extends Fragment {
                 if (!cameraHandler.isVideoing()){
                     cameraHandler.startVideo();
                     if( !cameraHandler.isVideoing() ){
-                        Toast.makeText(getActivity(), "Can't start taking video.", Toast.LENGTH_SHORT).show();
+                        toast.makeText(getActivity(), "Can't start taking video.", Toast.LENGTH_SHORT).show();
                     } else {
+                        toast.cancel();
                         cameraHandler.recordDotPosition(null);
-                        dotGeneratorHandler.postDelayed(dotGeneratorRunnable, 500);
+                        dotGeneratorHandler.post(dotGeneratorRunnable);
                     }
                 } else {
                     cameraHandler.stopVideo();
@@ -99,7 +103,8 @@ public class FragmentDataCollectionByVideo extends Fragment {
         Log.d(LOG_TAG, "Width: " + SCREEN_SIZE[0] + "    Height: " + SCREEN_SIZE[1]);
         drawHandler = new DrawHandler(getActivity(), SCREEN_SIZE);
         drawHandler.setDotHolderLayout((FrameLayout)dotHolderLayout);
-        Toast.makeText(getActivity(), "Press anywhere to start and stop", Toast.LENGTH_LONG).show();
+        toast = Toast.makeText(getActivity(), "Press anywhere to start and stop", Toast.LENGTH_LONG);
+        toast.show();
     }
 
 

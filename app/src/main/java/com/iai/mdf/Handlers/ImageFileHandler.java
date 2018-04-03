@@ -110,7 +110,7 @@ public class ImageFileHandler {
                 Environment.DIRECTORY_PICTURES), FOLDER_NAME + File.separator + subFolderName);
         if (!picFolder.exists()){
             if (!picFolder.mkdirs()){
-                Log.d("App", "failed to create directory");
+                Log.d("App", "failed to socketCreate directory");
             }
             MediaScannerConnection.scanFile(ctxt, new String[] {picFolder.getAbsolutePath()}, null, null);
         }

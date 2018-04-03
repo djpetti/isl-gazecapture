@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/game_background" >
+
+    <TextView
+        android:layout_width="450dp"
+        android:layout_height="120dp"
+        android:id="@+id/activity_game_menu_txt_title"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="30dp"
+        android:text="ISL\nMixed Controlled Game"
+        android:textSize="30dp"
+        android:textColor="@color/game_menu_title"
+        android:gravity="center"
+        android:background="@drawable/game_title_board"
+        />
+
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="@android:color/transparent"
+        android:layout_centerInParent="true"
+        android:paddingTop="40dp"
+        >
+        <Button
+            android:id="@+id/activity_game_mole_btn_start_34"
+            android:layout_width="135dp"
+            android:layout_height="60dp"
+            android:text="3x4"
+            android:textSize="35dp"
+            android:textColor="@color/blue"
+            android:textAllCaps="false"
+            android:background="@drawable/button_menu_options"
+            />
+        <View
+            android:layout_width="80dp"
+            android:layout_height="1dp" />
+        <Button
+            android:id="@+id/activity_game_mole_btn_start_33"
+            android:layout_width="135dp"
+            android:layout_height="60dp"
+            android:text="3x3"
+            android:textSize="35dp"
+            android:textColor="@color/blue"
+            android:textAllCaps="false"
+            android:background="@drawable/button_menu_options"/>
+    </LinearLayout>
+
+
+
+
+    <ImageButton
+        android:id="@+id/activity_game_mole_btn_setting"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:src="@drawable/button_menu_setting"
+        android:background="@android:color/transparent"
+        android:scaleType="centerInside"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="5dp"
+        android:layout_alignParentRight="true"
+        android:layout_marginRight="10dp"
+        />
+    <ImageButton
+        android:id="@+id/activity_game_mole_btn_exit"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:src="@drawable/button_menu_exit"
+        android:background="@android:color/transparent"
+        android:scaleType="centerInside"
+        android:layout_alignParentBottom="true"
+        android:layout_marginBottom="5dp"
+        android:layout_alignParentLeft="true"
+        android:layout_marginLeft="10dp" />
+
+
+</RelativeLayout>

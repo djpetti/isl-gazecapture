@@ -9,6 +9,7 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.INTERNET" />
 
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
@@ -16,24 +17,30 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme" >
-        <activity android:name="com.iai.mdf.Activities.MainActivity">
+        <activity android:name="com.iai.mdf.Activities.MainActivity"
+            android:screenOrientation="landscape" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name="com.iai.mdf.Activities.SettingActivity" />
-        <activity android:name="com.iai.mdf.Activities.DataCollectionActivity" />
-        <activity android:name="com.iai.mdf.Activities.DataProcessActivity" />
-        <activity android:name="com.iai.mdf.Activities.DemoRegrsActivity" />
+        <activity android:name="com.iai.mdf.Activities.SettingActivity" android:screenOrientation="portrait" />
+        <activity android:name="com.iai.mdf.Activities.DataCollectionActivity" android:screenOrientation="landscape"/>
+        <activity android:name="com.iai.mdf.Activities.DataProcessActivity" android:screenOrientation="portrait"/>
+        <activity android:name="com.iai.mdf.Activities.DemoRegrsActivity" android:screenOrientation="landscape"/>
         <activity android:name="com.iai.mdf.Activities.DemoClassActivity" />
-        <activity android:name="com.iai.mdf.Activities.DemoiTrackerActivity" />
-        <activity android:name="com.iai.mdf.Activities.DemoServerActivity2" />
-        <activity android:name="com.iai.mdf.Activities.DemoServerActivity1" />
+        <activity android:name="com.iai.mdf.Activities.DemoiTrackerActivity" android:screenOrientation="landscape"/>
+        <activity android:name="com.iai.mdf.Activities.DemoServerActivity2" android:screenOrientation="landscape"/>
+        <activity android:name="com.iai.mdf.Activities.DemoServerActivity1" android:screenOrientation="landscape"/>
         <activity android:name="com.iai.mdf.Activities.TestPBActivity" />
         <activity android:name="com.iai.mdf.Activities.OpenCVActivity" />
-        <activity android:name="com.iai.mdf.Activities.CloudActivity" />
+        <activity android:name="com.iai.mdf.Activities.CloudActivity" android:screenOrientation="landscape"/>
+        <activity android:name="com.iai.mdf.Activities.Game.GameMenuActivity" android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Holo.Light.NoActionBar.TranslucentDecor" />
+        <activity android:name="com.iai.mdf.Activities.Game.GameSettingActivity" android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Holo.Light.NoActionBar.TranslucentDecor" />
+        <activity android:name="com.iai.mdf.Activities.Game.GameMainActivity" android:screenOrientation="landscape"
+            android:theme="@android:style/Theme.Holo.Light.NoActionBar.TranslucentDecor" />
 
     </application>
 
