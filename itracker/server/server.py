@@ -228,13 +228,17 @@ class Server(object):
   def send_response(self, prediction, seq_num):
     """ Sends a response for a particular image prediction.
     Args:
-      prediction: The prediction, as a tuple, in cm.
-      seq_num: The sequence number of the image that the prediction is for. """
+      prediction: The prediction, as a tuple, in cm. If None, it assumes
+                  the prediction is invalid.
+      seq_num: The sequence number of the image that the prediction is for.
+      valid: Whether the prediction is valid. """
     logger.debug("Sending prediction %s for %d." % (str(prediction), seq_num))
 
     # Create JSON data to send.
-    response = {"PredictX": prediction[0], "PredictY": prediction[1],
-                "SequenceNumber": seq_num}
+    response = {"SequenceNumber": seq_num, "Valid": prediction is not None}
+    if prediction is not None:
+      response["PredictX"] = prediction[0]
+      response["PredictY"] = prediction[1]
     response = json.dumps(response)
 
     # Add a delimiter to the end.
@@ -312,7 +316,7 @@ class SendProcess(object):
     Returns:
       True if it sent new data, false if the sequence end was reached. """
     gaze_point, seq_num = self.__predictor.predict_gaze()
-    if gaze_point is None:
+    if seq_num is None:
       # A None tuple means the end of the sequence, so we'll want to join this
       # process.
       return False

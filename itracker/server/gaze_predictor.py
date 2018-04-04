@@ -82,10 +82,14 @@ class _CnnProcess(object):
     """ Reads an image from the input queue, processes it, and writes a
     prediction to the output queue. """
     left_eye, right_eye, face, grid, seq_num = self.__input_queue.get()
-    if left_eye is None:
+    if seq_num is None:
       # A None tuple means the end of the sequence. Propagate this through the
       # pipeline.
       self.__output_queue.put((None, None))
+      return
+    if left_eye is None:
+      # If we have a sequence number but no images, we got a bad detection.
+      self.__output_queue.put((None, seq_num))
       return
 
     # Convert everything to floats.
@@ -166,6 +170,8 @@ class _LandmarkProcess(object):
     if face is None:
       # We failed to get an image.
       logger.warning("Failed to get good detection for %d." % (seq_num))
+      # Send along the sequence number.
+      self.__cnn_process.add_new_input(None, None, None, None, seq_num)
       return
 
     # Produce face mask.
