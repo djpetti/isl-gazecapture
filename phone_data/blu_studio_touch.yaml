@@ -1,0 +1,14 @@
+ScreenData:
+  ScreenLongCm: 11.05
+  ScreenShortCm: 6.25
+  ResolutionLong: 1280
+  ResolutionShort: 720
+
+CameraData:
+  # Camera positioning, in cm.
+  CameraLongOffset: 1.05
+  CameraShortOffset: -1.85
+
+  # Camera FOV, in cm.
+  CameraFOVLong: 48.5
+  CameraFOVShort: 25.0

@@ -7,40 +7,8 @@ import shutil
 
 import cv2
 
-from itracker.common import eye_cropper
+from itracker.common import eye_cropper, phone_config
 
-class BluePhone(object):
-  """ Specifications for BluePhone. """
-
-  # Phone screen dimensions in cm.
-  SCREEN_LONG_CM = 11.05
-  SCREEN_SHORT_CM = 6.25
-
-  # Screen resolution, in pixels.
-  RES_LONG = 1280
-  RES_SHORT = 720
-
-  # Camera positioning, in cm.
-  CAMERA_LONG_OFFSET = 1.05
-  CAMERA_SHORT_OFFSET = -1.85
-
-class Nexus6P(object):
-  """ Specifications for Nexus 6P. """
-
-  # Phone screen dimensions in cm.
-  SCREEN_LONG_CM = 12.55
-  SCREEN_SHORT_CM = 7.10
-
-  # Screen resolution, in pixels.
-  RES_LONG = 2560
-  RES_SHORT = 1440
-
-  # Camera positioning, in cm.
-  CAMERA_LONG_OFFSET = 0.95
-  CAMERA_SHORT_OFFSET = -1.25
-
-# Which phone specs to use.
-PHONE = Nexus6P
 # Number of frames to skip at the beginning of each dot.
 SKIP_FRAMES = 15
 
@@ -213,16 +181,21 @@ def display_crops(image, leye_bbox, reye_bbox):
   cv2.imshow("test", vis)
   cv2.waitKey(0)
 
-def dot_to_cm(dot_x, dot_y):
+def dot_to_cm(dot_x, dot_y, phone):
   """ Converts the dot coordinates in pixels to cm, assuming a coordinate system
   as described by Mou, and a landscape orientation.
   Args:
     dot_x, dot_y: The pixel locations of the dot.
+    phone: The configuration for the phone that produced the data.
   Returns:
     The x and y coordinates of the dot in cm. """
+  res_long, res_short = phone.get_resolution()
+  size_long, size_short = phone.get_screen_cm()
+  offset_long, offset_short = phone.get_camera_offset()
+
   # Convert to cm directly.
-  dot_x = float(dot_x) / PHONE.RES_SHORT * PHONE.SCREEN_SHORT_CM
-  dot_y = float(dot_y) / PHONE.RES_LONG * PHONE.SCREEN_LONG_CM
+  dot_x = float(dot_x) / res_short * size_short
+  dot_y = float(dot_y) / res_long * size_long
 
   # The x and y values are actually flipped because we're working in landscape
   # mode.
@@ -231,15 +204,16 @@ def dot_to_cm(dot_x, dot_y):
   dot_y = tmp
 
   # Account for the camera positioning.
-  dot_x += PHONE.CAMERA_LONG_OFFSET
-  dot_y += PHONE.CAMERA_SHORT_OFFSET
+  dot_x += offset_long
+  dot_y += offset_short
 
   return (dot_x, dot_y)
 
-def read_dot_data(data_file):
+def read_dot_data(data_file, phone):
   """ Reads the dot data for each image.
   Args:
     data_file: The data file for the session.
+    phone: The configuration for the phone that produced the data.
   Returns:
     The number of frames for each dot, and a list of each dot position in cm, in
     order. """
@@ -257,21 +231,22 @@ def read_dot_data(data_file):
   dot_converted = []
   for pair in dot_data[1:]:
     x, y = pair.split()
-    x, y = dot_to_cm(int(x), int(y))
+    x, y = dot_to_cm(int(x), int(y), phone)
     dot_converted.append((x, y))
 
   return (frames_per_dot, dot_converted)
 
-def load_session(video_file, data_file):
+def load_session(video_file, data_file, phone):
   """ Loads an entire session worth of data.
   Args:
     video_file: The video file for the session.
     data_file: The data file for the session.
+    phone: The configuration for the phone that produced the data.
   Returns:
     A list containing tuples of the face crop,
     dot location, left eye bbox, right eye bbox, and face grid. """
   # Load the total list of images and dot coordinates.
-  frames_per_dot, dot_data = read_dot_data(data_file)
+  frames_per_dot, dot_data = read_dot_data(data_file, phone)
 
   # Open the video file.
   video_frames = cv2.VideoCapture(video_file)
@@ -361,14 +336,15 @@ def save_images(named_images, out_dir):
     if not cv2.imwrite(image_path, image):
       raise RuntimeError("Failed to write image %s" % (image_path))
 
-def process_session(video_file, data_file, out_dir):
+def process_session(video_file, data_file, out_dir, phone):
   """ Process one session worth of data.
   Args:
     video_file: Path to the session video file.
     data_file: Path to the session data file.
-    out_dir: The output directory to copy the images to. """
+    out_dir: The output directory to copy the images to.
+    phone: The configuration for the phone that produced the data. """
   # Load the session data.
-  session_data = load_session(video_file, data_file)
+  session_data = load_session(video_file, data_file, phone)
 
   # Generate names for the images.
   filename = os.path.basename(os.path.normpath(video_file))
@@ -381,11 +357,12 @@ def process_session(video_file, data_file, out_dir):
   # Write the images to the output directory.
   save_images(name_data, out_dir)
 
-def process_day(day_dir, out_dir):
+def process_day(day_dir, out_dir, phone):
   """ Processes one day's worth of data.
   Args:
     day_dir: The directory for that day's data.
-    out_dir: The output directory to write images to. """
+    out_dir: The output directory to write images to.
+    phone: The configuration for the phone that produced the data. """
   for session_video in os.listdir(day_dir):
     # We're going to look for the video files.
     if not session_video.endswith(".mp4"):
@@ -401,13 +378,14 @@ def process_day(day_dir, out_dir):
       continue
 
     # Process the session.
-    process_session(session_video, session_dat, out_dir)
+    process_session(session_video, session_dat, out_dir, phone)
 
-def process_dataset(dataset_dir, output_dir):
+def process_dataset(dataset_dir, output_dir, phone):
   """ Processes an entire dataset, one session at a time.
   Args:
     dataset_dir: The root dataset directory.
-    output_dir: Where to write the output images. """
+    output_dir: Where to write the output images.
+    phone: The configuration for the phone that produced the data. """
   # Create output directory.
   if os.path.exists(output_dir):
     # Remove existing direcory if it exists.
@@ -428,16 +406,22 @@ def process_dataset(dataset_dir, output_dir):
     percent = float(i) / len(days) * 100
     print "(%.2f%%) Processing session %s..." % (percent, item)
 
-    process_day(item_path, output_dir)
+    process_day(item_path, output_dir, phone)
 
 def main():
   parser = argparse.ArgumentParser("Convert Mou's dataset.")
   parser.add_argument("dataset_dir", help="The root dataset directory.")
   parser.add_argument("output_dir",
                       help="The directory to write output images.")
+  parser.add_argument("phone_config",
+                      help="The configuration file for the phone.")
   args = parser.parse_args()
 
-  process_dataset(args.dataset_dir, args.output_dir)
+  # Load the configuration.
+  print "Using phone configuration: %s" % (args.phone_config)
+  phone = phone_config.PhoneConfig(args.phone_config)
+
+  process_dataset(args.dataset_dir, args.output_dir, phone)
 
 if __name__ == "__main__":
   main()
