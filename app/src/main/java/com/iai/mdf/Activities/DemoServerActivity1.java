@@ -6,6 +6,7 @@ import android.media.ImageReader;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.Looper;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
@@ -91,6 +92,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
     private Configuration confHandler = Configuration.getInstance(this);
 
 
+
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -132,7 +134,6 @@ public class DemoServerActivity1 extends AppCompatActivity {
         frame_bounding_box.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                result_board.setText("");
                 drawHandler.clear(frame_bounding_box);
                 drawHandler.clear(frame_gaze_result);
                 drawHandler.clear(view_dot_container);
@@ -141,6 +142,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
                 if(isRealTimeDetection){
                     frame_background_grid.setBackgroundColor(0xFFFFFFFF);   // cover texture with white
                     autoDetectionHandler.post(autoDetectionRunnable);
+                    result_board.setText("");
                 } else {
                     frame_background_grid.setBackgroundColor(0x00FFFFFF);   // uncover texture with translucent
                     cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_PREVIEW);
@@ -182,6 +184,20 @@ public class DemoServerActivity1 extends AppCompatActivity {
                             Log.d(LOG_TAG, "Selected: 3x3");
                             break;
                     }
+                } else {
+                    // return to the previous state
+                    switch (currentClassNum){
+                        case 4:
+                            spinnerView.setSelection(0);
+                            break;
+                        case 6:
+                            spinnerView.setSelection(1);
+                            break;
+                        case 9:
+                            spinnerView.setSelection(2);
+                            break;
+                    }
+
                 }
             }
 
@@ -192,10 +208,10 @@ public class DemoServerActivity1 extends AppCompatActivity {
         });
         spinnerView.bringToFront();
 
-        toggleButton = (ToggleButton) findViewById(R.id.activity_demo_toggle_show_dot);
+        toggleButton = findViewById(R.id.activity_demo_toggle_show_dot);
         toggleButton.setChecked(false);
 
-        result_board = (TextView) findViewById(R.id.activity_demo_txtview_result);
+        result_board = findViewById(R.id.activity_demo_txtview_result);
         result_board.setText("Press Anywhere to Start");
 
         autoDetectionRunnable = new Runnable() {
@@ -237,7 +253,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
                     if( Build.MODEL.equalsIgnoreCase("BLU Studio Touch")) {
                         uploadImageOnBLU(image);
                     } else {
-                        uploadImage(image);
+                        socketHandler.uploadImage(image, confHandler);
                     }
                 }
                 image.close();
@@ -256,7 +272,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
         isRealTimeDetection = false;
         // stop socket communication
         if(socketHandler!=null) {
-            socketHandler.close();
+            socketHandler.socketDestroy();
         }
     }
 
@@ -292,6 +308,17 @@ public class DemoServerActivity1 extends AppCompatActivity {
 
     private void initSocketConnection(){
         socketHandler = new SocketHandler(socketIp, socketPort);
+        socketHandler.setConnectCallback(new SocketHandler.StringCallback() {
+            @Override
+            public void onResponse(String str) {
+            }
+
+            @Override
+            public void onError(String str) {
+                showToast("Please set the address and the port correctly");
+            }
+        });
+        socketHandler.socketCreate();
         socketHandler.setUiThreadHandler(new SocketHandler.StringCallback() {
             @Override
             public void onResponse(String str) {
@@ -300,8 +327,12 @@ public class DemoServerActivity1 extends AppCompatActivity {
                         JSONObject object = new JSONObject(str);
                         if (object != null) {
                             Log.d(LOG_TAG, object.toString());
-                            if (isRealTimeDetection) { // ignore the result from the delayed response
+                            if( object.getBoolean("Valid") && isRealTimeDetection ) {
                                 drawGaze(object);
+                                Log.d(LOG_TAG, "draw");
+                            } else {
+                                showToast("No Detection");
+                                Log.d(LOG_TAG, "no detection");
                             }
                         }
                     }
@@ -314,27 +345,13 @@ public class DemoServerActivity1 extends AppCompatActivity {
             public void onError(String str) {
                 Log.e(LOG_TAG, str);
                 if( str.equalsIgnoreCase(SocketHandler.ERROR_DISCONNECTED) ){
-//                    Toast.makeText(DemoServerActivity2.this, "Disconnected from server.\n Please restart.", Toast.LENGTH_SHORT).show();
-                    Log.d(LOG_TAG, "Connection is abnormally disconnected.");
-//                    long downTime = SystemClock.uptimeMillis();
-//                    long eventTime = SystemClock.uptimeMillis() + 100;
-//                    float x = 0.0f;
-//                    float y = 0.0f;
-//                    int metaState = 0;
-//                    MotionEvent motionEvent = MotionEvent.obtain(
-//                            downTime, eventTime,
-//                            MotionEvent.ACTION_UP,
-//                            x, y,
-//                            metaState
-//                    );
-//                    frame_bounding_box.dispatchTouchEvent(motionEvent);
-                } else if (str.equalsIgnoreCase(SocketHandler.ERROR_CONNECTION_FAIL)) {
-                    Toast.makeText(DemoServerActivity1.this, "Connection Failed. \nRestart Again", Toast.LENGTH_SHORT).show();
-                    Log.d(LOG_TAG, "Connection Failed.");
+                    showToast("Disconnect From Server\nRestart Please");
+                    frame_bounding_box.performClick();
+                } else if (str.equalsIgnoreCase(SocketHandler.ERROR_TIMEOUT)) {
+                    showToast("Timeout");
                 }
             }
         });
-        socketHandler.listen();
     }
 
 
@@ -363,38 +380,24 @@ public class DemoServerActivity1 extends AppCompatActivity {
         mFrameIndex++;
     }
 
-    private void uploadImage(Image image){
-        Mat yuvMat = ImageProcessHandler.getBGRMatFromImage(image);
-        Mat colorImg = new Mat(
-                DataCollectionActivity.Image_Size.getWidth(),
-                DataCollectionActivity.Image_Size.getHeight(),
-                CvType.CV_8UC3);
-        Imgproc.cvtColor(yuvMat, colorImg, Imgproc.COLOR_YUV2BGR_I420);
-        if( Build.MODEL.equalsIgnoreCase("Nexus 6P")){
-            Core.rotate(colorImg, colorImg, Core.ROTATE_180);
-        }
 
-        byte[] jpegBytes = ImageProcessHandler.fromMatToJpegByte(colorImg);
-//        byte[] imageBytes = ImageProcessHandler.fromMatToJpegByte2(colorImg);
-        Log.d(LOG_TAG, "Image Format Conversion: " + String.valueOf(TimerHandler.getInstance().toc()));
-        byte[] sizeBytes = ByteBuffer.allocate(4).putInt(jpegBytes.length).order(ByteOrder.nativeOrder()).array();
-        byte[] seqBytes = new byte[2];
-        seqBytes[0] = (byte)(mFrameIndex & 0xFF);
-        byte[] data = new byte[jpegBytes.length + 5];
-        System.arraycopy(sizeBytes, 0, data, 0, 4);
-        System.arraycopy(jpegBytes, 0, data, 4, jpegBytes.length);
-        System.arraycopy(seqBytes, 0, data, 4 + jpegBytes.length, 1);
-        socketHandler.send(data);
-        mFrameIndex++;
+
+
+
+
+
+
+
+    private Toast toast;
+    public void showToast(final String msg){
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                toast = Toast.makeText(DemoServerActivity1.this, msg, Toast.LENGTH_SHORT);
+                toast.show();
+            }
+        });
     }
-
-
-
-
-
-
-
-
 
     private int[] fetchScreenSize(){
         DisplayMetrics displayMetrics = new DisplayMetrics();

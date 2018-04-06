@@ -14,9 +14,13 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
+import android.util.Pair;
+import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
 import android.view.Window;
@@ -67,6 +71,7 @@ public class GameMainActivity extends Activity {
     private ImageView   imgServerConnect;
     private ImageButton btnController;
     private ImageButton btnExit;
+    private View            table;
     private LinearLayout    tableRow1;
     private LinearLayout    tableRow2;
     private LinearLayout    tableRow3;
@@ -77,7 +82,6 @@ public class GameMainActivity extends Activity {
     private GameResultDialog gameResultDialog;
 
     private int         curScore;
-    private Toast       toast;
 
     private boolean isGameStarted = false;
 
@@ -107,7 +111,7 @@ public class GameMainActivity extends Activity {
             public void onClick(View view) {
                 if( !serverConnector.isConnected() ) {
                     imgServerConnect.setImageResource(R.drawable.game_main_server_timeout);
-                    toast.makeText(GameMainActivity.this, "Connecting to the server...", Toast.LENGTH_SHORT).show();
+                    showToast("Connecting to the server...");
                     serverConnector.socketCreate();
                 }
             }
@@ -138,6 +142,7 @@ public class GameMainActivity extends Activity {
 
         // texture
         textureView = findViewById(R.id.activity_game_main_textureview);
+
 
         // prepare to start
         initGame();
@@ -200,6 +205,7 @@ public class GameMainActivity extends Activity {
                 }
             }
         };
+        table     = findViewById(R.id.activity_game_main_layout_table);
         tableRow1 = findViewById(R.id.activity_game_main_table_row1);
         tableRow2 = findViewById(R.id.activity_game_main_table_row2);
         tableRow3 = findViewById(R.id.activity_game_main_table_row3);
@@ -306,6 +312,7 @@ public class GameMainActivity extends Activity {
 
     /****  Server ****/
     private GameServerConnector serverConnector;
+    private Toast toast;
 
     private void connectServer(){
         SharedPreferences settings = getSharedPreferences(MainActivity.PREFERENCE_NAME, Context.MODE_PRIVATE);
@@ -326,12 +333,9 @@ public class GameMainActivity extends Activity {
 
             @Override
             public void onError(String str) {
-                if( toast!=null ) {
-                    toast.cancel();
-                }
                 imgServerConnect.setImageResource(R.drawable.game_main_server_invalid);
                 if (str.equalsIgnoreCase(GameServerConnector.ERROR_SETTING)) {
-                    toast.makeText(GameMainActivity.this, "Set the address and the port of the server", Toast.LENGTH_SHORT).show();
+                    showToast("Please set the address and the port correctly");
                 }
             }
         });
@@ -339,11 +343,18 @@ public class GameMainActivity extends Activity {
         serverConnector.setUiThreadHandler(new GameServerConnector.StringCallback() {
             @Override
             public void onResponse(String str) {
+                imgServerConnect.setImageResource(R.drawable.game_main_server_valid);
                 try {
                     if( str!=null ) {
                         JSONObject object = new JSONObject(str);
-                        if (object != null) {
-                            Log.d(LOG_TAG, object.toString());
+                        if (object != null ){
+                            if (object.getBoolean("Valid")) {
+                                analyzeGaze(object);
+                                Log.d(LOG_TAG, object.toString());
+                            } else {
+                                showToast("No detection");
+                                Log.d(LOG_TAG, "No detection");
+                            }
                         }
                     }
                 } catch (JSONException e) {
@@ -359,9 +370,17 @@ public class GameMainActivity extends Activity {
                     takeImageHandler.removeCallbacks(takeImageRunnable);
                 } else if (str.equalsIgnoreCase(GameServerConnector.ERROR_TIMEOUT)) {
                     imgServerConnect.setImageResource(R.drawable.game_main_server_timeout);
-                } else if (str.equalsIgnoreCase(GameServerConnector.ERROR_NO_DETECTION)) {
-                    imgServerConnect.setImageResource(R.drawable.game_main_server_valid);
                 }
+            }
+        });
+    }
+
+    public void showToast(final String msg){
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                toast = Toast.makeText(GameMainActivity.this, msg, Toast.LENGTH_SHORT);
+                toast.show();
             }
         });
     }
@@ -369,9 +388,6 @@ public class GameMainActivity extends Activity {
 
 
     /****  Camera ****/
-    private final String JSON_KEY_PREDICT_X = "PredictX";
-    private final String JSON_KEY_PREDICT_Y = "PredictY";
-    private final String JSON_KEY_SEQ_NUMBER = "SequenceNumber";
     private BaseLoaderCallback openCVLoaderCallback;
     private CameraHandler   cameraHandler;
     private Configuration   confHandler = Configuration.getInstance(this);
@@ -429,6 +445,68 @@ public class GameMainActivity extends Activity {
         } else {
             Log.d(LOG_TAG, "OpenCV library found inside package. Using it!");
             openCVLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+        }
+    }
+
+
+    /***** Gaze Control *****/
+    private final String JSON_KEY_PREDICT_X = "PredictX";
+    private final String JSON_KEY_PREDICT_Y = "PredictY";
+    private final String JSON_KEY_SEQ_NUMBER = "SequenceNumber";
+    private ArrayList<Pair<Float,Float>> lastThreePoints = new ArrayList<>();
+    private final int   CLICK_THRESHOLD = 85;
+
+    private void analyzeGaze(JSONObject object){
+        try {
+            int receivedIdx = object.getInt(JSON_KEY_SEQ_NUMBER);
+            if( receivedIdx > prevReceivedGazeIndex ){
+                prevReceivedGazeIndex = receivedIdx;
+                double portraitHori = object.getDouble(JSON_KEY_PREDICT_Y);
+                double portraitVert = object.getDouble(JSON_KEY_PREDICT_X);
+                float[] loc = new float[2];
+                loc[0] = (float)((portraitHori + confHandler.getCameraOffsetX())/confHandler.getScreenSizeX());
+                loc[1] = (float)((portraitVert + confHandler.getCameraOffsetY())/confHandler.getScreenSizeY());
+                lastThreePoints.add(new Pair(loc[0], loc[1]));
+                if( lastThreePoints.size()<3 ){
+                    return;
+                } else if (lastThreePoints.size()>3) {
+                    lastThreePoints.remove(0);
+                }
+                // analyze last three points distribution
+                float aveX = (lastThreePoints.get(0).first
+                        + lastThreePoints.get(1).first
+                        + lastThreePoints.get(2).first)/3;
+                float aveY = (lastThreePoints.get(0).second
+                        + lastThreePoints.get(1).second
+                        + lastThreePoints.get(2).second)/3;
+                double diff = 0;
+                for(Pair<Float, Float> eachPoint : lastThreePoints){
+                    diff += Math.sqrt((double)(eachPoint.first - aveX)*(eachPoint.first - aveX)
+                            + (eachPoint.second - aveY)*(eachPoint.second - aveY));
+                }
+                diff /= 3;
+                Log.d(LOG_TAG, String.valueOf(diff));
+                if(diff < CLICK_THRESHOLD){
+                    // Obtain MotionEvent object
+                    long downTime = SystemClock.uptimeMillis();
+                    long eventTime = SystemClock.uptimeMillis() + 100;
+                    int metaState = 0;
+                    MotionEvent motionEvent = MotionEvent.obtain(
+                            downTime,
+                            eventTime,
+                            MotionEvent.ACTION_UP,
+                            aveX,
+                            aveY,
+                            metaState
+                    );
+                    // Dispatch touch event to view
+                    table.dispatchTouchEvent(motionEvent);
+                } else {
+                    Log.d(LOG_TAG, "Moving");
+                }
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
         }
     }
 

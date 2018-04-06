@@ -1,15 +1,20 @@
 package com.iai.mdf.Handlers;
 
-import android.icu.text.LocaleDisplayNames;
-import android.os.CountDownTimer;
+import android.content.Context;
+import android.media.Image;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
+import android.widget.Toast;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.json.JSONStringer;
+import com.iai.mdf.Activities.DataCollectionActivity;
+import com.iai.mdf.DependenceClasses.Configuration;
+
+import org.opencv.core.Core;
+import org.opencv.core.CvType;
+import org.opencv.core.Mat;
+import org.opencv.imgproc.Imgproc;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
@@ -19,6 +24,8 @@ import java.io.OutputStream;
 import java.net.Socket;
 import java.net.SocketException;
 import java.net.SocketTimeoutException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /**
  * Created by Mou on 2/23/2018.
@@ -26,11 +33,15 @@ import java.net.SocketTimeoutException;
 
 public class SocketHandler {
 
-    public static final String ERROR_CONNECTION_FAIL = "connection fail";
+    public static final String SUCCESS_CONNECTED = "connected";
+    public static final String SUCCESS_DETECTED = "detected";
     public static final String ERROR_DISCONNECTED = "disconnected";
+    public static final String ERROR_SETTING = "setting";
+    public static final String ERROR_TIMEOUT = "timeout";
+    public static final String ERROR_NO_DETECTION = "no_detection";
     private static final String LOG_TAG = "SocketHandler";
-    private static final int MESSAGE_FROM_SERVER = 1;
-    private static final int MESSAGE_OF_ERROR = 2;
+    private static final int MSG_ON_SUCCESS = 1;
+    private static final int MSG_ON_ERROR = 2;
 
 
 
@@ -39,7 +50,10 @@ public class SocketHandler {
     private DataOutputStream dos;
     private boolean isConnected = false;
     private Handler uiThreadHandler = null;
-    private int    missingResponse = 0;
+    private int    missingResponse;
+    private StringCallback connectCallback;
+    private String  serverAddr;
+    private int     serverPort;
 
 
 
@@ -54,12 +68,14 @@ public class SocketHandler {
 
 
     public SocketHandler(final String addr, final int port){
+        this.serverAddr = addr;
+        this.serverPort = port;
         new Thread() {
             @Override
             public void run() {
                 try {
                     mSocket = new Socket(addr, port);
-                    mSocket.setSoTimeout(2000);
+                    mSocket.setSoTimeout(1500);
                     socketOutputStream = mSocket.getOutputStream();
                     dos = new DataOutputStream(socketOutputStream);
                     isConnected = true;
@@ -71,8 +87,45 @@ public class SocketHandler {
     }
 
 
-    public void close(){
+    public void setConnectCallback(StringCallback callback){
+        connectCallback = callback;
+    }
+
+    public void socketCreate(){
+        missingResponse = 0;
+                                                                        isConnected = true;
+        new Thread() {
+            @Override
+            public void run() {
+                try {
+                    mSocket = new Socket(serverAddr, serverPort);
+                    mSocket.setSoTimeout(1500);
+                    socketOutputStream = mSocket.getOutputStream();
+                    dos = new DataOutputStream(socketOutputStream);
+                    isConnected = true;
+                    connectCallback.onResponse(SUCCESS_CONNECTED);
+                } catch (SocketTimeoutException e){
+                    Log.d(LOG_TAG, "Create Socket Timeout");
+                    isConnected = false;
+                    if (connectCallback!=null){
+                        connectCallback.onError(ERROR_TIMEOUT);
+                    } else {
+                        e.printStackTrace();
+                    }
+                } catch (IOException e) {
+                    if (connectCallback!=null){
+                        connectCallback.onError(ERROR_SETTING);
+                    } else {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }.start();
+    }
+
+    public void socketDestroy(){
         try {
+            isConnected = false;
             if(dos != null) {
                 dos.close();
             }
@@ -93,26 +146,32 @@ public class SocketHandler {
                 @Override
                 public void run() {
                     try {
-                        if( missingResponse < 10) {
+                        if( missingResponse < 15) {
+                            missingResponse++;
                             dos.write(imageBytes);
                             Log.d(LOG_TAG, "Data Sent");
-                            missingResponse++;
                             BufferedReader input = new BufferedReader(new InputStreamReader(mSocket.getInputStream()));
                             String res = input.readLine();
-                            Message completeMessage = uiThreadHandler.obtainMessage(MESSAGE_FROM_SERVER, res);
+                            Message completeMessage = uiThreadHandler.obtainMessage(MSG_ON_SUCCESS, res);
                             completeMessage.sendToTarget();
                             missingResponse--;
                             Log.d(LOG_TAG, "Missing Response: " + String.valueOf(missingResponse));
                         } else {
-                            Message errorMessage = uiThreadHandler.obtainMessage(MESSAGE_OF_ERROR, ERROR_DISCONNECTED);
+                            Message errorMessage = uiThreadHandler.obtainMessage(MSG_ON_ERROR, ERROR_DISCONNECTED);
                             errorMessage.sendToTarget();
+                            isConnected = false;
+                            socketDestroy();
                         }
+                    } catch (SocketTimeoutException e) {
+                        Log.d(LOG_TAG,  "Timeout Happened");
+                        Message errorMessage = uiThreadHandler.obtainMessage(MSG_ON_ERROR, ERROR_TIMEOUT);
+                        errorMessage.sendToTarget();
                     } catch (SocketException e){
-                        if(e.getMessage().equalsIgnoreCase("Broken Pipe")){
-                            Log.d(LOG_TAG,  e.getMessage());
-                        } else if (e.getMessage().equalsIgnoreCase("Read Timed out")){
-                            Log.d(LOG_TAG,  e.getMessage());
-                        }
+                        Log.d(LOG_TAG,  "Broken Pipe");
+                        Message errorMessage = uiThreadHandler.obtainMessage(MSG_ON_ERROR, ERROR_DISCONNECTED);
+                        errorMessage.sendToTarget();
+                        isConnected = false;
+                        socketDestroy();
                     } catch (IOException e) {
                         e.printStackTrace();
                     }
@@ -121,23 +180,6 @@ public class SocketHandler {
         }
     }
 
-    public void listen( ) {
-        if( uiThreadHandler==null ){
-            Log.d(LOG_TAG, "set uiThreadHandler first. Call setUiThreadHandler()");
-            return;
-        }
-        Handler firstHandler = new Handler();
-        firstHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (mSocket==null || !mSocket.isConnected()){
-                    Message errorMessage = uiThreadHandler.obtainMessage(MESSAGE_OF_ERROR, ERROR_CONNECTION_FAIL);
-                    errorMessage.sendToTarget();
-                    isConnected = false;
-                }
-            }
-        }, 1000);
-    }
 
     public void setUiThreadHandler(final StringCallback callback){
         uiThreadHandler = new Handler(Looper.getMainLooper()){
@@ -146,10 +188,10 @@ public class SocketHandler {
                 String response = (String)msg.obj;
                 Log.d(LOG_TAG, msg.toString());
                 switch (msg.what){
-                    case MESSAGE_FROM_SERVER:
+                    case MSG_ON_SUCCESS:
                         callback.onResponse(response);
                         break;
-                    case MESSAGE_OF_ERROR:
+                    case MSG_ON_ERROR:
                         Log.d(LOG_TAG, response);
                         callback.onError(response);
                         break;
@@ -162,4 +204,46 @@ public class SocketHandler {
     public boolean isConnected() {
         return isConnected;
     }
+
+    /******  Higher Level of API ******/
+    private int             mFrameIndex = 0;
+
+    public void uploadImage(Image image, Configuration confHandler){
+        Log.d(LOG_TAG, "Come on");
+        Mat yuvMat = ImageProcessHandler.getBGRMatFromImage(image);
+        Mat colorImg = new Mat(
+                DataCollectionActivity.Image_Size.getWidth(),
+                DataCollectionActivity.Image_Size.getHeight(),
+                CvType.CV_8UC3);
+        Imgproc.cvtColor(yuvMat, colorImg, Imgproc.COLOR_YUV2BGR_I420);
+        switch (confHandler.getImageRotation()){
+            case 0:
+                break;
+            case 90:
+                Core.rotate(colorImg, colorImg, Core.ROTATE_90_CLOCKWISE);
+                break;
+            case 180:
+                Core.rotate(colorImg, colorImg, Core.ROTATE_180);
+                break;
+            case 270:
+                Core.rotate(colorImg, colorImg, Core.ROTATE_90_COUNTERCLOCKWISE);
+                break;
+            default:
+                break;
+        }
+        TimerHandler.getInstance().tic();
+        byte[] jpegBytes = ImageProcessHandler.fromMatToJpegByte(colorImg);
+        Log.d(LOG_TAG, "Image Format Conversion: " + String.valueOf(TimerHandler.getInstance().toc()));
+        byte[] sizeBytes = ByteBuffer.allocate(4).putInt(jpegBytes.length).order(ByteOrder.nativeOrder()).array();
+        byte[] seqBytes = new byte[2];
+        seqBytes[0] = (byte)(mFrameIndex & 0xFF);
+        byte[] data = new byte[jpegBytes.length + 5];
+        System.arraycopy(sizeBytes, 0, data, 0, 4);
+        System.arraycopy(jpegBytes, 0, data, 4, jpegBytes.length);
+        System.arraycopy(seqBytes, 0, data, 4 + jpegBytes.length, 1);
+        send(data);
+        mFrameIndex++;
+    }
+
+
 }

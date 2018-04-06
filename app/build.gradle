@@ -21,9 +21,12 @@ android {
             // libraries Gradle should build and package with your APK.
             abiFilters 'armeabi-v7a'
             abiFilters 'armeabi'
+            abiFilters 'arm64-v8a'  // nexus 6p
+            abiFilters 'mips'
+            abiFilters 'mips64'
             abiFilters 'x86_64'
             abiFilters 'x86'        // tablet
-            abiFilters 'arm64-v8a'  // nexus 6p
+
         }
 
     }

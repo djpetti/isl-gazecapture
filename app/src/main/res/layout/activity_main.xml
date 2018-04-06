@@ -11,7 +11,7 @@
         android:id="@+id/main_activity_txt_title"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="0.3"
+        android:layout_weight="0.25"
         android:gravity="center"
         android:text="@string/main_activity_txt_title"
         android:textSize="30sp"
@@ -22,7 +22,7 @@
     <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="0.7"
+        android:layout_weight="0.75"
         android:paddingTop="40dp">
         <LinearLayout
             android:orientation="vertical"

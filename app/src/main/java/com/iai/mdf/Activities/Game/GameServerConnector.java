@@ -102,6 +102,7 @@ public class GameServerConnector {
                         e.printStackTrace();
                     }
                 } catch (IOException e) {
+                    connectCallback.onError(ERROR_SETTING);
                     e.printStackTrace();
                 }
             }
@@ -135,7 +136,7 @@ public class GameServerConnector {
                 @Override
                 public void run() {
                     try {
-                        if( missingResponse < 20) {
+                        if( missingResponse < 15) {
                             missingResponse++;
                             dos.write(imageBytes);
                             Log.d(LOG_TAG, "Data Sent");
