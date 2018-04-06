@@ -98,7 +98,6 @@ class Server(object):
       logger.warning("Failed to read frame.")
       # Send invalid response.
       self.send_response(None, sequence_num)
-
       return False;
     else:
       logger.info("Got new frame.")

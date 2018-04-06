@@ -117,8 +117,8 @@ class EyeCropper:
     high_y = int(bot[1])
 
     # Make sure coordinates are in range.
-    low_x = max(0.0, low_x)
-    low_y = max(0.0, low_y)
+    low_x = max(0, low_x)
+    low_y = max(0, low_y)
 
     if (high_x - low_x < 1 or high_y - low_y < 1):
       # This is just a bad detection.
@@ -214,6 +214,7 @@ class EyeCropper:
       The face grid x and y positions, as well as the width and height, all as
       one tuple. """
     image_h, image_w, _ = self.__image_shape
+    print self.__image_shape
 
     # Normalize image dimensions and face box for the camera FOV.
     fov_long, fov_short = self.__phone.get_camera_fov()
@@ -234,7 +235,7 @@ class EyeCropper:
     face_w += diff_w
     face_h += diff_h
     print face_bbox
-    print "%f, %f" % (scale_w, scale_h)
+    print "%f, %f" % (image_w, image_h)
     print "(%f, %f, %f, %f)" % (face_x, face_y, face_w, face_h)
 
     # Convert to 25x25 grid coordinate system.
@@ -242,6 +243,14 @@ class EyeCropper:
     grid_y = face_y / image_h * 25.0
     grid_w = face_w / image_w * 25.0
     grid_h = face_h / image_h * 25.0
+
+    # Make sure everything's in-bounds.
+    grid_x = max(grid_x, 0.0)
+    grid_y = max(grid_y, 0.0)
+    if grid_x + grid_w > 25.0:
+      grid_w = 25.0 - grid_x
+    if grid_y + grid_h > 25.0:
+      grid_h = 25.0 - grid_y
 
     return (int(grid_x), int(grid_y), int(grid_w), int(grid_h))
 
@@ -252,8 +261,7 @@ class EyeCropper:
       represent the background. """
     x, y, w, h = self.face_grid_box()
 
-    x = max(0, x)
-    y = max(0, y)
+    print "(%d, %d, %d, %d)" % (x, y, w, h)
 
     # Create the interior image.
     face_box = np.ones((h, w))
