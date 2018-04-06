@@ -13,11 +13,20 @@ import config
 
 logger = logging.getLogger(__name__)
 
+# This is the baseline FOV that we normalize camera FOVs to. In this case, it is
+# taken from the camera on an iPhone 6S.
+FOV_NORM_LONG = 38.0
+FOV_NORM_SHORT = 28.0
 
 class EyeCropper:
   """ Handles croping the eye from a series of images. """
 
-  def __init__(self):
+  def __init__(self, phone):
+    """
+    Args:
+      phone: The configuration of the phone that produced the data. """
+    self.__phone = phone
+
     # Landmark detector to use henceforth.
     self.__detector = ld.LandmarkDetection()
     self.__pose = ld.PoseEstimation()
@@ -199,33 +208,58 @@ class EyeCropper:
       A matrix with pitch, yaw, and roll. """
     return self.__pose.weakIterative_Occlusion(self.__points)
 
+  def face_grid_box(self):
+    """ Computes the dimensions fot the face grid of the last image it cropped.
+    Returns:
+      The face grid x and y positions, as well as the width and height, all as
+      one tuple. """
+    image_h, image_w, _ = self.__image_shape
+
+    # Normalize image dimensions and face box for the camera FOV.
+    fov_long, fov_short = self.__phone.get_camera_fov()
+    scale_w = FOV_NORM_LONG / fov_long
+    scale_h = FOV_NORM_SHORT / fov_short
+
+    diff_w = image_w - image_w * scale_w
+    diff_h = image_h - image_h * scale_h
+    image_w -= diff_w
+    image_h -= diff_h
+
+    # The face coordinates are going to shift, since we're effectively cutting
+    # part of the image off.
+    face_bbox = self.__get_face_bbox(self.__points)
+    face_x, face_y, face_w, face_h = [float(x) for x in face_bbox]
+    face_x -= diff_w / 2
+    face_y -= diff_h / 2
+    face_w += diff_w
+    face_h += diff_h
+    print face_bbox
+    print "%f, %f" % (scale_w, scale_h)
+    print "(%f, %f, %f, %f)" % (face_x, face_y, face_w, face_h)
+
+    # Convert to 25x25 grid coordinate system.
+    grid_x = face_x / image_w * 25.0
+    grid_y = face_y / image_h * 25.0
+    grid_w = face_w / image_w * 25.0
+    grid_h = face_h / image_h * 25.0
+
+    return (int(grid_x), int(grid_y), int(grid_w), int(grid_h))
+
   def face_grid(self):
     """ Constructs the face grid input for the last image it cropped.
     Returns:
       A 25x25 matrix, where 1s represent the location of the face, and 0s
       represent the background. """
-    bbox = self.__get_face_bbox(self.__points)
-    p1_x, p1_y = bbox[0:2]
-    p2_x = p1_x + bbox[2]
-    p2_y = p1_y + bbox[3]
+    x, y, w, h = self.face_grid_box()
 
-    # Scale to the image shape.
-    image_y, image_x, _ = self.__image_shape
-    p1_x = float(p1_x) / image_x * 25.0
-    p2_x = float(p2_x) / image_x * 25.0
-    p1_y = float(p1_y) / image_y * 25.0
-    p2_y = float(p2_y) / image_y * 25.0
-
-    p1_x = int(p1_x)
-    p2_x = int(p2_x)
-    p1_y = int(p1_y)
-    p2_y = int(p2_y)
+    x = max(0, x)
+    y = max(0, y)
 
     # Create the interior image.
-    face_box = np.ones((p2_y - p1_y, p2_x - p1_x))
+    face_box = np.ones((h, w))
     # Create the background.
     frame = np.zeros((25, 25))
     # Superimpose it.
-    frame[p1_y:p2_y, p1_x:p2_x] = face_box
+    frame[y:(y + h), x:(x + w)] = face_box
 
     return frame

@@ -6,7 +6,7 @@ import logging
 
 import cv2
 
-from itracker.common import config
+from itracker.common import config, phone_config
 from itracker.server.gaze_predictor import GazePredictor
 from itracker.server import server
 
@@ -40,14 +40,15 @@ def demo(port):
     cv2.imshow("test", frame)
     cv2.waitKey(1)
 
-def predict_forever(model_file, port, display_crops=False):
+def predict_forever(model_file, port, phone, display_crops=False):
   """ Runs the server process and prediction pipeline forever.
   Args:
     model_file: The model file to use for predictions.
     port: The port for the server to listen on.
+    phone: The configuration for the phone we are using.
     display_crops: If true, it will display the crops for the images it
                    receives. Useful for debugging. """
-  predictor = GazePredictor(model_file, display=display_crops)
+  predictor = GazePredictor(model_file, phone, display=display_crops)
   my_server = server.Server(port)
 
   while True:
@@ -65,17 +66,22 @@ def predict_forever(model_file, port, display_crops=False):
 def main():
   parser = argparse.ArgumentParser( \
       description="Run the gaze estimation server.")
+  parser.add_argument("phone_config",
+                      help="Path to configuration for phone we are using.")
   parser.add_argument("-d", "--demo", action="store_true",
                       help="Run a demo server that displays received images.")
   parser.add_argument("-c", "--display_crops", action="store_true",
                       help="Displays crops for the images it receives.")
   args = parser.parse_args()
 
+  # Load the phone configuration.
+  phone = phone_config.PhoneConfig(args.phone_config)
+
   if args.demo:
     # Run the demo.
     demo(config.SERVER_PORT)
   else:
-    predict_forever(config.MODEL_FILE, config.SERVER_PORT,
+    predict_forever(config.MODEL_FILE, config.SERVER_PORT, phone,
                     display_crops=args.display_crops)
 
 

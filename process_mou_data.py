@@ -13,7 +13,7 @@ from itracker.common import eye_cropper, phone_config
 SKIP_FRAMES = 15
 
 # Eye cropper that will be used if needed.
-cropper = eye_cropper.EyeCropper()
+cropper = None
 
 def load_image_data(session_dir, image_name, image):
   """ Loads metadata for an image.
@@ -104,27 +104,19 @@ def convert_to_face_coords(face_bbox, leye_bbox, reye_bbox):
 
   return (leye_bbox, reye_bbox)
 
-def get_face_grid(image_size, face_bbox):
-  """ Computes the face grid fractional values for a face crop.
-  Args:
-    image_size: The shape of the raw image.
-    face_bbox: The face bounding box.
+def get_face_grid():
+  """ Computes the face grid fractional values for the last image it cropped.
   Returns:
     The fractional x, y, w, and h of the face grid. """
-  image_h, image_w, _ = image_size
-
-  grid_x = float(face_bbox[0]) / image_w
-  grid_y = float(face_bbox[1]) / image_h
-
-  grid_w = float(face_bbox[2]) / image_w
-  grid_h = float(face_bbox[3]) / image_h
+  # Get standard bounding box.
+  grid_x, grid_y, grid_w, grid_h = cropper.face_grid_box()
 
   # We have to do some numerical gymnastics here, since the training code
   # expects the grid to be 1-indexed, like in the gazecapture dataset.
-  grid_x = ((grid_x * 25.0) + 1) / 25.0
-  grid_y = ((grid_y * 25.0) + 1) / 25.0
-  grid_w = ((grid_w * 25.0) + 1) / 25.0
-  grid_h = ((grid_h * 25.0) + 1) / 25.0
+  grid_x = (grid_x + 1) / 25.0
+  grid_y = (grid_y + 1) / 25.0
+  grid_w = (grid_w + 1) / 25.0
+  grid_h = (grid_h + 1) / 25.0
 
   return (grid_x, grid_y, grid_w, grid_h)
 
@@ -138,11 +130,12 @@ def extract_crop(image, bbox):
   x, y, w, h = bbox
   return image[y:y + h, x:x + w]
 
-def load_face_and_data(image):
+def load_face_and_data(image, phone):
   """ Loads an image and corresponding data for that image, and extracts the
   face.
   Args:
     image: The raw image that we want to process.
+    phone: The configuration of the phone that produced the data.
   Returns:
     The loaded face crop, the left eye bbox coordinates, the right eye bbox
     coordinates, and the face grid fractional coordinates, or a tuple of None if
@@ -154,7 +147,7 @@ def load_face_and_data(image):
     print "WARNING: Failed to crop image."
     return (None, None, None, None)
 
-  face_grid = get_face_grid(image.shape, face_bbox)
+  face_grid = get_face_grid()
   face_crop = extract_crop(image, face_bbox)
   leye_bbox, reye_bbox = convert_to_face_coords(list(face_bbox),
                                                 list(leye_bbox),
@@ -267,7 +260,7 @@ def load_session(video_file, data_file, phone):
         continue
 
       # Load face and calculate bbox data.
-      face_crop, leye_bbox, reye_bbox, grid = load_face_and_data(frame)
+      face_crop, leye_bbox, reye_bbox, grid = load_face_and_data(frame, phone)
       if face_crop is None:
         # Detection failed.
         continue
@@ -421,6 +414,8 @@ def main():
   print "Using phone configuration: %s" % (args.phone_config)
   phone = phone_config.PhoneConfig(args.phone_config)
 
+  global cropper
+  cropper = eye_cropper.EyeCropper(phone)
   process_dataset(args.dataset_dir, args.output_dir, phone)
 
 if __name__ == "__main__":

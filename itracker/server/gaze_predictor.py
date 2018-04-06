@@ -16,15 +16,17 @@ logger = logging.getLogger(__name__)
 class GazePredictor(object):
   """ Handles capturing eye images, and uses the model to predict gaze. """
 
-  def __init__(self, model_file, display=False):
+  def __init__(self, model_file, phone, display=False):
     """
     Args:
       model_file: The saved model to load for predictions.
+      phone: The configuration data for the phone we are using.
       display: If true, it will enable a debug display that shows the image
                crops. """
     # Initialize capture and prediction processes.
     self.__prediction_process = _CnnProcess(model_file)
     self.__landmark_process = _LandmarkProcess(self.__prediction_process,
+                                               phone,
                                                display=display)
 
   def __del__(self):
@@ -132,14 +134,16 @@ class _LandmarkProcess(object):
   """ Reads images from a queue, and runs landmark detection in a separate
   process. """
 
-  def __init__(self, cnn_process, display=False):
+  def __init__(self, cnn_process, phone, display=False):
     """
     Args:
+      phone: The configuration of the phone that we are capturing data on.
       cnn_process: The _CnnProcess to send captured images to.
       display: If true, it will enable a debugging display that shows the
                detected crops on-screen. """
     self.__cnn_process = cnn_process
     self.__display = display
+    self.__phone = phone
 
     # Create the queues.
     self.__input_queue = Queue()
@@ -195,7 +199,7 @@ class _LandmarkProcess(object):
   def run_forever(self):
     """ Reads and crops images indefinitely. """
     # Eye cropper to use for eye detection.
-    self.__cropper = EyeCropper()
+    self.__cropper = EyeCropper(self.__phone)
 
     while True:
       self.__run_once()
