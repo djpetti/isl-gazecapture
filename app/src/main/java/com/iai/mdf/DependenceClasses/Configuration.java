@@ -74,8 +74,8 @@ public class Configuration {
         ((Activity)ctxt).getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
         screenResoX = displayMetrics.widthPixels;
         screenResoY = displayMetrics.heightPixels;
-        collectionCaptureDelayTime = settings.getInt(this.KEY_CAPTURE_SPEED_COLLECTION, 400);
-        demoCaptureDelayTime = settings.getInt(this.KEY_CAPTURE_SPEED_REALTIME, 330);
+        collectionCaptureDelayTime = settings.getInt(this.KEY_CAPTURE_SPEED_COLLECTION, 700);
+        demoCaptureDelayTime = settings.getInt(this.KEY_CAPTURE_SPEED_REALTIME, 300);
         imageRotation = settings.getInt(this.KEY_CAPTURE_ROTATION, 0);
     }
 

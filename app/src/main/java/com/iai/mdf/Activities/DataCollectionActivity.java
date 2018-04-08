@@ -14,9 +14,14 @@ import android.view.WindowManager;
 import android.widget.Toast;
 
 import com.iai.mdf.Fragments.FragmentDataCollectionByPicture;
+import com.iai.mdf.Fragments.FragmentDataCollectionByPicture2;
 import com.iai.mdf.Fragments.FragmentDataCollectionByVideo;
 import com.iai.mdf.Fragments.FragmentPreview;
 import com.iai.mdf.R;
+
+import org.opencv.android.BaseLoaderCallback;
+import org.opencv.android.LoaderCallbackInterface;
+import org.opencv.android.OpenCVLoader;
 
 /**
  * Created by mou on 9/16/17.
@@ -29,6 +34,7 @@ public class DataCollectionActivity extends AppCompatActivity {
     private final String FRAGMENT_TAG_PICTURE = "PICTURE_FRAGMENT";
     private final String FRAGMENT_TAG_VIDEO = "VIDEO_FRAGMENT";
 
+    private BaseLoaderCallback openCVLoaderCallback;
     private boolean doubleBackToExitPressedOnce = false;
     private FragmentManager     fragmentManager;
 
@@ -41,6 +47,9 @@ public class DataCollectionActivity extends AppCompatActivity {
         setContentView(R.layout.activity_data_collection);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         getSupportActionBar().hide();
+
+        // load OpenCV
+        initOpenCV();
 
         fragmentManager = getSupportFragmentManager();
         FragmentPreview fragmentPreview = new FragmentPreview();
@@ -60,7 +69,8 @@ public class DataCollectionActivity extends AppCompatActivity {
                 FragmentTransaction transaction = fragmentManager.beginTransaction();
                 switch (v.getId()) {
                     case R.id.fragment_preview_btn_picture:
-                        FragmentDataCollectionByPicture fragmentDataCollectionByPicture = new FragmentDataCollectionByPicture();
+//                        FragmentDataCollectionByPicture fragmentDataCollectionByPicture = new FragmentDataCollectionByPicture();
+                        FragmentDataCollectionByPicture2 fragmentDataCollectionByPicture = new FragmentDataCollectionByPicture2();
                         transaction.replace(R.id.activity_data_collection_layout_fragment_holder, fragmentDataCollectionByPicture, FRAGMENT_TAG_PICTURE);
                         transaction.commit();
                         break;
@@ -93,8 +103,8 @@ public class DataCollectionActivity extends AppCompatActivity {
         if( fragment instanceof FragmentPreview ){    // if not collecting the training data
             super.onBackPressed();
             return;
-        } else if( fragment instanceof FragmentDataCollectionByPicture ) {
-            if( !((FragmentDataCollectionByPicture)fragment).isPicSaved() ){
+        } else if( fragment instanceof FragmentDataCollectionByPicture2 ) {
+            if( !((FragmentDataCollectionByPicture2)fragment).isPicSaved() ){
                 return;
             }
             if (doubleBackToExitPressedOnce) {
@@ -128,7 +138,33 @@ public class DataCollectionActivity extends AppCompatActivity {
 
 
 
-
+    private void initOpenCV(){
+        // used when loading openCV4Android
+        openCVLoaderCallback = new BaseLoaderCallback(this) {
+            @Override
+            public void onManagerConnected(int status) {
+                switch (status) {
+                    case LoaderCallbackInterface.SUCCESS: {
+                        Log.d(LOG_TAG, "OpenCV loaded successfully");
+//                    mOpenCvCameraView.enableView();
+//                    mOpenCvCameraView.setOnTouchListener(ColorBlobDetectionActivity.this);
+                    }
+                    break;
+                    default: {
+                        super.onManagerConnected(status);
+                    }
+                    break;
+                }
+            }
+        };
+        if (!OpenCVLoader.initDebug()) {
+            Log.d(LOG_TAG, "Internal OpenCV library not found. Using OpenCV Manager for initialization");
+            OpenCVLoader.initAsync(OpenCVLoader.OPENCV_VERSION_3_0_0, this, openCVLoaderCallback);
+        } else {
+            Log.d(LOG_TAG, "OpenCV library found inside package. Using it!");
+            openCVLoaderCallback.onManagerConnected(LoaderCallbackInterface.SUCCESS);
+        }
+    }
 
 
 

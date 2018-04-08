@@ -68,7 +68,7 @@ public class ImageFileHandler {
         if( -1!=imageWidth && -1!=imageHeight && -1!=imageFormat ) {
             imageReader = ImageReader.newInstance(imageWidth, imageHeight, imageFormat, maxImages);
             ImageReader.OnImageAvailableListener onImageAvailableListener;
-             onImageAvailableListener = new ImageReader.OnImageAvailableListener() {
+            onImageAvailableListener = new ImageReader.OnImageAvailableListener() {
                 @Override
                 public void onImageAvailable(ImageReader reader) {
                     Image image = reader.acquireLatestImage();

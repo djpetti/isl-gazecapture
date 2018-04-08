@@ -103,7 +103,7 @@ public class FragmentPreview extends Fragment{
     @Override
     public void onResume() {
         super.onResume();
-        cameraHandler = CameraHandler.getInstance(getActivity(), false);
+        cameraHandler = new CameraHandler(getActivity(), false);
         cameraHandler.startPreview(textureView);
     }
 

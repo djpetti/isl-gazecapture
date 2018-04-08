@@ -70,7 +70,6 @@ public class CameraHandler {
     private Context         ctxt;
     private CameraManager   cameraManager;
     private CameraDevice    frontCamera;
-    private ImageFileHandler imageFileHandler;
     private int             cameraState;
     Range<Integer> controlAECompensationRange;
     private Semaphore cameraOpenCloseLock = new Semaphore(1);
@@ -80,31 +79,31 @@ public class CameraHandler {
 
 
     // private constructor
-    private CameraHandler(Context context, boolean isUpload) {
+    public CameraHandler(Context context, boolean isPreviewUsed) {
         this.ctxt = context;
         cameraManager = (CameraManager) ctxt.getSystemService(Context.CAMERA_SERVICE);
-        imageFileHandler = new ImageFileHandler(context);
-        if( isUpload ) {
+        if( isPreviewUsed ) {
             imageReaderForPrev = ImageReader.newInstance(
-                    DataCollectionActivity.Image_Size.getWidth(),
                     DataCollectionActivity.Image_Size.getHeight(),
+                    DataCollectionActivity.Image_Size.getWidth(),
                     ImageFormat.YUV_420_888,
                     10
             );
         } else {
             imageReaderForPrev = null;
+            imageFileHandler = new ImageFileHandler(context);
         }
         frontCamera = null;
         cameraState = CAMERA_STATE_IDLE;
     }
 
     // to socketCreate a CameraHandler Singleton
-    public static synchronized CameraHandler getInstance(Context context, boolean isUpload) {
-        if (null == myInstance) {
-            myInstance = new CameraHandler(context, isUpload);
-        }
-        return myInstance;
-    }
+//    public static synchronized CameraHandler getInstance(Context context, boolean isPreviewUsed) {
+//        if (null == myInstance) {
+//            myInstance = new CameraHandler(context, isPreviewUsed);
+//        }
+//        return myInstance;
+//    }
 
 
     private String getFrontCameraId() {
@@ -141,9 +140,10 @@ public class CameraHandler {
 
 
 
-    /*************** Data Collection ***************/
+    /*************** Data Collection (Deprecated) ***************/
 
     // background capture
+    private ImageFileHandler            imageFileHandler;
     private Size                        savedImageSize;
     private CameraDevice.StateCallback  stateCallbackForImage;
     private CaptureRequest.Builder      captureBuilderForImage;
@@ -439,8 +439,8 @@ public class CameraHandler {
             frontCameraForPrev.createCaptureSession(
                     outputSurfaces,
                     new CameraCaptureSession.StateCallback() {
-                                @Override
-                                public void onConfigured(CameraCaptureSession session) {
+                        @Override
+                        public void onConfigured(CameraCaptureSession session) {
                                     if( frontCamera!=null ){
                                         return;
                                     }

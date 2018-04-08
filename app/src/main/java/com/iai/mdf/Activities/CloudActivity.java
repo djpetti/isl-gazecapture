@@ -126,7 +126,7 @@ public class CloudActivity extends AppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
-        cameraHandler = CameraHandler.getInstance(this, true);
+        cameraHandler = new CameraHandler(this, true);
         cameraHandler.setOnImageAvailableListenerForPrev(new ImageReader.OnImageAvailableListener() {
             @Override
             public void onImageAvailable(ImageReader reader) {

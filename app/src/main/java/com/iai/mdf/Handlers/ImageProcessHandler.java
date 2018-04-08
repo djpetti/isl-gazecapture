@@ -16,6 +16,7 @@ import android.renderscript.Type;
 import com.iai.mdf.Activities.MainActivity;
 import com.iai.mdf.JNInterface.MobileGazeJniInterface;
 
+import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfByte;
@@ -356,6 +357,19 @@ public class ImageProcessHandler {
 
     public static void cropSingleRegionAndSaveTFInput(long addrMat, int[] rect, int[] size, float[] tensorflowInput, long cropMatAddr, String path){
         jniHandler.cropImageAndSaveInput(addrMat, rect, size, tensorflowInput, cropMatAddr, path);
+    }
+
+    public static boolean rotateImage(Mat img, int degree){
+        if( degree == Core.ROTATE_90_CLOCKWISE
+                || degree == Core.ROTATE_180
+                || degree == Core.ROTATE_90_COUNTERCLOCKWISE ) {
+            jniHandler.rotateImage(
+                    img.getNativeObjAddr(),
+                    degree);
+            return true;
+        } else {
+            return false;
+        }
     }
 
     public static int[] getRotatedRGBImage(Image image){

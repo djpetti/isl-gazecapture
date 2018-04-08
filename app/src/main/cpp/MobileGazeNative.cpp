@@ -317,6 +317,24 @@ Java_com_iai_mdf_JNInterface_MobileGazeJniInterface_getRotatedRGBImage(
 }
 
 
+JNIEXPORT void JNICALL
+Java_com_iai_mdf_JNInterface_MobileGazeJniInterface_rotateImage(JNIEnv *env, jobject instance,
+                                                                jlong matAddr, jint rotate) {
+
+    // TODO
+    Mat &imageMat = *(Mat *) matAddr;
+    //0=CW, 1=180, 2=CCW
+    if (rotate == 0) {
+        transpose(imageMat, imageMat);
+        flip(imageMat, imageMat, 1); //transpose+flip(1)=CW
+    } else if (rotate == 1) {
+        flip(imageMat, imageMat, -1);    //flip(-1)=180
+    } else if (rotate == 2) {
+        transpose(imageMat, imageMat);
+        flip(imageMat, imageMat, 0); //transpose+flip(0)=CCW
+    }
+}
+
 JNIEXPORT jbyteArray JNICALL
 Java_com_iai_mdf_JNInterface_MobileGazeJniInterface_encodeIntoJpegArray(JNIEnv *env,
                                                                         jobject instance,

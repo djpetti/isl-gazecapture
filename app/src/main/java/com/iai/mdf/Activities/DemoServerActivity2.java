@@ -6,7 +6,6 @@ import android.media.ImageReader;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
-import android.os.Looper;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
@@ -22,8 +21,6 @@ import android.widget.Toast;
 import android.widget.ToggleButton;
 
 import com.iai.mdf.DependenceClasses.Configuration;
-import com.iai.mdf.DependenceClasses.DeviceProfile;
-import com.iai.mdf.FaceDetectionAPI;
 import com.iai.mdf.Handlers.CameraHandler;
 import com.iai.mdf.Handlers.DrawHandler;
 import com.iai.mdf.Handlers.ImageProcessHandler;
@@ -37,7 +34,6 @@ import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
 import org.opencv.core.Point;
@@ -58,10 +54,6 @@ public class DemoServerActivity2 extends AppCompatActivity {
     public static final String BUNDLE_KEY_IP = "ip";
     public static final String BUNDLE_KEY_PORT = "port";
     private final String LOG_TAG = "DemoServerActivity2";
-    private final String JSON_STRING_START = "RESP_START";
-    private final String JSON_KEY_PREDICT_X = "PredictX";
-    private final String JSON_KEY_PREDICT_Y = "PredictY";
-    private final String JSON_KEY_SEQ_NUMBER = "SequenceNumber";
 
 
     private CameraHandler cameraHandler;
@@ -78,7 +70,7 @@ public class DemoServerActivity2 extends AppCompatActivity {
     private BaseLoaderCallback openCVLoaderCallback;
     private boolean isRealTimeDetection = false;
     private Handler autoDetectionHandler = new Handler();
-    private Runnable autoDetectionRunnable;
+    private Runnable takePicRunnable;
     private Runnable autoDotGenerationRunnable;
     private TensorFlowHandler tensorFlowHandler;
     private int         mFrameIndex = 0;
@@ -137,20 +129,20 @@ public class DemoServerActivity2 extends AppCompatActivity {
                 drawHandler.clear(frame_gaze_result);
                 drawHandler.clear(view_dot_container);
                 Log.d(LOG_TAG, "pressed");  //cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_STILL_CAPTURE);
-                if ( !socketHandler.isConnected() ){
-                    showToast("Not connected.\nRestart the activity please");
+                if( !socketHandler.isConnected() && !isRealTimeDetection ){
+                    Toast.makeText(DemoServerActivity2.this, "Restart to connect to the server", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 isRealTimeDetection = !isRealTimeDetection;
                 if(isRealTimeDetection){
                     frame_background_grid.setBackgroundColor(0xFFFFFFFF);   // cover texture with white
-                    autoDetectionHandler.post(autoDetectionRunnable);
+                    autoDetectionHandler.post(takePicRunnable);
                     autoDetectionHandler.post(autoDotGenerationRunnable);
                     result_board.setText("");
                 } else {
                     frame_background_grid.setBackgroundColor(0x00FFFFFF);   // uncover texture with translucent
                     cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_PREVIEW);
-                    autoDetectionHandler.removeCallbacks(autoDetectionRunnable);
+                    autoDetectionHandler.removeCallbacks(takePicRunnable);
                     autoDetectionHandler.removeCallbacks(autoDotGenerationRunnable);
                     result_board.setText("Press Anywhere to Start");
                 }
@@ -163,12 +155,10 @@ public class DemoServerActivity2 extends AppCompatActivity {
         result_board = (TextView) findViewById(R.id.activity_demo_txtview_result);
         result_board.setText("Press Anywhere to Start");
 
-        autoDetectionRunnable = new Runnable() {
+        takePicRunnable = new Runnable() {
             @Override
             public void run() {
                 cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_STILL_CAPTURE);
-//                drawHandler.clear(frame_bounding_box);
-//                drawHandler.clear(view_dot_container);
                 autoDetectionHandler.postDelayed(this, confHandler.getDemoCaptureDelayTime());
             }
         };
@@ -192,7 +182,7 @@ public class DemoServerActivity2 extends AppCompatActivity {
     @Override
     public void onResume() {
         super.onResume();
-        cameraHandler = CameraHandler.getInstance(this, true);
+        cameraHandler = new CameraHandler(this, true);
         cameraHandler.setOnImageAvailableListenerForPrev(new ImageReader.OnImageAvailableListener() {
             @Override
             public void onImageAvailable(ImageReader reader) {
@@ -203,7 +193,7 @@ public class DemoServerActivity2 extends AppCompatActivity {
 //                    drawHandler.clear(frame_bounding_box);
 //                    drawHandler.clear(frame_gaze_result);
                     if( Build.MODEL.equalsIgnoreCase("BLU Studio Touch")) {
-                        uploadImageOnBLU(image);
+                        socketHandler.uploadImageOnBLU(image);
                     } else {
                         socketHandler.uploadImage(image, confHandler);
                     }
@@ -220,13 +210,11 @@ public class DemoServerActivity2 extends AppCompatActivity {
     public void onPause(){
         super.onPause();
         cameraHandler.stopPreview();
-        autoDetectionHandler.removeCallbacks(autoDetectionRunnable);
+        autoDetectionHandler.removeCallbacks(takePicRunnable);
         autoDetectionHandler.removeCallbacks(autoDotGenerationRunnable);
         isRealTimeDetection = false;
         // stop socket communication
-        if(socketHandler!=null) {
-            socketHandler.socketDestroy();
-        }
+        socketHandler.socketDestroy();
     }
 
 
@@ -261,32 +249,20 @@ public class DemoServerActivity2 extends AppCompatActivity {
 
     private void initSocketConnection(){
         socketHandler = new SocketHandler(socketIp, socketPort);
-        socketHandler.setConnectCallback(new SocketHandler.StringCallback() {
-            @Override
-            public void onResponse(String str) {
-            }
-
-            @Override
-            public void onError(String str) {
-                showToast("Please set the address and the port correctly");
-            }
-        });
-        socketHandler.socketCreate();
         socketHandler.setUiThreadHandler(new SocketHandler.StringCallback() {
             @Override
             public void onResponse(String str) {
                 try {
-                    if( str!=null ) {
-                        JSONObject object = new JSONObject(str);
-                        if (object != null) {
+                    if (str.equalsIgnoreCase(SocketHandler.SUCCESS_CONNECT_MSG)){
+                        return;
+                    }
+                    JSONObject object = new JSONObject(str);
+                    if (object != null) {
+                        if( object.getBoolean(SocketHandler.JSON_KEY_VALID) && isRealTimeDetection ) {
+                            drawGaze(object);
                             Log.d(LOG_TAG, object.toString());
-                            if( object.getBoolean("Valid") && isRealTimeDetection ) {
-                                drawGaze(object);
-                                Log.d(LOG_TAG, "draw");
-                            } else {
-                                showToast("No Detection");
-                                Log.d(LOG_TAG, "no detection");
-                            }
+                        } else {
+                            Log.d(LOG_TAG, "inValid");
                         }
                     }
                 } catch (JSONException e) {
@@ -298,40 +274,17 @@ public class DemoServerActivity2 extends AppCompatActivity {
             public void onError(String str) {
                 Log.e(LOG_TAG, str);
                 if( str.equalsIgnoreCase(SocketHandler.ERROR_DISCONNECTED) ){
-                    showToast("Disconnect From Server\nRestart Please");
+                    Toast.makeText(DemoServerActivity2.this, "Disconnect From Server\nRestart Please", Toast.LENGTH_SHORT).show();
                     frame_bounding_box.performClick();
                 } else if (str.equalsIgnoreCase(SocketHandler.ERROR_TIMEOUT)) {
-                    showToast("Timeout");
+                     Log.d(LOG_TAG, "Timeout");
+                } else if (str.equalsIgnoreCase(SocketHandler.ERROR_SETTING)) {
+                    Toast.makeText(DemoServerActivity2.this, "Please set the address and the port correctly", Toast.LENGTH_SHORT).show();
+                    result_board.setText("Wrong address or port");
                 }
             }
         });
-    }
-
-
-    private long total_time = 0;
-    private void uploadImageOnBLU(Image image){
-        TimerHandler.getInstance().tic();
-//        byte[] jpegBytes = ImageProcessHandler.encodeIntoJpegBytes(image);
-        Mat colorImg = new Mat(
-                DataCollectionActivity.Image_Size.getWidth(),
-                DataCollectionActivity.Image_Size.getHeight(),
-                CvType.CV_8UC4);
-        ImageProcessHandler.getRGBMat(image, colorImg.getNativeObjAddr());
-        Imgproc.cvtColor(colorImg, colorImg, Imgproc.COLOR_BGRA2BGR);
-//
-        byte[] jpegBytes = ImageProcessHandler.fromMatToJpegByte(colorImg);
-//        byte[] imageBytes = ImageProcessHandler.fromMatToJpegByte2(colorImg);
-        Log.d(LOG_TAG, "Image Format Conversion: " + String.valueOf(TimerHandler.getInstance().toc()));
-        total_time += TimerHandler.getInstance().toc();
-        byte[] sizeBytes = ByteBuffer.allocate(4).putInt(jpegBytes.length).order(ByteOrder.nativeOrder()).array();
-        byte[] seqBytes = new byte[2];
-        seqBytes[0] = (byte)(mFrameIndex & 0xFF);
-        byte[] data = new byte[jpegBytes.length + 5];
-        System.arraycopy(sizeBytes, 0, data, 0, 4);
-        System.arraycopy(jpegBytes, 0, data, 4, jpegBytes.length);
-        System.arraycopy(seqBytes, 0, data, 4 + jpegBytes.length, 1);
-        socketHandler.send(data);
-        mFrameIndex++;
+        socketHandler.socketCreate();
     }
 
 
@@ -339,18 +292,6 @@ public class DemoServerActivity2 extends AppCompatActivity {
 
 
 
-
-
-    private Toast toast;
-    public void showToast(final String msg){
-        new Handler(Looper.getMainLooper()).post(new Runnable() {
-            @Override
-            public void run() {
-                toast = Toast.makeText(DemoServerActivity2.this, msg, Toast.LENGTH_SHORT);
-                toast.show();
-            }
-        });
-    }
 
     private int[] fetchScreenSize(){
         DisplayMetrics displayMetrics = new DisplayMetrics();
@@ -358,20 +299,13 @@ public class DemoServerActivity2 extends AppCompatActivity {
         return new int[]{displayMetrics.widthPixels, displayMetrics.heightPixels};
     }
 
-    private void switchBackground(FrameLayout layoutHolder, int layoutId){
-        layoutHolder.removeAllViews();
-        LayoutInflater inflater = (LayoutInflater) this.getSystemService(LAYOUT_INFLATER_SERVICE);
-        View childLayout = inflater.inflate(layoutId, (ViewGroup) findViewById(R.id.grid_for_demo));
-        layoutHolder.addView(childLayout);
-    }
-
     private void drawGaze(JSONObject object){
         try {
-            int receivedIdx = object.getInt(JSON_KEY_SEQ_NUMBER);
+            int receivedIdx = object.getInt(SocketHandler.JSON_KEY_SEQ_NUMBER);
             if( receivedIdx > prevReceivedGazeIndex ){
                 prevReceivedGazeIndex = receivedIdx;
-                double portraitHori = object.getDouble(JSON_KEY_PREDICT_Y);
-                double portraitVert = object.getDouble(JSON_KEY_PREDICT_X);
+                double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
+                double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
                 float[] loc = new float[2];
 //                loc[0] = (float)((portraitHori + deviceProfile.getCameraOffsetX())/deviceProfile.getScreenSizeX());
 //                loc[1] = (float)((portraitVert + deviceProfile.getCameraOffsetY())/deviceProfile.getScreenSizeY());

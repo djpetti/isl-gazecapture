@@ -36,6 +36,7 @@ import com.iai.mdf.Activities.MainActivity;
 import com.iai.mdf.DependenceClasses.Configuration;
 import com.iai.mdf.DependenceClasses.GameGrid;
 import com.iai.mdf.Handlers.CameraHandler;
+import com.iai.mdf.Handlers.SocketHandler;
 import com.iai.mdf.R;
 
 import org.json.JSONException;
@@ -311,40 +312,23 @@ public class GameMainActivity extends Activity {
 
 
     /****  Server ****/
-    private GameServerConnector serverConnector;
+    private SocketHandler serverConnector;
     private Toast toast;
 
     private void connectServer(){
         SharedPreferences settings = getSharedPreferences(MainActivity.PREFERENCE_NAME, Context.MODE_PRIVATE);
         String lastIp = settings.getString(GameSettingActivity.BUNDLE_KEY_IP, null);
         String lastPort = settings.getString(GameSettingActivity.BUNDLE_KEY_PORT, "0");
-        serverConnector = new GameServerConnector(lastIp, Integer.parseInt(lastPort));
-        serverConnector.setConnectCallback(new GameServerConnector.StringCallback() {
-            @Override
-            public void onResponse(String str) {
-                if( toast!=null ) {
-                    toast.cancel();
-                }
-                imgServerConnect.setImageResource(R.drawable.game_main_server_valid);
-                if( isGameStarted ){
-                    takeImageHandler.post(takeImageRunnable);
-                }
-            }
-
-            @Override
-            public void onError(String str) {
-                imgServerConnect.setImageResource(R.drawable.game_main_server_invalid);
-                if (str.equalsIgnoreCase(GameServerConnector.ERROR_SETTING)) {
-                    showToast("Please set the address and the port correctly");
-                }
-            }
-        });
-        serverConnector.socketCreate();
-        serverConnector.setUiThreadHandler(new GameServerConnector.StringCallback() {
+        serverConnector = new SocketHandler(lastIp, Integer.parseInt(lastPort));
+        serverConnector.setUiThreadHandler(new SocketHandler.StringCallback() {
             @Override
             public void onResponse(String str) {
                 imgServerConnect.setImageResource(R.drawable.game_main_server_valid);
                 try {
+                    if (str.equalsIgnoreCase(SocketHandler.SUCCESS_CONNECT_MSG) && isGameStarted){
+                        takeImageHandler.post(takeImageRunnable);
+                        return;
+                    }
                     if( str!=null ) {
                         JSONObject object = new JSONObject(str);
                         if (object != null ){
@@ -352,8 +336,7 @@ public class GameMainActivity extends Activity {
                                 analyzeGaze(object);
                                 Log.d(LOG_TAG, object.toString());
                             } else {
-                                showToast("No detection");
-                                Log.d(LOG_TAG, "No detection");
+                                Log.d(LOG_TAG, "inValid");
                             }
                         }
                     }
@@ -370,9 +353,13 @@ public class GameMainActivity extends Activity {
                     takeImageHandler.removeCallbacks(takeImageRunnable);
                 } else if (str.equalsIgnoreCase(GameServerConnector.ERROR_TIMEOUT)) {
                     imgServerConnect.setImageResource(R.drawable.game_main_server_timeout);
+                } else if (str.equalsIgnoreCase(SocketHandler.ERROR_SETTING)) {
+                    Toast.makeText(GameMainActivity.this, "Please check the address and the port to use eye controller", Toast.LENGTH_SHORT).show();
+                    imgServerConnect.setImageResource(R.drawable.game_main_server_invalid);
                 }
             }
         });
+        serverConnector.socketCreate();
     }
 
     public void showToast(final String msg){
@@ -400,7 +387,7 @@ public class GameMainActivity extends Activity {
 
 
     private void cameraInit(){
-        cameraHandler = CameraHandler.getInstance(this, true);
+        cameraHandler = new CameraHandler(this, true);
         cameraHandler.setOnImageAvailableListenerForPrev(new ImageReader.OnImageAvailableListener() {
             @Override
             public void onImageAvailable(ImageReader reader) {
@@ -450,38 +437,38 @@ public class GameMainActivity extends Activity {
 
 
     /***** Gaze Control *****/
-    private final String JSON_KEY_PREDICT_X = "PredictX";
-    private final String JSON_KEY_PREDICT_Y = "PredictY";
-    private final String JSON_KEY_SEQ_NUMBER = "SequenceNumber";
-    private ArrayList<Pair<Float,Float>> lastThreePoints = new ArrayList<>();
+    private ArrayList<Pair<Float,Float>> prePoints = new ArrayList<>();
     private final int   CLICK_THRESHOLD = 85;
+    private final int   NUM_OF_PRE_POINTS = 3;
 
     private void analyzeGaze(JSONObject object){
         try {
-            int receivedIdx = object.getInt(JSON_KEY_SEQ_NUMBER);
+            int receivedIdx = object.getInt(SocketHandler.JSON_KEY_SEQ_NUMBER);
             if( receivedIdx > prevReceivedGazeIndex ){
                 prevReceivedGazeIndex = receivedIdx;
-                double portraitHori = object.getDouble(JSON_KEY_PREDICT_Y);
-                double portraitVert = object.getDouble(JSON_KEY_PREDICT_X);
+                double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
+                double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
                 float[] loc = new float[2];
                 loc[0] = (float)((portraitHori + confHandler.getCameraOffsetX())/confHandler.getScreenSizeX());
                 loc[1] = (float)((portraitVert + confHandler.getCameraOffsetY())/confHandler.getScreenSizeY());
-                lastThreePoints.add(new Pair(loc[0], loc[1]));
-                if( lastThreePoints.size()<3 ){
+                prePoints.add(new Pair(loc[0], loc[1]));
+                if( prePoints.size()<NUM_OF_PRE_POINTS ){
                     return;
-                } else if (lastThreePoints.size()>3) {
-                    lastThreePoints.remove(0);
+                } else if (prePoints.size()>NUM_OF_PRE_POINTS) {
+                    prePoints.remove(0);
                 }
                 // analyze last three points distribution
-                float aveX = (lastThreePoints.get(0).first
-                        + lastThreePoints.get(1).first
-                        + lastThreePoints.get(2).first)/3;
-                float aveY = (lastThreePoints.get(0).second
-                        + lastThreePoints.get(1).second
-                        + lastThreePoints.get(2).second)/3;
+                double aveX = 0;
+                double aveY = 0;
+                for(Pair<Float, Float> eachPoint:prePoints){
+                    aveX += eachPoint.first;
+                    aveY += eachPoint.second;
+                }
+                aveX /= NUM_OF_PRE_POINTS;
+                aveY /= NUM_OF_PRE_POINTS;
                 double diff = 0;
-                for(Pair<Float, Float> eachPoint : lastThreePoints){
-                    diff += Math.sqrt((double)(eachPoint.first - aveX)*(eachPoint.first - aveX)
+                for(Pair<Float, Float> eachPoint : prePoints){
+                    diff += Math.sqrt((eachPoint.first - aveX)*(eachPoint.first - aveX)
                             + (eachPoint.second - aveY)*(eachPoint.second - aveY));
                 }
                 diff /= 3;
@@ -495,8 +482,8 @@ public class GameMainActivity extends Activity {
                             downTime,
                             eventTime,
                             MotionEvent.ACTION_UP,
-                            aveX,
-                            aveY,
+                            (float) aveX,
+                            (float) aveY,
                             metaState
                     );
                     // Dispatch touch event to view

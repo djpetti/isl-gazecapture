@@ -27,6 +27,8 @@ public class MobileGazeJniInterface {
 
     public native int[] getRotatedRGBImage(byte[] yBytes, byte[] uBytes, byte[] vBytes, int origWidth, int origHeight);
 
+    public native void rotateImage(long addr, int rotate);
+
     public native void cropImage(long matAddr, int[] rect, int[] resize, float[] tensorFlowInput, long cropAddr); // resize[0] is width; resize[1] is height
 
     public native void cropImageAndSaveInput(long matAddr, int[] rect, int[] size, float[] tensorFlowInput, long cropAddr, String path);
