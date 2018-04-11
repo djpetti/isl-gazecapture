@@ -214,7 +214,6 @@ class EyeCropper:
       The face grid x and y positions, as well as the width and height, all as
       one tuple. """
     image_h, image_w, _ = self.__image_shape
-    print self.__image_shape
 
     # Normalize image dimensions and face box for the camera FOV.
     fov_long, fov_short = self.__phone.get_camera_fov()
@@ -223,8 +222,6 @@ class EyeCropper:
 
     diff_w = image_w - image_w * scale_w
     diff_h = image_h - image_h * scale_h
-    image_w -= diff_w
-    image_h -= diff_h
 
     # The face coordinates are going to shift, since we're effectively cutting
     # part of the image off.
@@ -234,9 +231,6 @@ class EyeCropper:
     face_y -= diff_h / 2
     face_w += diff_w
     face_h += diff_h
-    print face_bbox
-    print "%f, %f" % (image_w, image_h)
-    print "(%f, %f, %f, %f)" % (face_x, face_y, face_w, face_h)
 
     # Convert to 25x25 grid coordinate system.
     grid_x = face_x / image_w * 25.0
@@ -261,7 +255,6 @@ class EyeCropper:
       represent the background. """
     x, y, w, h = self.face_grid_box()
 
-    print "(%d, %d, %d, %d)" % (x, y, w, h)
 
     # Create the interior image.
     face_box = np.ones((h, w))
