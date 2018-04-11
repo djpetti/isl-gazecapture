@@ -49,7 +49,7 @@ import cv2
 import numpy as np
 
 
-batch_size = 256
+batch_size = 128
 # How many batches to have loaded into VRAM at once.
 load_batches = 4
 # Shape of the input images.
@@ -62,7 +62,7 @@ input_shape = (224, 224, 3)
 # Learning rates to set.
 learning_rates = [0.001, 0.0001]
 # How many iterations to train for at each learning rate.
-iterations = [29676, 100000]
+iterations = [150000, 150000]
 
 # Learning rate hyperparameters.
 momentum = 0.9
@@ -74,6 +74,10 @@ synsets_save_file = "synsets.pkl"
 dataset_files = "/training_data/daniel/gazecap_myelin/dataset"
 # Location of the cache files.
 cache_dir = "/training_data/daniel/gazecap_myelin"
+
+# Validation data.
+valid_dataset_files = "/training_data/daniel/gazecap_myelin_val/dataset"
+valid_cache_dir = "/training_data/daniel/gazecap_myelin_val"
 
 # L2 regularizer for weight decay.
 l2_reg = regularizers.l2(0.0005)
@@ -276,19 +280,19 @@ def build_network(fine_tune=False):
   face_gray = gray_layer(face_scaled)
 
   # Shared eye layers.
-  conv_e1 = layers.Conv2D(96, (11, 11), strides=(4, 4), activation="relu",
+  conv_e1 = layers.Conv2D(144, (11, 11), strides=(4, 4), activation="relu",
                           kernel_regularizer=l2_reg, trainable=trainable)
   pool_e1 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
   norm_e1 = layers.BatchNormalization(trainable=trainable)
 
   pad_e2 = layers.ZeroPadding2D(padding=(2, 2))
-  conv_e2 = layers.Conv2D(256, (5, 5), activation="relu",
+  conv_e2 = layers.Conv2D(384, (5, 5), activation="relu",
                           kernel_regularizer=l2_reg, trainable=trainable)
   pool_e2 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
   norm_e2 = layers.BatchNormalization(trainable=trainable)
 
   pad_e3 = layers.ZeroPadding2D(padding=(1, 1))
-  conv_e3 = layers.Conv2D(384, (3, 3), activation="relu",
+  conv_e3 = layers.Conv2D(576, (3, 3), activation="relu",
                           kernel_regularizer=l2_reg, trainable=trainable)
 
   conv_e4 = layers.Conv2D(64, (1, 1), activation="relu",
@@ -329,13 +333,12 @@ def build_network(fine_tune=False):
 
   # Concatenate eyes and put through a shared FC layer.
   eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
-  eye_drop = layers.Dropout(0.5)(eye_combined)
   fc_e1 = layers.Dense(128, activation="relu",
                        kernel_regularizer=l2_reg,
-                       trainable=trainable)(eye_drop)
+                       trainable=trainable)(eye_combined)
 
   # Face layers.
-  face_conv_f1 = layers.Conv2D(96, (11, 11), strides=(4, 4),
+  face_conv_f1 = layers.Conv2D(144, (11, 11), strides=(4, 4),
                                activation="relu",
                                kernel_regularizer=l2_reg,
                                trainable=trainable)(face_gray)
@@ -344,7 +347,7 @@ def build_network(fine_tune=False):
   face_norm_f1 = layers.BatchNormalization(trainable=trainable)(face_pool_f1)
 
   face_pad_f2 = layers.ZeroPadding2D(padding=(2, 2))(face_norm_f1)
-  face_conv_f2 = layers.Conv2D(256, (5, 5), activation="relu",
+  face_conv_f2 = layers.Conv2D(384, (5, 5), activation="relu",
                                kernel_regularizer=l2_reg,
                                trainable=trainable)(face_pad_f2)
   face_pool_f2 = layers.MaxPooling2D(pool_size=(3, 3),
@@ -352,7 +355,7 @@ def build_network(fine_tune=False):
   face_norm_f2 = layers.BatchNormalization(trainable=trainable)(face_pool_f2)
 
   face_pad_f3 = layers.ZeroPadding2D(padding=(1, 1))(face_norm_f2)
-  face_conv_f3 = layers.Conv2D(384, (3, 3), activation="relu",
+  face_conv_f3 = layers.Conv2D(576, (3, 3), activation="relu",
                                kernel_regularizer=l2_reg,
                                trainable=trainable)(face_pad_f3)
 
@@ -379,10 +382,9 @@ def build_network(fine_tune=False):
 
   # Concat everything and put through a final FF layer.
   all_concat = layers.Concatenate()([fc_e1, face_fc2, grid_fc2])
-  all_concat_drop = layers.Dropout(0.5)(all_concat)
   all_fc1 = layers.Dense(128, activation="relu",
                          kernel_regularizer=l2_reg,
-                         trainable=trainable)(all_concat_drop)
+                         trainable=trainable)(all_concat)
   all_fc2 = layers.Dense(2, kernel_regularizer=l2_reg)(all_fc1)
 
   # Build the model.
@@ -498,6 +500,47 @@ def main(load_model=None):
   json.dump((training_loss, testing_acc, training_acc), results_file)
   results_file.close()
 
+def validate(load_model, iterations):
+  """ Validates the network.
+  Args:
+    load_model: A pretrained model to validate.
+    iterations: How many iterations to validate for. """
+  model = build_network()
+  logging.info("Loading pretrained model '%s'." % (load_model))
+  model.load_weights(load_model)
+
+  # We don't actually train, but we need the compiled model for testing.
+  opt = optimizers.SGD(lr=0.01, momentum=0.9)
+  model.compile(optimizer=opt, loss=distance_metric, metrics=[distance_metric])
+
+  data = data_loader.SequentialDataManagerLoader(batch_size, load_batches,
+                                                 image_shape, valid_cache_dir,
+                                                 valid_dataset_files,
+                                                 patch_shape=patch_shape,
+                                                 pca_stddev=50,
+                                                 patch_flip=False,
+                                                 raw_labels=True)
+
+  testing_acc = []
+
+  # Train at each learning rate.
+  for i in range(0, iterations):
+    testing_data, testing_labels = data.get_test_set()
+    leye_crops, reye_crops, face_crops, mask_data, dot_data = \
+        process_data(testing_data, testing_labels)
+
+    loss, accuracy = model.evaluate([leye_crops, reye_crops, face_crops,
+                                      mask_data],
+                                    dot_data,
+                                    batch_size=batch_size)
+
+    logging.info("Loss: %f, Accuracy: %f" % (loss, accuracy))
+    testing_acc.append(accuracy)
+
+  print "Mean accuracy: %f" % (np.mean(testing_acc))
+
+  data.exit_gracefully()
+
 
 if __name__ == "__main__":
-  main(load_model="eye_model_finetuned.hd5")
+  validate("eye_model_large.hd5", 372)
