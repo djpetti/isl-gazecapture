@@ -78,13 +78,16 @@ cache_dir = "/training_data/daniel/gazecap_myelin"
 # Validation data.
 valid_dataset_files = "/training_data/daniel/gazecap_myelin_val/dataset"
 valid_cache_dir = "/training_data/daniel/gazecap_myelin_val"
+# Fine-tuning data.
+ft_dataset_files = "/training_data/daniel_g6_myelin/dataset"
+ft_cache_dir = "/training_data/daniel_g6_myelin"
 
 # L2 regularizer for weight decay.
 l2_reg = regularizers.l2(0.0005)
 
 # Configure GPU VRAM usage.
 config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 0.6
+config.gpu_options.per_process_gpu_memory_fraction = 1.0
 set_session(tf.Session(config=config))
 
 
@@ -541,6 +544,46 @@ def validate(load_model, iterations):
 
   data.exit_gracefully()
 
+def fine_tune(load_model, lr_mult):
+  """ Fine-tunes the model.
+  Args:
+    load_model: The model to load for fine-tuning.
+    lr_mult: Factor to multiply the learning rate by. """
+  model = build_network(fine_tune=True)
+  logging.info("Loading pretrained model '%s'." % (load_model))
+  model.load_weights(load_model)
+
+  data = data_loader.DataManagerLoader(batch_size, load_batches, image_shape,
+                                       ft_cache_dir, ft_dataset_files,
+                                       patch_shape=patch_shape,
+                                       pca_stddev=50,
+                                       patch_flip=False,
+                                       raw_labels=True)
+
+  if os.path.exists(synsets_save_file):
+    logging.info("Loading existing synsets...")
+    data.load(synsets_save_file)
+
+
+  training_acc = []
+  training_loss = []
+  testing_acc = []
+
+  # Train at each learning rate.
+  for lr, iters in zip(learning_rates, iterations):
+    lr *= lr_mult
+
+    loss, acc = train_section(model, data, lr, iters)
+
+    training_loss.extend(loss)
+    testing_acc.extend(acc)
+
+  data.exit_gracefully()
+
+  print "Saving results..."
+  results_file = open("gazecapture_results.json", "w")
+  json.dump((training_loss, testing_acc, training_acc), results_file)
+  results_file.close()
 
 if __name__ == "__main__":
-  validate("eye_model_large.hd5", 372)
+  validate("models/eye_model_large.hd5", 15)
