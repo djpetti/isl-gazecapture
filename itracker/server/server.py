@@ -17,6 +17,8 @@ READ_BUFFER_LENGTH = 8192
 # The JPEG magic at the start and end of each frame.
 JPEG_MAGIC_START = bytes(b"\xFF\xD8")
 JPEG_MAGIC_END = bytes(b"\xFF\xD9")
+# Maximum size value before we assume that the size is invalid.
+MAX_SIZE = 1000000
 
 
 logger = logging.getLogger(__name__)
@@ -85,16 +87,30 @@ class Server(object):
     and adds it to the __received_frames list. It also clears the
     current_frame array.
     Args:
-      sequence_num: The sequence number of the new frame. """
+      sequence_num: The sequence number of the new frame.
+    Returns:
+      False if it tries to decode an invalid frame, true otherwise. """
     image = cv2.imdecode(np.asarray(self.__current_frame), cv2.IMREAD_COLOR)
+    self.__current_frame = bytearray([])
+
     if image is None:
       # Failed to decode the image.
       logger.warning("Failed to read frame.")
+      # Send invalid response.
+      self.send_response(None, sequence_num)
 
-    logger.debug("Got new frame.")
-    self.__received_frames.appendleft((image, sequence_num))
+      return False;
+    else:
+      logger.info("Got new frame.")
+      self.__received_frames.appendleft((image, sequence_num))
 
+      return True
+
+  def __reset_state_machine(self):
+    """ Resets the image reading state machine. """
     self.__current_frame = bytearray([])
+    self.__size_remaining = -1
+    self.__state = self.State.READ_MAGIC_START_BYTE1
 
   def __process_new_data(self, size):
     """ Processes a chunk of newly received data.
@@ -138,9 +154,7 @@ class Server(object):
           # This means that our size was invalid. We're going to have to throw
           # this image away and manually search for the start of the next one.
           logger.warning("Lost image framing.")
-          self.__current_frame = bytearray([])
-          self.__size_remaining = -1
-          self.__state = self.State.READ_MAGIC_START_BYTE1
+          self.__reset_state_machine()
 
       elif self.__state == self.State.READ_MAGIC_END_BYTE2:
         # Look for the second byte of the end magic.
@@ -158,8 +172,10 @@ class Server(object):
 
         # Since we read the sequence number, we can go ahead and extract the
         # image.
-        logger.debug("Sequence number: %d" % (byte))
-        self.__extract_frame(byte)
+        logger.info("Sequence number: %d" % (byte))
+        if not self.__extract_frame(byte):
+          logger.error("Got invalid image. Resetting.")
+          self.__reset_state_machine()
 
       elif self.__state == self.State.READ_IMAGE_SIZE:
         # Read the current size byte of the next image.
@@ -178,6 +194,11 @@ class Server(object):
           self.__size_remaining -= 2
           # Assume that the next image starts directly after this.
           jpeg_start_index = i + 1
+
+          if self.__size_remaining > MAX_SIZE:
+            logger.error("Invalid image size. (%d) Resetting." % \
+                         (self.__size_remaining))
+            self.__reset_state_machine()
 
       i += 1
 
