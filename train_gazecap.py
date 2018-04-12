@@ -337,8 +337,7 @@ def build_network(fine_tune=False):
   # Concatenate eyes and put through a shared FC layer.
   eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
   fc_e1 = layers.Dense(128, activation="relu",
-                       kernel_regularizer=l2_reg,
-                       trainable=trainable)(eye_combined)
+                       kernel_regularizer=l2_reg)(eye_combined)
 
   # Face layers.
   face_conv_f1 = layers.Conv2D(144, (11, 11), strides=(4, 4),
@@ -371,8 +370,7 @@ def build_network(fine_tune=False):
                           kernel_regularizer=l2_reg,
                           trainable=trainable)(face_flatten_f4)
   face_fc2 = layers.Dense(64, activation="relu",
-                          kernel_regularizer=l2_reg,
-                          trainable=trainable)(face_fc1)
+                          kernel_regularizer=l2_reg)(face_fc1)
 
   # Face grid.
   grid_flat = layers.Flatten()(grid_floats)
@@ -380,14 +378,12 @@ def build_network(fine_tune=False):
                           kernel_regularizer=l2_reg,
                           trainable=trainable)(grid_flat)
   grid_fc2 = layers.Dense(128, activation="relu",
-                          kernel_regularizer=l2_reg,
-                          trainable=trainable)(grid_fc1)
+                          kernel_regularizer=l2_reg)(grid_fc1)
 
   # Concat everything and put through a final FF layer.
   all_concat = layers.Concatenate()([fc_e1, face_fc2, grid_fc2])
   all_fc1 = layers.Dense(128, activation="relu",
-                         kernel_regularizer=l2_reg,
-                         trainable=trainable)(all_concat)
+                         kernel_regularizer=l2_reg)(all_concat)
   all_fc2 = layers.Dense(2, kernel_regularizer=l2_reg)(all_fc1)
 
   # Build the model.
@@ -586,4 +582,4 @@ def fine_tune(load_model, lr_mult):
   results_file.close()
 
 if __name__ == "__main__":
-  validate("models/eye_model_large.hd5", 15)
+  fine_tune("models/eye_model_large.hd5", 0.1)
