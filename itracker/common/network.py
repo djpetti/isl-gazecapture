@@ -11,13 +11,31 @@ import tensorflow as tf
 INPUT_SHAPE = (224, 224, 3)
 
 
-def build_network(face_shape=None):
+def rgb_to_grayscale(image_tensor):
+  """ Converts a tensor of RGB images to grayscale. This is meant to be used in
+  a Keras Lambda layer.
+  Args:
+    image_tensor: The tensor of images to convert.
+  Returns:
+    The same tensor, with all images converted to grayscale. """
+  # Weight each channel before averaging.
+  luma_weights = tf.constant([[0.21], [0.72], [0.07]])
+  # Average using a single contraction operation.
+  grayscale = tf.tensordot(image_tensor, luma_weights, axes=[[3], [0]])
+
+  return grayscale
+
+def build_network(face_shape=None, fine_tune=False):
   """ Builds the network.
   Args:
     face_shape: If specified, the network can automatically resize the face
                 input.
+    fine_tune: Whether we are fine-tuning the model. If so, only the last two
+               layers will be trainable.
   Returns:
     The built network, ready to train. """
+  trainable = not fine_tune
+
   # L2 regularizer for weight decay.
   l2_reg = regularizers.l2(0.0005)
 
@@ -43,28 +61,34 @@ def build_network(face_shape=None):
                                                            INPUT_SHAPE[1])))
     face_scaled = scale_layer(face_floats)
 
+  # Convert everything to grayscale.
+  gray_layer = layers.Lambda(lambda x: rgb_to_grayscale(x))
+  left_eye_gray = gray_layer(left_eye_floats)
+  right_eye_gray = gray_layer(right_eye_floats)
+  face_gray = gray_layer(face_scaled)
+
   # Shared eye layers.
-  conv_e1 = layers.Conv2D(96, (11, 11), strides=(4, 4), activation="relu",
-                          kernel_regularizer=l2_reg)
+  conv_e1 = layers.Conv2D(144, (11, 11), strides=(4, 4), activation="relu",
+                          kernel_regularizer=l2_reg, trainable=trainable)
   pool_e1 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
-  norm_e1 = layers.BatchNormalization()
+  norm_e1 = layers.BatchNormalization(trainable=trainable)
 
   pad_e2 = layers.ZeroPadding2D(padding=(2, 2))
-  conv_e2 = layers.Conv2D(256, (5, 5), activation="relu",
-                          kernel_regularizer=l2_reg)
+  conv_e2 = layers.Conv2D(384, (5, 5), activation="relu",
+                          kernel_regularizer=l2_reg, trainable=trainable)
   pool_e2 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
-  norm_e2 = layers.BatchNormalization()
+  norm_e2 = layers.BatchNormalization(trainable=trainable)
 
   pad_e3 = layers.ZeroPadding2D(padding=(1, 1))
-  conv_e3 = layers.Conv2D(384, (3, 3), activation="relu",
-                          kernel_regularizer=l2_reg)
+  conv_e3 = layers.Conv2D(576, (3, 3), activation="relu",
+                          kernel_regularizer=l2_reg, trainable=trainable)
 
   conv_e4 = layers.Conv2D(64, (1, 1), activation="relu",
-                          kernel_regularizer=l2_reg)
+                          kernel_regularizer=l2_reg, trainable=trainable)
   flatten_e4 = layers.Flatten()
 
   # Left eye stack.
-  leye_conv_e1 = conv_e1(left_eye_floats)
+  leye_conv_e1 = conv_e1(left_eye_gray)
   leye_pool_e1 = pool_e1(leye_conv_e1)
   leye_norm_e1 = norm_e1(leye_pool_e1)
 
@@ -80,7 +104,7 @@ def build_network(face_shape=None):
   leye_flatten_e4 = flatten_e4(leye_conv_e4)
 
   # Right eye stack.
-  reye_conv_e1 = conv_e1(right_eye_floats)
+  reye_conv_e1 = conv_e1(right_eye_gray)
   reye_pool_e1 = pool_e1(reye_conv_e1)
   reye_norm_e1 = norm_e1(reye_pool_e1)
 
@@ -98,47 +122,57 @@ def build_network(face_shape=None):
   # Concatenate eyes and put through a shared FC layer.
   eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
   fc_e1 = layers.Dense(128, activation="relu",
-                       kernel_regularizer=l2_reg)(eye_combined)
+                       kernel_regularizer=l2_reg,
+                       trainable=trainable)(eye_combined)
 
   # Face layers.
-  face_conv_f1 = layers.Conv2D(96, (11, 11), strides=(4, 4),
+  face_conv_f1 = layers.Conv2D(144, (11, 11), strides=(4, 4),
                                activation="relu",
-                               kernel_regularizer=l2_reg)(face_scaled)
+                               kernel_regularizer=l2_reg,
+                               trainable=trainable)(face_gray)
   face_pool_f1 = layers.MaxPooling2D(pool_size=(3, 3),
                                      strides=(2, 2))(face_conv_f1)
-  face_norm_f1 = layers.BatchNormalization()(face_pool_f1)
+  face_norm_f1 = layers.BatchNormalization(trainable=trainable)(face_pool_f1)
 
   face_pad_f2 = layers.ZeroPadding2D(padding=(2, 2))(face_norm_f1)
-  face_conv_f2 = layers.Conv2D(256, (5, 5), activation="relu",
-                               kernel_regularizer=l2_reg)(face_pad_f2)
+  face_conv_f2 = layers.Conv2D(384, (5, 5), activation="relu",
+                               kernel_regularizer=l2_reg,
+                               trainable=trainable)(face_pad_f2)
   face_pool_f2 = layers.MaxPooling2D(pool_size=(3, 3),
                                      strides=(2, 2))(face_conv_f2)
-  face_norm_f2 = layers.BatchNormalization()(face_pool_f2)
+  face_norm_f2 = layers.BatchNormalization(trainable=trainable)(face_pool_f2)
 
   face_pad_f3 = layers.ZeroPadding2D(padding=(1, 1))(face_norm_f2)
-  face_conv_f3 = layers.Conv2D(384, (3, 3), activation="relu",
-                               kernel_regularizer=l2_reg)(face_pad_f3)
+  face_conv_f3 = layers.Conv2D(576, (3, 3), activation="relu",
+                               kernel_regularizer=l2_reg,
+                               trainable=trainable)(face_pad_f3)
 
   face_conv_f4 = layers.Conv2D(64, (1, 1), activation="relu",
-                               kernel_regularizer=l2_reg)(face_conv_f3)
+                               kernel_regularizer=l2_reg,
+                               trainable=trainable)(face_conv_f3)
   face_flatten_f4 = layers.Flatten()(face_conv_f4)
 
   face_fc1 = layers.Dense(128, activation="relu",
-                          kernel_regularizer=l2_reg)(face_flatten_f4)
+                          kernel_regularizer=l2_reg,
+                          trainable=trainable)(face_flatten_f4)
   face_fc2 = layers.Dense(64, activation="relu",
-                          kernel_regularizer=l2_reg)(face_fc1)
+                          kernel_regularizer=l2_reg,
+                          trainable=trainable)(face_fc1)
 
   # Face grid.
   grid_flat = layers.Flatten()(grid_floats)
   grid_fc1 = layers.Dense(256, activation="relu",
-                          kernel_regularizer=l2_reg)(grid_flat)
+                          kernel_regularizer=l2_reg,
+                          trainable=trainable)(grid_flat)
   grid_fc2 = layers.Dense(128, activation="relu",
-                          kernel_regularizer=l2_reg)(grid_fc1)
+                          kernel_regularizer=l2_reg,
+                          trainable=trainable)(grid_fc1)
 
   # Concat everything and put through a final FF layer.
   all_concat = layers.Concatenate()([fc_e1, face_fc2, grid_fc2])
   all_fc1 = layers.Dense(128, activation="relu",
-                         kernel_regularizer=l2_reg)(all_concat)
+                         kernel_regularizer=l2_reg,
+                         trainable=trainable)(all_concat)
   all_fc2 = layers.Dense(2, kernel_regularizer=l2_reg)(all_fc1)
 
   # Build the model.
@@ -148,4 +182,3 @@ def build_network(face_shape=None):
   model.summary()
 
   return model
-
