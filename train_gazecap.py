@@ -378,7 +378,8 @@ def build_network(fine_tune=False):
                           kernel_regularizer=l2_reg,
                           trainable=trainable)(grid_flat)
   grid_fc2 = layers.Dense(128, activation="relu",
-                          kernel_regularizer=l2_reg)(grid_fc1)
+                          kernel_regularizer=l2_reg,
+                          trainable=trainable)(grid_fc1)
 
   # Concat everything and put through a final FF layer.
   all_concat = layers.Concatenate()([fc_e1, face_fc2, grid_fc2])
@@ -540,11 +541,12 @@ def validate(load_model, iterations):
 
   data.exit_gracefully()
 
-def fine_tune(load_model, lr_mult):
+def fine_tune(load_model, ft_lrs):
   """ Fine-tunes the model.
   Args:
     load_model: The model to load for fine-tuning.
-    lr_mult: Factor to multiply the learning rate by. """
+    ft_lrs: List of tuples of learning rates and iteration counts for
+            fine-tuning. """
   model = build_network(fine_tune=True)
   logging.info("Loading pretrained model '%s'." % (load_model))
   model.load_weights(load_model)
@@ -566,9 +568,7 @@ def fine_tune(load_model, lr_mult):
   testing_acc = []
 
   # Train at each learning rate.
-  for lr, iters in zip(learning_rates, iterations):
-    lr *= lr_mult
-
+  for lr, iters in ft_lrs:
     loss, acc = train_section(model, data, lr, iters)
 
     training_loss.extend(loss)
@@ -582,4 +582,4 @@ def fine_tune(load_model, lr_mult):
   results_file.close()
 
 if __name__ == "__main__":
-  fine_tune("models/eye_model_large.hd5", 0.1)
+  fine_tune("models/eye_model_large.hd5", [(0.0001, 1000), (0.00001, 500)])
