@@ -71,9 +71,9 @@ momentum = 0.9
 save_file = "eye_model_finetuned.hd5"
 synsets_save_file = "synsets.pkl"
 # Location of the dataset files.
-dataset_files = "/training_data/daniel/gazecap_myelin/dataset"
+dataset_files = "/training_data/gazecap_myelin/dataset"
 # Location of the cache files.
-cache_dir = "/training_data/daniel/gazecap_myelin"
+cache_dir = "/training_data/gazecap_myelin"
 
 # Validation data.
 valid_dataset_files = "/training_data/daniel/gazecap_myelin_val/dataset"
@@ -280,7 +280,15 @@ def build_network(fine_tune=False):
   gray_layer = layers.Lambda(lambda x: rgb_to_grayscale(x))
   left_eye_gray = gray_layer(left_eye_floats)
   right_eye_gray = gray_layer(right_eye_floats)
-  face_gray = gray_layer(face_scaled)
+
+  # Get pretrained VGG model for use as a base.
+  vgg = keras.applications.vgg19.VGG19(include_top=False,
+                                       input_tensor=face_scaled)
+  vgg_out = vgg.outputs
+
+  # Freeze all layers in VGG.
+  for layer in vgg.layers:
+    layer.trainable = False
 
   # Shared eye layers.
   conv_e1 = layers.Conv2D(144, (11, 11), strides=(4, 4), activation="relu",
@@ -340,31 +348,7 @@ def build_network(fine_tune=False):
                        kernel_regularizer=l2_reg)(eye_combined)
 
   # Face layers.
-  face_conv_f1 = layers.Conv2D(144, (11, 11), strides=(4, 4),
-                               activation="relu",
-                               kernel_regularizer=l2_reg,
-                               trainable=trainable)(face_gray)
-  face_pool_f1 = layers.MaxPooling2D(pool_size=(3, 3),
-                                     strides=(2, 2))(face_conv_f1)
-  face_norm_f1 = layers.BatchNormalization(trainable=trainable)(face_pool_f1)
-
-  face_pad_f2 = layers.ZeroPadding2D(padding=(2, 2))(face_norm_f1)
-  face_conv_f2 = layers.Conv2D(384, (5, 5), activation="relu",
-                               kernel_regularizer=l2_reg,
-                               trainable=trainable)(face_pad_f2)
-  face_pool_f2 = layers.MaxPooling2D(pool_size=(3, 3),
-                                     strides=(2, 2))(face_conv_f2)
-  face_norm_f2 = layers.BatchNormalization(trainable=trainable)(face_pool_f2)
-
-  face_pad_f3 = layers.ZeroPadding2D(padding=(1, 1))(face_norm_f2)
-  face_conv_f3 = layers.Conv2D(576, (3, 3), activation="relu",
-                               kernel_regularizer=l2_reg,
-                               trainable=trainable)(face_pad_f3)
-
-  face_conv_f4 = layers.Conv2D(64, (1, 1), activation="relu",
-                               kernel_regularizer=l2_reg,
-                               trainable=trainable)(face_conv_f3)
-  face_flatten_f4 = layers.Flatten()(face_conv_f4)
+  face_flatten_f4 = layers.Flatten()(vgg_out)
 
   face_fc1 = layers.Dense(128, activation="relu",
                           kernel_regularizer=l2_reg,
@@ -582,4 +566,4 @@ def fine_tune(load_model, ft_lrs):
   results_file.close()
 
 if __name__ == "__main__":
-  fine_tune("models/eye_model_large.hd5", [(0.0001, 1000), (0.00001, 500)])
+  main()
