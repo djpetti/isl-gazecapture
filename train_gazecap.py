@@ -28,7 +28,7 @@ _configure_logging()
 
 # This forks a lot of processes, so we want to import it as soon as possible,
 # when there is as little memory as possible in use.
-from rpinets.myelin import data_loader
+#from rpinets.myelin import data_loader
 
 from six.moves import cPickle as pickle
 import json
@@ -91,37 +91,32 @@ config.gpu_options.per_process_gpu_memory_fraction = 1.0
 set_session(tf.Session(config=config))
 
 
-def create_bitmask_image(x, y, w, h):
-  """ Creates the bitmask image from the bbox points.
+def create_bitmask_images(bboxes):
+  """ Creates the bitmask images from the bbox points.
   Args:
-    x, y: The x and y coordinates of the first point, in frame fractions.
-    w, h: The width and height of the face, in frame fractions.
+    bboxes: A matrix of bounding boxes, where each box is a row vector of x, y,
+            width, and height.
   Returns:
     The generated bitmask image. """
   # Scale to mask size.
-  x *= 25
-  y *= 25
-  w *= 25
-  h *= 25
-
+  bboxes *= 25
   # It's one-indexed in the dataset.
-  x = int(round(x)) - 1
-  y = int(round(y)) - 1
-  w = int(round(w)) - 1
-  h = int(round(h)) - 1
+  bboxes = np.round(bboxes).astype(np.uint8) - 1
 
-  x = max(0, x)
-  y = max(0, y)
-
-  # Create the interior image.
-  face_box = np.ones((h, w))
+  bboxes = np.clip(bboxes, 0, 25)
 
   # Create the background.
-  frame = np.zeros((25, 25))
-  # Superimpose it correctly.
-  frame[y:y + h, x:x + w] = face_box
+  frames = np.zeros((bboxes.shape[0], 25, 25))
 
-  return frame
+  for i in range(0, bboxes.shape[0]):
+    # Create the interior image.
+    x, y, w, h = bboxes[i];
+    face_box = np.ones((h, w))
+
+    # Superimpose it correctly.
+    frames[i, y:y + h, x:x + w] = face_box
+
+  return frames
 
 def convert_labels(labels):
   """ Convert the raw labels from the dataset into matrices that can be fed into
@@ -130,7 +125,7 @@ def convert_labels(labels):
     labels: The labels to convert.
   Returns:
     The converted label gaze points, left eye crop points, right eye crop
-    points, and face masks. """
+    points, and face masks box points. """
   dots = []
   leye_crops = []
   reye_crops = []
@@ -150,12 +145,8 @@ def convert_labels(labels):
     leye_crops.append(eye_crops[0:4])
     # Extract right eye crops.
     reye_crops.append(eye_crops[4:8])
-
-    # Convert bitmask.
-    x, y, w, h = all_data[2:6]
-
-    face_mask = create_bitmask_image(x, y, w, h)
-    face_masks.append(face_mask)
+    # Extract bitmask.
+    face_masks.append(all_data[2:6])
 
   dot_stack = np.stack(dots, axis=0)
   leye_stack = np.stack(leye_crops, axis=0)
@@ -163,6 +154,74 @@ def convert_labels(labels):
   face_stack = np.stack(face_masks, axis=0)
 
   return (dot_stack, leye_stack, reye_stack, face_stack)
+
+def maybe_flip(dot_data, leye_data, reye_data, mask_data, face_data):
+  """ Randomly flips images and dots as a data augmentation procedure.
+  Args:
+    dot_data: The ground-truth dot locations.
+    leye_data: The left eye bounding boxes.
+    reye_data: The right eye bounding boaxes.
+    mask_data: The face mask boxes.
+    face_data: The face crops.
+  Returns:
+    Modified arguments in the same order. """
+  # Multiplicand for flipping boxes.
+  batch_size = dot_data.shape[0]
+  box_flip = np.ones((batch_size, 4), dtype=np.int8)
+  selections = np.random.choice([-1, 1], batch_size).astype(np.int8)
+  selections_mask = 1 - np.clip(selections, 0, 1)
+  selections_mask = selections_mask.astype(np.uint8)
+  selections_mask_exp_1 = np.expand_dims(selections_mask, 1)
+  box_flip[:, 0] *= selections
+
+  # Multiplicand for flipping dots.
+  dot_flip = box_flip[:, :2]
+
+  # Start by subtracting the frame center from all boxes, so we can flip around
+  # zero.
+  leye_data[:, 0] -= 0.5
+  reye_data[:, 0] -= 0.5
+  mask_data[:, 0] -= 0.5
+
+  # Now, flip the boxes around zero.
+  leye_data *= box_flip
+  reye_data *= box_flip
+  mask_data *= box_flip
+
+  # Add the frame center back to all the boxes.
+  leye_data[:, 0] += 0.5
+  reye_data[:, 0] += 0.5
+  mask_data[:, 0] += 0.5
+
+  # We need to subtract the width too, so that it's truly flipped.
+  leye_data[:, 0] -= leye_data[:, 2] * selections_mask
+  reye_data[:, 0] -= reye_data[:, 2] * selections_mask
+  mask_data[:, 0] -= mask_data[:, 2] * selections_mask
+
+  # For the ones that were flipped, we need to switch the left and right eye
+  # data.
+  left_flipped = leye_data * selections_mask_exp_1
+  left_not_flipped = leye_data * (1 - selections_mask_exp_1)
+  right_flipped = reye_data * selections_mask_exp_1
+  right_not_flipped = reye_data * (1 - selections_mask_exp_1)
+  leye_data = left_not_flipped + right_flipped
+  reye_data = right_not_flipped + left_flipped
+
+  # Flip the dots.
+  dot_data *= dot_flip
+
+  # Mask for flipping the face.
+  face_mask = selections.astype(np.object)
+  face_mask[face_mask == 1] = None
+
+  # Flip the faces.
+  same_slice = slice(None, None, None)
+  flips = [(same_slice, slice(None, None, face_mask[i]), same_slice) \
+           for i in range(0, face_data.shape[0])]
+  face_flipped = np.array([img[flip] for img, flip in zip(face_data, flips)])
+
+  # The original face_data should only have the correct elements flipped.
+  return (dot_data, leye_data, reye_data, mask_data, face_flipped)
 
 def extract_eye_crops(face_crops, leye_crops, reye_crops):
   """ Extracts the eye crops from the input face crops.
@@ -195,13 +254,17 @@ def extract_eye_crops(face_crops, leye_crops, reye_crops):
   # Determine the width and height of the face crops.
   _, h_face, w_face, _ = face_crops.shape
 
+  # Make sure everything is in range.
+  leye_crops = np.clip(leye_crops, 0.0, 1.0)
+  reye_crops = np.clip(reye_crops, 0.0, 1.0)
+
   # Calculate the actual pixels at which to crop.
   face_sizes = np.array([w_face, h_face, w_face, h_face])
   leye_pixels = leye_crops * face_sizes
   reye_pixels = reye_crops * face_sizes
 
-  leye_pixels = leye_pixels.astype(np.int)
-  reye_pixels = reye_pixels.astype(np.int)
+  leye_pixels = leye_pixels.astype(np.uint16)
+  reye_pixels = reye_pixels.astype(np.uint16)
 
   # Do the cropping.
   leye_extracted = get_crops(face_crops, leye_pixels)
@@ -388,7 +451,10 @@ def process_data(face_data, labels):
     The converted left eye crops, right eye crops, face crops, face grids, and
     ground-truth dot locations. """
   # Process raw label names.
-  dot_data, leye_data, reye_data, mask_data = convert_labels(labels)
+  dot_data, leye_data, reye_data, mask_bboxes = convert_labels(labels)
+  # Randomly flip some images for data augmentation.
+  dot_data, leye_data, reye_data, mask_data, face_data = \
+      maybe_flip(dot_data, leye_data, reye_data, mask_data, face_data)
   # Extract left and right eye crops.
   leye_crops, reye_crops = extract_eye_crops(face_data, leye_data, reye_data)
 
