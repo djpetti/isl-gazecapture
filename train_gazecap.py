@@ -28,7 +28,7 @@ _configure_logging()
 
 # This forks a lot of processes, so we want to import it as soon as possible,
 # when there is as little memory as possible in use.
-#from rpinets.myelin import data_loader
+from rpinets.myelin import data_loader
 
 from six.moves import cPickle as pickle
 import json
@@ -47,6 +47,8 @@ import tensorflow as tf
 import cv2
 
 import numpy as np
+
+from itracker.common import config
 
 
 batch_size = 128
@@ -515,7 +517,9 @@ def main(load_model=None):
   """
   Args:
     load_model: A pretrained model to load, if specified. """
-  model = build_network()
+  face_shape = (path_shape[0], path_shape[1], image_shape[2])
+  net = config.NET_ARCH(face_shape=face_shape)
+  model = net.build_model()
   if load_model:
     logging.info("Loading pretrained model '%s'." % (load_model))
     model.load_weights(load_model)
@@ -555,7 +559,10 @@ def validate(load_model, iterations):
   Args:
     load_model: A pretrained model to validate.
     iterations: How many iterations to validate for. """
-  model = build_network()
+  face_shape = (path_shape[0], path_shape[1], image_shape[2])
+  net = config.NET_ARCH(face_shape=face_shape)
+  model = net.build_model()
+
   logging.info("Loading pretrained model '%s'." % (load_model))
   model.load_weights(load_model)
 
@@ -597,7 +604,10 @@ def fine_tune(load_model, ft_lrs):
     load_model: The model to load for fine-tuning.
     ft_lrs: List of tuples of learning rates and iteration counts for
             fine-tuning. """
-  model = build_network(fine_tune=True)
+  face_shape = (path_shape[0], path_shape[1], image_shape[2])
+  net = config.NET_ARCH(face_shape=face_shape, fine_tune=True)
+  model = net.build_model()
+
   logging.info("Loading pretrained model '%s'." % (load_model))
   model.load_weights(load_model)
 

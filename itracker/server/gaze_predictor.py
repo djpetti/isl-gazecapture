@@ -6,7 +6,7 @@ import cv2
 
 import numpy as np
 
-from ..common import network
+from ..common import config
 from ..common.eye_cropper import EyeCropper
 
 
@@ -74,7 +74,8 @@ class _CnnProcess(object):
   def predict_forever(self):
     """ Generates predictions indefinitely. """
     # Load the model we trained.
-    self.__predictor = network.build_network()
+    model = config.NET_ARCH()
+    self.__predictor = model.build()
     self.__predictor.load_weights(self.__model_file)
 
     while True:
