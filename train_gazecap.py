@@ -35,6 +35,7 @@ import json
 import os
 import sys
 
+import keras.applications as applications
 import keras.backend as K
 from keras.models import Model, load_model
 import keras.layers as layers
@@ -49,9 +50,9 @@ import cv2
 import numpy as np
 
 
-batch_size = 128
+batch_size = 64
 # How many batches to have loaded into VRAM at once.
-load_batches = 4
+load_batches = 5
 # Shape of the input images.
 image_shape = (400, 400, 3)
 # Shape of the extracted patches.
@@ -62,7 +63,7 @@ input_shape = (224, 224, 3)
 # Learning rates to set.
 learning_rates = [0.001, 0.0001]
 # How many iterations to train for at each learning rate.
-iterations = [150000, 150000]
+iterations = [114085, 300000]
 
 # Learning rate hyperparameters.
 momentum = 0.9
@@ -76,11 +77,11 @@ dataset_files = "/training_data/gazecap_myelin/dataset"
 cache_dir = "/training_data/gazecap_myelin"
 
 # Validation data.
-valid_dataset_files = "/training_data/daniel/gazecap_myelin_val/dataset"
-valid_cache_dir = "/training_data/daniel/gazecap_myelin_val"
+valid_dataset_files = "/training_data/gazecap_myelin_val/dataset"
+valid_cache_dir = "/training_data/gazecap_myelin_val"
 # Fine-tuning data.
-ft_dataset_files = "/training_data/daniel_g6_myelin/dataset"
-ft_cache_dir = "/training_data/daniel_g6_myelin"
+ft_dataset_files = "/training_data/gazecap_myelin/dataset"
+ft_cache_dir = "/training_data/gazecap_myelin"
 
 # L2 regularizer for weight decay.
 l2_reg = regularizers.l2(0.0005)
@@ -282,9 +283,9 @@ def build_network(fine_tune=False):
   right_eye_gray = gray_layer(right_eye_floats)
 
   # Get pretrained VGG model for use as a base.
-  vgg = keras.applications.vgg19.VGG19(include_top=False,
-                                       input_tensor=face_scaled)
-  vgg_out = vgg.outputs
+  vgg = applications.vgg19.VGG19(include_top=False,
+                                 input_tensor=face_scaled)
+  vgg_out = vgg.outputs[0]
 
   # Freeze all layers in VGG.
   for layer in vgg.layers:
@@ -344,15 +345,17 @@ def build_network(fine_tune=False):
 
   # Concatenate eyes and put through a shared FC layer.
   eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
+  eye_combined_drop = layers.Dropout(0.5)(eye_combined)
   fc_e1 = layers.Dense(128, activation="relu",
-                       kernel_regularizer=l2_reg)(eye_combined)
+                       kernel_regularizer=l2_reg)(eye_combined_drop)
 
   # Face layers.
   face_flatten_f4 = layers.Flatten()(vgg_out)
+  face_flatten_drop = layers.Dropout(0.5)(face_flatten_f4)
 
   face_fc1 = layers.Dense(128, activation="relu",
                           kernel_regularizer=l2_reg,
-                          trainable=trainable)(face_flatten_f4)
+                          trainable=trainable)(face_flatten_drop)
   face_fc2 = layers.Dense(64, activation="relu",
                           kernel_regularizer=l2_reg)(face_fc1)
 
@@ -566,4 +569,4 @@ def fine_tune(load_model, ft_lrs):
   results_file.close()
 
 if __name__ == "__main__":
-  main()
+  validate("eye_model_finetuned.hd5", 743)
