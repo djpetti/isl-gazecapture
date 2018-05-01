@@ -335,7 +335,7 @@ class SendProcess(object):
     """ Runs one interation of the sender process.
     Returns:
       True if it sent new data, false if the sequence end was reached. """
-    gaze_point, seq_num = self.__predictor.predict_gaze()
+    gaze_point, seq_num, _ = self.__predictor.predict_gaze()
     if seq_num is None:
       # A None tuple means the end of the sequence, so we'll want to join this
       # process.

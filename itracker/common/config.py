@@ -10,3 +10,6 @@ MIN_CONFIDENCE = 0.20
 
 # Specifies the network architecture we will use.
 NET_ARCH = network.LargeNetwork
+# Time in seconds that an image gets to live in the pipeline before we consider
+# it stale.
+STALE_THRESHOLD = 0.1

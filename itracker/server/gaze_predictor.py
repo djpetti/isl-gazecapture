@@ -13,6 +13,20 @@ from ..common.eye_cropper import EyeCropper
 logger = logging.getLogger(__name__)
 
 
+def _is_stale(timestamp):
+  """ Checks if an image is stale.
+  Args:
+    timestamp: The timestamp of the image to check.
+  Returns:
+    True if the image is stale, false otherwise. """
+  if time.time() - timestamp > config.STALE_THRESHOLD:
+    logger.warning("Dropping stale image from %f at %f." % \
+                   (timestamp, time.time()))
+    return True
+
+  return False
+
+
 class GazePredictor(object):
   """ Handles capturing eye images, and uses the model to predict gaze. """
 
@@ -37,8 +51,8 @@ class GazePredictor(object):
   def predict_gaze(self):
     """ Predicts the user's gaze based on current frames.
     Returns:
-      The predicted gaze point, in cm, as well as the sequence number of the
-      corresponding frame. """
+      The predicted gaze point, in cm, the sequence number of the
+      corresponding frame, and the timestamp. """
     # Wait for new output from the predictor.
     return self.__prediction_process.get_output()
 
@@ -47,7 +61,11 @@ class GazePredictor(object):
     Args:
       image: The image to add.
       seq_num: The sequence number of the image. """
-    self.__landmark_process.add_new_input(image, seq_num)
+    # Add a new timestamp for this image. This allows us to drop frames that go
+    # stale.
+    timestamp = time.time()
+
+    self.__landmark_process.add_new_input(image, seq_num, timestamp)
 
 class _CnnProcess(object):
   """ Runs the CNN prediction in a separate process on the GPU, so that it can
@@ -84,15 +102,20 @@ class _CnnProcess(object):
   def __predict_once(self):
     """ Reads an image from the input queue, processes it, and writes a
     prediction to the output queue. """
-    left_eye, right_eye, face, grid, seq_num = self.__input_queue.get()
+    left_eye, right_eye, face, grid, seq_num, timestamp = \
+        self.__input_queue.get()
     if seq_num is None:
       # A None tuple means the end of the sequence. Propagate this through the
       # pipeline.
-      self.__output_queue.put((None, None))
+      self.__output_queue.put((None, None, None))
       return
     if left_eye is None:
       # If we have a sequence number but no images, we got a bad detection.
-      self.__output_queue.put((None, seq_num))
+      self.__output_queue.put((None, seq_num, timestamp))
+      return
+    if _is_stale(timestamp):
+      # The image is stale, so indicate that it is invalid.
+      self.__output_queue.put((None, seq_num, timestamp))
       return
 
     # Convert everything to floats.
@@ -112,9 +135,9 @@ class _CnnProcess(object):
     # Remove the batch dimension, and convert to Python floats.
     pred = [float(x) for x in pred[0]]
 
-    self.__output_queue.put((pred, seq_num))
+    self.__output_queue.put((pred, seq_num, timestamp))
 
-  def add_new_input(self, left_eye, right_eye, face, grid, seq_num):
+  def add_new_input(self, left_eye, right_eye, face, grid, seq_num, timestamp):
     """ Adds a new input to be processed. Will block.
     Args:
       left_eye: The left eye crop.
@@ -122,8 +145,10 @@ class _CnnProcess(object):
       face: The face crop.
       grid: The face grid.
       seq_num: The sequence number of the image.
+      timestamp: The timestamp of the image.
     """
-    self.__input_queue.put((left_eye, right_eye, face, grid, seq_num))
+    self.__input_queue.put((left_eye, right_eye, face, grid, seq_num,
+                            timestamp))
 
   def get_output(self):
     """ Gets an output from the prediction process. Will block.
@@ -163,12 +188,16 @@ class _LandmarkProcess(object):
     """ Reads and crops a single image. It will send it to the predictor
     process when finished. """
     # Get the next input from the queue.
-    image, seq_num = self.__input_queue.get()
+    image, seq_num, timestamp = self.__input_queue.get()
     if image is None:
       # A None tuple means the end of a sequence. Propagate this through the
       # pipeline.
-      self.__cnn_process.add_new_input(None, None, None, None, None)
+      self.__cnn_process.add_new_input(None, None, None, None, None, None)
       return
+    if _is_stale(timestamp):
+      # Image is stale. Indicate that it is invalid.
+      self.__cnn_process.add_new_input(None, None, None, None, seq_num,
+                                       timestamp)
 
     # Crop the image.
     left_eye, right_eye, face = self.__cropper.crop_image(image)
@@ -176,7 +205,8 @@ class _LandmarkProcess(object):
       # We failed to get an image.
       logger.warning("Failed to get good detection for %d." % (seq_num))
       # Send along the sequence number.
-      self.__cnn_process.add_new_input(None, None, None, None, seq_num)
+      self.__cnn_process.add_new_input(None, None, None, None, seq_num,
+                                       timestamp)
       return
 
     # Produce face mask.
@@ -195,7 +225,7 @@ class _LandmarkProcess(object):
 
     # Send it along.
     self.__cnn_process.add_new_input(left_eye, right_eye, face, mask,
-                                     seq_num)
+                                     seq_num, timestamp)
 
   def run_forever(self):
     """ Reads and crops images indefinitely. """
@@ -205,9 +235,10 @@ class _LandmarkProcess(object):
     while True:
       self.__run_once()
 
-  def add_new_input(self, image, seq_num):
+  def add_new_input(self, image, seq_num, timestamp):
     """ Adds a new input to be processed. Will block.
     Args:
       image: The image to process.
-      seq_num: The sequence number of the image. """
-    self.__input_queue.put((image, seq_num))
+      seq_num: The sequence number of the image.
+      timestamp: The timestamp of the image. """
+    self.__input_queue.put((image, seq_num, timestamp))
