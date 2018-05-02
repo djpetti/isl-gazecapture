@@ -11,11 +11,37 @@ import cv2
 
 import numpy as np
 
+import tensorflow as tf
+
 
 # Number of testing and validation sessions.
 NUM_TEST_SESSIONS = 150
 NUM_VAL_SESSIONS = 50
 
+
+def _int64_feature(value):
+	""" Converts a list to an int64 feature.
+	Args:
+		value: The list to convert.
+	Returns:
+	  The corresponding feature. """
+	return tf.train.Feature(int64_list=tf.train.Int64List(value=value))
+
+def _bytes_feature(value):
+  """ Converts a list to a uint8 feature.
+  Args:
+    value: The list to convert.
+  Returns:
+    The corresponding feature. """
+  return tf.train.Feature(bytes_list=tf.train.BytesList(value=value))
+
+def _float_feature(value):
+  """ Converts a list to a float32 feature.
+  Args:
+    value: The list to convert.
+  Returns:
+    The corresponding feature. """
+  return tf.train.Feature(float_list=tf.train.FloatList(value=value))
 
 def extract_crop_data(crop_info):
   """ Extracts the crop bounding data from the raw structure.
@@ -34,7 +60,7 @@ def extract_crop_data(crop_info):
   y_crop = np.asarray(y_crop, dtype=np.float32)
   w_crop = np.asarray(w_crop, dtype=np.float32)
   h_crop = np.asarray(h_crop, dtype=np.float32)
-  crop_valid = np.asarray(crop_valid)
+  crop_valid = np.asarray(crop_valid, dtype=np.uint8)
 
   return x_crop, y_crop, w_crop, h_crop, crop_valid
 
@@ -71,24 +97,24 @@ def extract_face_crops(images, face_data):
 
   return crops
 
-def generate_names(dot_info, grid_info, face_info, left_eye_info,
-                   right_eye_info, session):
-  """ Generates names for a set of images that match our existing data from Zac.
+def generate_label_features(dot_info, grid_info, face_info, left_eye_info,
+                            right_eye_info):
+  """ Generates label features for a set of data.
   Args:
     dot_info: The loaded dot information.
     grid_info: The loaded face grid information.
     left_eye_info: The loaded left eye crop information.
     right_eye_info: The loaded right eye crop information.
     face_grid: The loaded face grid information.
-    session: The name of the session.
   Returns:
-    A list of generated names. Names will be None if the data is not valid. """
+    Generated list of features, in this order: dots, face size, left eye, right eye,
+    grid. It also returns a list indicating which items are valid. """
   # Location of the dot.
-  x_cam = dot_info["XCam"]
-  y_cam = dot_info["YCam"]
+  x_cam = np.asarray(dot_info["XCam"], dtype=np.float32)
+  y_cam = np.asarray(dot_info["YCam"], dtype=np.float32)
 
   # Crop coordinates and sizes.
-  _, _, w_face, h_face, _ = extract_crop_data(face_info)
+  _, _, w_face, h_face, face_valid = extract_crop_data(face_info)
   x_leye, y_leye, w_leye, h_leye, leye_valid = extract_crop_data(left_eye_info)
   x_reye, y_reye, w_reye, h_reye, reye_valid = extract_crop_data(right_eye_info)
   # Face grid coordinates and sizes.
@@ -115,51 +141,78 @@ def generate_names(dot_info, grid_info, face_info, left_eye_info,
   w_grid /= 25.0
   h_grid /= 25.0
 
-  names = []
-  for i in range(0, len(x_cam)):
-    # Check if the frame is valid.
-    if not (grid_valid[i] and leye_valid[i] and reye_valid[i]):
-      names.append(None)
-      continue
+  # Fuse arrays.
+  dots = np.stack([x_cam, y_cam], axis=1)
+  face_size = np.stack([w_face, h_face], axis=1)
+  leye_boxes = np.stack([x_leye, y_leye, w_leye, h_leye], axis=1)
+  reye_boxes = np.stack([x_reye, y_reye, w_reye, h_reye], axis=1)
+  grid_boxes = np.stack([x_grid, y_grid, w_grid, h_grid], axis=1)
 
-    # Generate a name for the frame.
-    name = "gazecap_%s_f%d_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f_%f.jpg" % \
-            (session, i, x_cam[i], y_cam[i], x_grid[i], y_grid[i], w_grid[i],
-             h_grid[i], x_leye[i], y_leye[i], w_leye[i], h_leye[i], x_reye[i],
-             y_reye[i], w_reye[i], h_reye[i])
-    names.append(name)
+  # Create features.
+  features = []
+  for i in range(0, dots.shape[0]):
+    dots_feature = _float_feature(list(dots[i]))
+    face_size_feature = _float_feature(list(face_size[i]))
+    leye_box_feature = _float_feature(list(leye_boxes[i]))
+    reye_box_feature = _float_feature(list(reye_boxes[i]))
+    grid_box_feature = _float_feature(list(grid_boxes[i]))
 
-  return names
+    features.append((dots_feature, face_size_feature, leye_box_feature,
+                     reye_box_feature, grid_box_feature))
 
-def save_images(frames, names, outdir):
+  # Generate valid array.
+  valid = np.logical_and(np.logical_and(face_valid, grid_valid),
+                         np.logical_and(leye_valid, reye_valid))
+
+  return features, valid
+
+def save_images(frames, label_features, split, writer):
   """ Copies the processed images to an output directory, with the correct
   names.
   Args:
     frames: The processed frames.
-    names: The generated names for the frames, in order.
-    outdir: The name of the directory to copy the frames to. """
-  for frame, new_name in zip(frames, names):
-    if new_name is None:
+    label_features: The generated label features, in order.
+    split: The name of the split.
+    writer: The records writer to write the data with. """
+  for frame, features in zip(frames, label_features):
+    if frame is None:
       # This means that the frame is invalid.
       continue
 
-    out_path = os.path.join(outdir, new_name)
-    if not cv2.imwrite(out_path, frame):
-      raise RuntimeError("Failed to write image %s." % (out_path))
+    # Compress and serialize the image.
+    ret, encoded = cv2.imencode(".jpg", frame)
+    if not ret:
+      print "WARNING: Encoding frame failed."
+      continue
+    image_feature = _bytes_feature(tf.compat.as_bytes(encoded.tostring()))
 
-def load_images(frame_dir, frame_info, names):
+    # Create the combined feature.
+    dots, face_size, leye_box, reye_box, grid_box = features
+    combined_feature = {"%s/dots" % (split): dots,
+                        "%s/face_size" % (split): face_size,
+                        "%s/leye_box" % (split): leye_box,
+                        "%s/reye_box" % (split): reye_box,
+                        "%s/grid_box" % (split): grid_box,
+                        "%s/image" % (split): image_feature}
+    example = \
+        tf.train.Example(features=tf.train.Features(feature=combined_feature))
+
+    # Write it out.
+    writer.write(example.SerializeToString())
+
+def load_images(frame_dir, frame_info, valid):
   """ Loads images from the frame directory.
   Args:
     frame_dir: The directory to load images from.
     frame_info: The list of frame names.
-    names: The new names to give to the loaded frames.
+    valid: List indicating whether each frame is valid.
   Returns:
     A list of the loaded frames. Frames that are None aren't valid, and weren't
     loaded. """
   images = []
 
   for i, frame in enumerate(frame_info):
-    if names[i] is None:
+    if not valid[i]:
       # Frame is invalid anyway, don't bother loading it.
       images.append(None)
       continue
@@ -173,11 +226,12 @@ def load_images(frame_dir, frame_info, names):
 
   return images
 
-def process_session(session_dir, out_dir):
+def process_session(session_dir, split, writer):
   """ Process a session worth of data.
   Args:
     session_dir: The directory of the session.
-    out_dir: The output directory to copy the images to.
+    split: The name of the split.
+    writer: The records writer to write the loaded data with.
   Returns:
     True if it saved some valid data, false if there was no valid data. """
   session_name = session_dir.split("/")[-1]
@@ -207,13 +261,14 @@ def process_session(session_dir, out_dir):
   frame_info = json.load(frame_file)
   frame_file.close()
 
-  # Generate image names.
-  names = generate_names(dot_info, grid_info, face_info, leye_info, reye_info,
-                         session_name)
+  # Generate label features.
+  label_features, valid = generate_label_features(dot_info, grid_info,
+                                                  face_info, leye_info,
+                                                  reye_info)
 
   # Check if we have any valid data from this session.
-  for name in names:
-    if name is not None:
+  for image in valid:
+    if image:
       break
   else:
     # No valid data, no point in continuing.
@@ -221,11 +276,11 @@ def process_session(session_dir, out_dir):
 
   # Load images and crop faces.
   frame_dir = os.path.join(session_dir, "frames")
-  frames = load_images(frame_dir, frame_info, names)
+  frames = load_images(frame_dir, frame_info, valid)
   face_crops = extract_face_crops(frames, face_info)
 
   # Copy images.
-  save_images(face_crops, names, out_dir)
+  save_images(face_crops, label_features, split, writer)
 
   return True
 
@@ -233,7 +288,7 @@ def process_dataset(dataset_dir, output_dir, start_at=None):
   """ Processes an entire dataset, one session at a time.
   Args:
     dataset_dir: The root dataset directory.
-    output_dir: Where to write the output images.
+    output_dir: Where to write the output data.
     start_at: Session to start at. """
   # Create output directory.
   if not start_at:
@@ -243,13 +298,16 @@ def process_dataset(dataset_dir, output_dir, start_at=None):
       shutil.rmtree(output_dir)
     os.mkdir(output_dir)
 
-    # Make split directories.
-    os.mkdir(os.path.join(output_dir, "train"))
-    os.mkdir(os.path.join(output_dir, "test"))
-    os.mkdir(os.path.join(output_dir, "val"))
-
   num_test = 0
   num_val = 0
+
+  # Create writers for writing output.
+  train_record = os.path.join(output_dir, "gazecapture_train.tfrecord")
+  test_record = os.path.join(output_dir, "gazecapture_test.tfrecord")
+  val_record = os.path.join(output_dir, "gazecapture_val.tfrecord")
+  train_writer = tf.python_io.TFRecordWriter(train_record)
+  test_writer = tf.python_io.TFRecordWriter(test_record)
+  val_writer = tf.python_io.TFRecordWriter(val_record)
 
   sessions = os.listdir(dataset_dir)
 
@@ -277,23 +335,31 @@ def process_dataset(dataset_dir, output_dir, start_at=None):
     print "(%.2f%%) Processing session %s..." % (percent, item)
 
     # Determine which split this belongs in.
-    split_dir = None
+    split = None
+    writer = None
     used_test = False
     used_val = False
     if num_test < NUM_TEST_SESSIONS:
-      split_dir = os.path.join(output_dir, "test")
+      split = "test"
+      writer = test_writer
       used_test = True
     elif num_val < NUM_VAL_SESSIONS:
-      split_dir = os.path.join(output_dir, "val")
+      split = "val"
+      writer = val_writer
       used_val = True
     else:
-      split_dir = os.path.join(output_dir, "train")
+      writer = train_writer
+      split = "train"
 
-    if process_session(item_path, split_dir):
+    if process_session(item_path, split, writer):
       if used_test:
         num_test += 1
       elif used_val:
         num_val += 1
+
+  train_writer.close()
+  test_writer.close()
+  val_writer.close()
 
 def main():
   parser = argparse.ArgumentParser("Convert the GazeCapture dataset.")
