@@ -93,6 +93,10 @@ def extract_face_crops(images, face_data):
 
     # Crop the image.
     crop = images[i][start_y:end_y, start_x:end_x]
+
+    # Resize the crop.
+    crop = cv2.resize(crop, (400, 400))
+
     crops.append(crop)
 
   return crops
@@ -184,7 +188,7 @@ def save_images(frames, label_features, split, writer):
     if not ret:
       print "WARNING: Encoding frame failed."
       continue
-    image_feature = _bytes_feature(tf.compat.as_bytes(encoded.tostring()))
+    image_feature = _bytes_feature([tf.compat.as_bytes(encoded.tostring())])
 
     # Create the combined feature.
     dots, face_size, leye_box, reye_box, grid_box = features
@@ -222,6 +226,7 @@ def load_images(frame_dir, frame_info, valid):
     image = cv2.imread(frame_path)
     if image is None:
       raise RuntimeError("Failed to read image: %s" % (frame_path))
+
     images.append(image)
 
   return images
