@@ -5,7 +5,6 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
-import android.support.v4.app.FragmentActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -15,15 +14,12 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
-import com.iai.mdf.DependenceClasses.Configuration;
-import com.iai.mdf.DependenceClasses.DeviceProfile;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.Handlers.ImageFileHandler;
 import com.iai.mdf.Activities.DataCollectionActivity;
 import com.iai.mdf.Handlers.CameraHandler;
 import com.iai.mdf.Handlers.DrawHandler;
 import com.iai.mdf.R;
-
-import java.util.ArrayList;
 
 /**
  * Created by mou on 9/16/17.
@@ -63,7 +59,7 @@ public class FragmentDataCollectionByPicture extends Fragment {
                     isPicSaved = false;
                     dotCounter++;
                     drawHandler.showNextPoint();
-                    delayCapture(Configuration.getInstance(getContext()).getCollectionCaptureDelayTime());
+                    delayCapture(DeviceConfiguration.getInstance(getContext()).getCollectionCaptureDelayTime());
                     if( dotCounter < 4 ){
                         cameraHandler.deleteLastPicture();
                     }

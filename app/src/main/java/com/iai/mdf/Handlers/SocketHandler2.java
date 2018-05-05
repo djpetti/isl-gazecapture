@@ -7,18 +7,16 @@ import android.os.Message;
 import android.util.Log;
 
 import com.iai.mdf.Activities.DataCollectionActivity;
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
-import org.opencv.imgcodecs.Imgcodecs;
 import org.opencv.imgproc.Imgproc;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.Socket;
@@ -27,7 +25,6 @@ import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
 
 /**
  * Created by Mou on 2/23/2018.
@@ -237,7 +234,7 @@ public class SocketHandler2 {
     /******  Higher Level of API ******/
     private int             mFrameIndex = 0;
 
-    public void uploadImage(Image image, Configuration   confHandler){
+    public void uploadImage(Image image, DeviceConfiguration confHandler){
         Mat yuvMat = ImageProcessHandler.getBGRMatFromImage(image);
         Mat colorImg = new Mat(
                 DataCollectionActivity.Image_Size.getWidth(),

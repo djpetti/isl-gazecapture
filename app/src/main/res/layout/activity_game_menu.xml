@@ -29,8 +29,32 @@
         android:paddingTop="40dp"
         >
         <Button
+            android:id="@+id/activity_game_mole_btn_start_22"
+            android:layout_width="120dp"
+            android:layout_height="60dp"
+            android:text="2x2"
+            android:textSize="35dp"
+            android:textColor="@color/blue"
+            android:textAllCaps="false"
+            android:background="@drawable/button_menu_options"/>
+        <View
+            android:layout_width="40dp"
+            android:layout_height="1dp" />
+        <Button
+            android:id="@+id/activity_game_mole_btn_start_33"
+            android:layout_width="120dp"
+            android:layout_height="60dp"
+            android:text="3x3"
+            android:textSize="35dp"
+            android:textColor="@color/blue"
+            android:textAllCaps="false"
+            android:background="@drawable/button_menu_options"/>
+        <View
+            android:layout_width="40dp"
+            android:layout_height="1dp" />
+        <Button
             android:id="@+id/activity_game_mole_btn_start_34"
-            android:layout_width="135dp"
+            android:layout_width="120dp"
             android:layout_height="60dp"
             android:text="3x4"
             android:textSize="35dp"
@@ -38,18 +62,6 @@
             android:textAllCaps="false"
             android:background="@drawable/button_menu_options"
             />
-        <View
-            android:layout_width="80dp"
-            android:layout_height="1dp" />
-        <Button
-            android:id="@+id/activity_game_mole_btn_start_33"
-            android:layout_width="135dp"
-            android:layout_height="60dp"
-            android:text="3x3"
-            android:textSize="35dp"
-            android:textColor="@color/blue"
-            android:textAllCaps="false"
-            android:background="@drawable/button_menu_options"/>
     </LinearLayout>
 
 

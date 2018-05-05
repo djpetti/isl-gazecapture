@@ -7,7 +7,7 @@ import android.os.Message;
 import android.util.Log;
 
 import com.iai.mdf.Activities.DataCollectionActivity;
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
@@ -46,7 +46,7 @@ public class SocketHandler {
     private static final int MSG_ON_SUCCESS = 1;
     private static final int MSG_ON_ERROR = 2;
     private static final int TIMEOUT_LENGTH = 1500;
-    private static final int MAX_SUCCESSIVE_TIMEOUT = 15;
+    private static final int MAX_SUCCESSIVE_TIMEOUT = 80;
 
 
     private Socket mSocket = null;
@@ -81,7 +81,7 @@ public class SocketHandler {
 
     public void socketCreate(){
         missingResponse = 0;
-        new Thread() {
+        new Thread(){
             @Override
             public void run() {
                 try {
@@ -118,6 +118,7 @@ public class SocketHandler {
             }
             if(mSocket!=null) {
                 mSocket.close();
+                mSocket = null;
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -126,7 +127,7 @@ public class SocketHandler {
 
     public void send(final byte[] imageBytes){
         if( mSocket!=null && mSocket.isConnected() ) {
-            new Thread() {
+            new Thread(new Runnable() {
                 @Override
                 public void run() {
                     try {
@@ -166,7 +167,7 @@ public class SocketHandler {
                         e.printStackTrace();
                     }
                 }
-            }.start();
+            }).start();
         }
     }
 
@@ -198,7 +199,7 @@ public class SocketHandler {
     /******  Higher Level of API ******/
     private int             mFrameIndex = 0;
 
-    public void uploadImage(Image image, Configuration confHandler){
+    public void uploadImage(Image image, DeviceConfiguration confHandler){
         Mat yuvMat = ImageProcessHandler.getBGRMatFromImage(image);
         Mat colorImg = new Mat(
                 DataCollectionActivity.Image_Size.getWidth(),

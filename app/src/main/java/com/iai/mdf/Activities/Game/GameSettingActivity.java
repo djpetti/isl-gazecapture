@@ -10,12 +10,16 @@ import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
 import com.iai.mdf.Activities.MainActivity;
 import com.iai.mdf.R;
+
+import belka.us.androidtoggleswitch.widgets.ToggleSwitch;
 
 /**
  * Created by mou on 3/24/18.
@@ -24,17 +28,19 @@ import com.iai.mdf.R;
 public class GameSettingActivity extends Activity {
 
     private final String LOG_TAG = "GameSettingActivity";
-    public static final String BUNDLE_KEY_IP = "ip";
-    public static final String BUNDLE_KEY_PORT = "port";
+    public static final String  BUNDLE_KEY_IP = "ip";
+    public static final String  BUNDLE_KEY_PORT = "port";
 
 
 
     private SharedPreferences settings;
     private EditText ipInput;
     private EditText portInput;
-    private SeekBar toggleSpeed;
+    private SeekBar seekbarSpeed;
+    private CheckBox checkBoxAutoTrigger;
     private Button btnYes;
     private Button btnNo;
+
     private Button btnClear;
 
 
@@ -49,15 +55,18 @@ public class GameSettingActivity extends Activity {
         settings = getSharedPreferences(MainActivity.PREFERENCE_NAME, Context.MODE_PRIVATE);
         String lastIp = settings.getString(GameSettingActivity.BUNDLE_KEY_IP, null);
         String lastPort = settings.getString(GameSettingActivity.BUNDLE_KEY_PORT, null);
-        ipInput = findViewById(R.id.dialog_game_setting_editxt_ip);
-        portInput = findViewById(R.id.dialog_game_setting_editxt_port);
+        ipInput = findViewById(R.id.activity_game_setting_editxt_ip);
+        portInput = findViewById(R.id.activity_game_setting_editxt_port);
         ipInput.setText(lastIp);
         portInput.setText(lastPort);
 
-        toggleSpeed = findViewById(R.id.dialog_game_setting_toggle_speed);
+        seekbarSpeed = findViewById(R.id.activity_game_setting_seekbar_speed);
+
+        checkBoxAutoTrigger = findViewById(R.id.activity_game_checkbox_gaze_trigger);
+        checkBoxAutoTrigger.setChecked(settings.getBoolean(GameMainActivity.KEY_TRIGGER_MODE, true));
 
 
-        btnYes = findViewById(R.id.dialog_game_setting_btn_confirm);
+        btnYes = findViewById(R.id.activity_game_setting_btn_confirm);
         btnYes.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -65,12 +74,13 @@ public class GameSettingActivity extends Activity {
                 SharedPreferences.Editor editor = settings.edit();
                 editor.putString(GameSettingActivity.BUNDLE_KEY_IP, ipInput.getText().toString());
                 editor.putString(GameSettingActivity.BUNDLE_KEY_PORT, portInput.getText().toString());
+                editor.putBoolean(GameMainActivity.KEY_TRIGGER_MODE, checkBoxAutoTrigger.isChecked());
                 editor.commit();
                 finish();
             }
         });
 
-        btnNo = findViewById(R.id.dialog_game_setting_btn_cancel);
+        btnNo = findViewById(R.id.activity_game_setting_btn_cancel);
         btnNo.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

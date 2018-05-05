@@ -10,23 +10,20 @@ import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.LayoutInflater;
 import android.view.TextureView;
 import android.view.View;
-import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.Handlers.CameraHandler;
 import com.iai.mdf.Handlers.DrawHandler;
-import com.iai.mdf.Handlers.ImageProcessHandler;
 import com.iai.mdf.Handlers.SocketHandler;
 import com.iai.mdf.Handlers.TensorFlowHandler;
-import com.iai.mdf.Handlers.TimerHandler;
 import com.iai.mdf.R;
 
 import org.json.JSONException;
@@ -34,13 +31,8 @@ import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.core.CvType;
-import org.opencv.core.Mat;
 import org.opencv.core.Point;
-import org.opencv.imgproc.Imgproc;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 
 //import com.moutaigua.isl_android_gaze.FaceDetectionAPI;
@@ -68,19 +60,19 @@ public class DemoServerActivity2 extends AppCompatActivity {
     private int[]       SCREEN_SIZE;
     private int[]       TEXTURE_SIZE;
     private BaseLoaderCallback openCVLoaderCallback;
-    private boolean isRealTimeDetection = false;
-    private Handler autoDetectionHandler = new Handler();
-    private Runnable takePicRunnable;
-    private Runnable autoDotGenerationRunnable;
+    private boolean     isRealTimeDetection = false;
+    private Handler     autoDetectionHandler = new Handler();
+    private Runnable    takePicRunnable;
+    private Runnable    autoDotGenerationRunnable;
     private TensorFlowHandler tensorFlowHandler;
     private int         mFrameIndex = 0;
     private int         currentClassNum = 4;
     private SocketHandler socketHandler;
     private int         prevReceivedGazeIndex = 0;
-    private String  socketIp = null;
-    private int     socketPort;
+    private String      socketIp = null;
+    private int         socketPort;
     private ArrayList<Point> estimationList = new ArrayList<>();
-    private Configuration confHandler = Configuration.getInstance(this);
+    private DeviceConfiguration confHandler = DeviceConfiguration.getInstance(this);
 
 
 
@@ -90,6 +82,7 @@ public class DemoServerActivity2 extends AppCompatActivity {
         setContentView(R.layout.activity_demo_2);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         getSupportActionBar().hide();
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Bundle extras = getIntent().getExtras();
         socketIp = extras.getString(BUNDLE_KEY_IP);
         socketPort = extras.getInt(BUNDLE_KEY_PORT);
@@ -98,6 +91,8 @@ public class DemoServerActivity2 extends AppCompatActivity {
         initOpenCV();
 
         SCREEN_SIZE = fetchScreenSize();
+        Log.d("test", String.valueOf(SCREEN_SIZE[0]));
+        Log.d("test", String.valueOf(SCREEN_SIZE[1]));
         textureView = findViewById(R.id.activity_demo_preview_textureview);
         // ensure texture fill the screen with a certain ratio
         TEXTURE_SIZE = SCREEN_SIZE;
@@ -301,22 +296,20 @@ public class DemoServerActivity2 extends AppCompatActivity {
 
     private void drawGaze(JSONObject object){
         try {
-            int receivedIdx = object.getInt(SocketHandler.JSON_KEY_SEQ_NUMBER);
-            if( receivedIdx > prevReceivedGazeIndex ){
-                prevReceivedGazeIndex = receivedIdx;
-                double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
-                double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
-                float[] loc = new float[2];
-//                loc[0] = (float)((portraitHori + deviceProfile.getCameraOffsetX())/deviceProfile.getScreenSizeX());
-//                loc[1] = (float)((portraitVert + deviceProfile.getCameraOffsetY())/deviceProfile.getScreenSizeY());
-                loc[0] = (float)((portraitHori + confHandler.getCameraOffsetX())/confHandler.getScreenSizeX());
-                loc[1] = (float)((portraitVert + confHandler.getCameraOffsetY())/confHandler.getScreenSizeY());
-                if (toggleButton.isChecked()){
-                    loc = adjustEstimation(loc);
-                }
-                drawExactResult(loc);
-//                drawClassifiedResult(loc, toggleButton.isChecked());
+//            int receivedIdx = object.getInt(SocketHandler.JSON_KEY_SEQ_NUMBER);
+//            if( receivedIdx > prevReceivedGazeIndex ){
+//            prevReceivedGazeIndex = receivedIdx;
+            double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
+            double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
+            float[] loc = new float[2];
+            loc[0] = (float)((portraitHori + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePWidth());
+            loc[1] = (float)((portraitVert + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePHeight());
+            if (toggleButton.isChecked()){
+                loc = adjustEstimation(loc);
             }
+            drawExactResult(loc);
+//                drawClassifiedResult(loc, toggleButton.isChecked());
+//            }
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -336,8 +329,8 @@ public class DemoServerActivity2 extends AppCompatActivity {
     }
 
     private void drawExactResult(float[] estimateGaze){
-        int portraitX = (int)(TEXTURE_SIZE[0] * estimateGaze[0]);
-        int portraitY = (int)(TEXTURE_SIZE[1] * estimateGaze[1]);
+        int portraitX = (int)(SCREEN_SIZE[0] * estimateGaze[0]);
+        int portraitY = (int)(SCREEN_SIZE[1] * estimateGaze[1]);
         drawHandler.fillRect(portraitX, portraitY, 80,80, frame_gaze_result, R.color.estimated_square_color, false);
     }
 

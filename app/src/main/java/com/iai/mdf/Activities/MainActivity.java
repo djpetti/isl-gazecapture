@@ -20,7 +20,7 @@ import android.widget.Button;
 import android.widget.EditText;
 
 import com.iai.mdf.Activities.Game.GameMenuActivity;
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.R;
 
 import java.util.ArrayList;
@@ -39,7 +39,7 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         getSupportActionBar().hide();
         checkPermissions();
-        Configuration.getInstance(this).loadConfiguration();
+        DeviceConfiguration.getInstance(this).loadConfiguration();
 
 
         Button btn_data_collection =  (Button) findViewById(R.id.main_activity_btn_data_collection);

@@ -3,6 +3,7 @@ package com.iai.mdf.DependenceClasses;
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.res.Configuration;
 import android.util.DisplayMetrics;
 
 
@@ -11,12 +12,12 @@ import android.util.DisplayMetrics;
  * Created by mou on 3/12/18.
  */
 
-public class Configuration {
+public class DeviceConfiguration {
 
     public static final int COLLECTION_CAPTURE_DELAY_MIN = 350;
-    public static final int DEMO_CAPTURE_DELAY_MIN = 250;
+    public static final int DEMO_CAPTURE_DELAY_MIN = 1;
 
-    private final String LOG_TAG = "Configuration";
+    private final String LOG_TAG = "DeviceConfiguration";
     private static final String PREFERENCE_NAME = "isl_mobile_eye_gaze";
     private static final String KEY_CAMERA_POS_X = "camera_pos_x";
     private static final String KEY_CAMERA_POS_Y = "camera_pos_y";
@@ -36,27 +37,27 @@ public class Configuration {
      */
 
 
-    private static Configuration myInstance;
+    private static DeviceConfiguration myInstance;
     private Context ctxt;
-    private float   cameraOffsetX;
-    private float   cameraOffsetY;
-    private float   screenSizeX;
-    private float   screenSizeY;
-    private int     screenResoX;
-    private int     screenResoY;
+    private float   cameraOffsetPWidth;
+    private float   cameraOffsetPHeight;
+    private float   screenSizePWidth;
+    private float   screenSizePHeight;
+    private int     screenResoPWidth;
+    private int     screenResoPHeight;
     private int     collectionCaptureDelayTime;
     private int     demoCaptureDelayTime;
     private int     imageRotation;
 
 
 
-    private Configuration(Context context) {
+    private DeviceConfiguration(Context context) {
         ctxt = context;
     }
 
-    public static synchronized Configuration getInstance(Context context){
+    public static synchronized DeviceConfiguration getInstance(Context context){
         if( myInstance==null ){
-            myInstance = new Configuration(context);
+            myInstance = new DeviceConfiguration(context);
         }
         return myInstance;
     }
@@ -66,14 +67,19 @@ public class Configuration {
 
     public void loadConfiguration(){
         SharedPreferences settings = ctxt.getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE);
-        cameraOffsetX = settings.getFloat(this.KEY_CAMERA_POS_X, 0);
-        cameraOffsetY = settings.getFloat(this.KEY_CAMERA_POS_Y, 0);
-        screenSizeX = settings.getFloat(this.KEY_DISPLAY_SHORT_CM, 0);
-        screenSizeY = settings.getFloat(this.KEY_DISPLAY_LONG_CM, 0);
+        cameraOffsetPWidth = settings.getFloat(this.KEY_CAMERA_POS_X, 0);
+        cameraOffsetPHeight = settings.getFloat(this.KEY_CAMERA_POS_Y, 0);
+        screenSizePWidth = settings.getFloat(this.KEY_DISPLAY_SHORT_CM, 0);
+        screenSizePHeight = settings.getFloat(this.KEY_DISPLAY_LONG_CM, 0);
         DisplayMetrics displayMetrics = new DisplayMetrics();
         ((Activity)ctxt).getWindowManager().getDefaultDisplay().getRealMetrics(displayMetrics);
-        screenResoX = displayMetrics.widthPixels;
-        screenResoY = displayMetrics.heightPixels;
+        if (ctxt.getResources().getConfiguration().orientation == Configuration.ORIENTATION_PORTRAIT){
+            screenResoPWidth = displayMetrics.widthPixels;
+            screenResoPHeight = displayMetrics.heightPixels;
+        } else {
+            screenResoPWidth = displayMetrics.heightPixels;
+            screenResoPHeight = displayMetrics.widthPixels;
+        }
         collectionCaptureDelayTime = settings.getInt(this.KEY_CAPTURE_SPEED_COLLECTION, 700);
         demoCaptureDelayTime = settings.getInt(this.KEY_CAPTURE_SPEED_REALTIME, 300);
         imageRotation = settings.getInt(this.KEY_CAPTURE_ROTATION, 0);
@@ -82,10 +88,10 @@ public class Configuration {
     public void saveConfiguration(){
         SharedPreferences settings = ctxt.getSharedPreferences(PREFERENCE_NAME, Context.MODE_PRIVATE);
         SharedPreferences.Editor editor = settings.edit();
-        editor.putFloat(this.KEY_CAMERA_POS_X, cameraOffsetX);
-        editor.putFloat(this.KEY_CAMERA_POS_Y, cameraOffsetY);
-        editor.putFloat(this.KEY_DISPLAY_SHORT_CM, screenSizeX);
-        editor.putFloat(this.KEY_DISPLAY_LONG_CM, screenSizeY);
+        editor.putFloat(this.KEY_CAMERA_POS_X, cameraOffsetPWidth);
+        editor.putFloat(this.KEY_CAMERA_POS_Y, cameraOffsetPHeight);
+        editor.putFloat(this.KEY_DISPLAY_SHORT_CM, screenSizePWidth);
+        editor.putFloat(this.KEY_DISPLAY_LONG_CM, screenSizePHeight);
         editor.putInt(this.KEY_CAPTURE_SPEED_COLLECTION, collectionCaptureDelayTime);
         editor.putInt(this.KEY_CAPTURE_SPEED_REALTIME, demoCaptureDelayTime);
         editor.putInt(this.KEY_CAPTURE_ROTATION, imageRotation);
@@ -96,52 +102,52 @@ public class Configuration {
 
 
 
-    public float getCameraOffsetX() {
-        return cameraOffsetX;
+    public float getCameraOffsetPWidth() {
+        return cameraOffsetPWidth;
     }
 
-    public void setCameraOffsetX(float cameraOffsetX) {
-        this.cameraOffsetX = cameraOffsetX;
+    public void setCameraOffsetPWidth(float cameraOffsetPWidth) {
+        this.cameraOffsetPWidth = cameraOffsetPWidth;
     }
 
-    public float getCameraOffsetY() {
-        return cameraOffsetY;
+    public float getCameraOffsetPHeight() {
+        return cameraOffsetPHeight;
     }
 
-    public void setCameraOffsetY(float cameraOffsetY) {
-        this.cameraOffsetY = cameraOffsetY;
+    public void setCameraOffsetPHeight(float cameraOffsetPHeight) {
+        this.cameraOffsetPHeight = cameraOffsetPHeight;
     }
 
-    public float getScreenSizeX() {
-        return screenSizeX;
+    public float getScreenSizePWidth() {
+        return screenSizePWidth;
     }
 
-    public void setScreenSizeX(float screenSizeX) {
-        this.screenSizeX = screenSizeX;
+    public void setScreenSizePWidth(float screenSizePWidth) {
+        this.screenSizePWidth = screenSizePWidth;
     }
 
-    public float getScreenSizeY() {
-        return screenSizeY;
+    public float getScreenSizePHeight() {
+        return screenSizePHeight;
     }
 
-    public void setScreenSizeY(float screenSizeY) {
-        this.screenSizeY = screenSizeY;
+    public void setScreenSizePHeight(float screenSizePHeight) {
+        this.screenSizePHeight = screenSizePHeight;
     }
 
-    public int getScreenResoX() {
-        return screenResoX;
+    public int getScreenResoPWidth() {
+        return screenResoPWidth;
     }
 
-    public void setScreenResoX(int screenResoX) {
-        this.screenResoX = screenResoX;
+    public void setScreenResoPWidth(int screenResoPWidth) {
+        this.screenResoPWidth = screenResoPWidth;
     }
 
-    public int getScreenResoY() {
-        return screenResoY;
+    public int getScreenResoPHeight() {
+        return screenResoPHeight;
     }
 
-    public void setScreenResoY(int screenResoY) {
-        this.screenResoY = screenResoY;
+    public void setScreenResoPHeight(int screenResoPHeight) {
+        this.screenResoPHeight = screenResoPHeight;
     }
 
     public int getCollectionCaptureDelayTime() {

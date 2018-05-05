@@ -13,7 +13,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.R;
 
 /**
@@ -27,7 +27,7 @@ public class SettingActivity extends AppCompatActivity {
     private static final String PREFERENCE_NAME = "isl_mobile_eye_gaze";
     private static final String LOG_TAG = "SettingActivity";
 
-    private Configuration confHandler;
+    private DeviceConfiguration confHandler;
     private EditText editCameraPosX;
     private EditText editCameraPosY;
     private EditText editDisplaySizeX;
@@ -44,18 +44,18 @@ public class SettingActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_setting);
 
-        confHandler = Configuration.getInstance(this);
+        confHandler = DeviceConfiguration.getInstance(this);
 
         editCameraPosX = findViewById(R.id.setting_activity_editxt_camera_short);
-        editCameraPosX.setText(String.valueOf(confHandler.getCameraOffsetX()));
+        editCameraPosX.setText(String.valueOf(confHandler.getCameraOffsetPWidth()));
         editCameraPosX.clearFocus();
         editCameraPosY = findViewById(R.id.setting_activity_editxt_camera_long);
-        editCameraPosY.setText(String.valueOf(confHandler.getCameraOffsetY()));
+        editCameraPosY.setText(String.valueOf(confHandler.getCameraOffsetPHeight()));
 
         editDisplaySizeX = findViewById(R.id.setting_activity_editxt_display_short_cm);
-        editDisplaySizeX.setText(String.valueOf(confHandler.getScreenSizeX()));
+        editDisplaySizeX.setText(String.valueOf(confHandler.getScreenSizePWidth()));
         editDisplaySizeY = findViewById(R.id.setting_activity_editxt_display_long_cm);
-        editDisplaySizeY.setText(String.valueOf(confHandler.getScreenSizeY()));
+        editDisplaySizeY.setText(String.valueOf(confHandler.getScreenSizePHeight()));
 
         editCaptureSpeedCollection = findViewById(R.id.setting_activity_editxt_capture_speed_collection);
         editCaptureSpeedCollection.setText(String.valueOf(confHandler.getCollectionCaptureDelayTime()));
@@ -149,7 +149,7 @@ public class SettingActivity extends AppCompatActivity {
             Toast.makeText(this, "All fields are required", Toast.LENGTH_SHORT).show();
             return false;
         }
-        if( Integer.parseInt(editCaptureSpeedCollection.getText().toString()) < Configuration.COLLECTION_CAPTURE_DELAY_MIN){
+        if( Integer.parseInt(editCaptureSpeedCollection.getText().toString()) < DeviceConfiguration.COLLECTION_CAPTURE_DELAY_MIN){
             Toast.makeText(this, "Collection Capture delay should be greater than 350 ms", Toast.LENGTH_SHORT).show();
             return false;
         }
@@ -157,7 +157,7 @@ public class SettingActivity extends AppCompatActivity {
             Toast.makeText(this, "All fields are required", Toast.LENGTH_SHORT).show();
             return false;
         }
-        if( Integer.parseInt(editCaptureSpeedRealtime.getText().toString()) < Configuration.DEMO_CAPTURE_DELAY_MIN){
+        if( Integer.parseInt(editCaptureSpeedRealtime.getText().toString()) < DeviceConfiguration.DEMO_CAPTURE_DELAY_MIN){
             Toast.makeText(this, "Collection Capture delay should be greater than 250 ms", Toast.LENGTH_SHORT).show();
             return false;
         }
@@ -224,14 +224,14 @@ public class SettingActivity extends AppCompatActivity {
 
 
     private void updateSetting(){
-        confHandler.setCameraOffsetX( Float.parseFloat(editCameraPosX.getText().toString()) ) ;
-        confHandler.setCameraOffsetY( Float.parseFloat(editCameraPosY.getText().toString()) ) ;
-        confHandler.setScreenSizeX( Float.parseFloat(editDisplaySizeX.getText().toString()) ) ;
-        confHandler.setScreenSizeY( Float.parseFloat(editDisplaySizeY.getText().toString()) ) ;
+        confHandler.setCameraOffsetPWidth( Float.parseFloat(editCameraPosX.getText().toString()) ) ;
+        confHandler.setCameraOffsetPHeight( Float.parseFloat(editCameraPosY.getText().toString()) ) ;
+        confHandler.setScreenSizePWidth( Float.parseFloat(editDisplaySizeX.getText().toString()) ) ;
+        confHandler.setScreenSizePHeight( Float.parseFloat(editDisplaySizeY.getText().toString()) ) ;
         confHandler.setCollectionCaptureDelayTime( Integer.parseInt(editCaptureSpeedCollection.getText().toString()) );
         confHandler.setDemoCaptureDelayTime( Integer.parseInt(editCaptureSpeedRealtime.getText().toString()) );
         confHandler.setImageRotation( Integer.parseInt(editPictureRotation.getText().toString()) );
-        Configuration.getInstance(this).saveConfiguration();
+        DeviceConfiguration.getInstance(this).saveConfiguration();
     }
 
 

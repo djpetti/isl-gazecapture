@@ -24,14 +24,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name="com.iai.mdf.Activities.SettingActivity" android:screenOrientation="portrait" />
+        <activity android:name="com.iai.mdf.Activities.SettingActivity" android:screenOrientation="landscape" />
         <activity android:name="com.iai.mdf.Activities.DataCollectionActivity" android:screenOrientation="portrait"/>
         <activity android:name="com.iai.mdf.Activities.DataProcessActivity" android:screenOrientation="portrait"/>
         <activity android:name="com.iai.mdf.Activities.DemoRegrsActivity" android:screenOrientation="portrait"/>
         <activity android:name="com.iai.mdf.Activities.DemoClassActivity" />
         <activity android:name="com.iai.mdf.Activities.DemoiTrackerActivity" android:screenOrientation="portrait"/>
         <activity android:name="com.iai.mdf.Activities.DemoServerActivity2" android:screenOrientation="portrait"/>
-        <activity android:name="com.iai.mdf.Activities.DemoServerActivity1" android:screenOrientation="portrait"/>
+        <activity android:name="com.iai.mdf.Activities.DemoServerActivity1" android:screenOrientation="portrait" />
         <activity android:name="com.iai.mdf.Activities.TestPBActivity" />
         <activity android:name="com.iai.mdf.Activities.OpenCVActivity" />
         <activity android:name="com.iai.mdf.Activities.CloudActivity" android:screenOrientation="portrait"/>

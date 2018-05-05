@@ -25,14 +25,14 @@ import java.util.Random;
 public class GameGrid {
 
     private final String LOG_TAG = "GameGrid";
-    static final int MOLE_LIFE_NORMAL = 1500;
-    static final int WRONG_WHACK_PENALTY = -30;
+    static final int    MOLE_LIFE_NORMAL = 1500;
+    static final int    WRONG_WHACK_PENALTY = 0;
     static final double GAME_SPEED_VARIATION_PROB = 0.90;
     static final int    GAME_MAX_MOLES = 3;
 
     private Activity ctxt;
-    private ArrayList<ImageButton> holes;
-    private ArrayList<ImageView> holeCovers;
+    private ArrayList<ImageButton>  holes;
+    private ArrayList<ImageView>    holeCovers;
     private ArrayList<Mole> moles;
     private int GRID_SIZE_ROW;
     private int GRID_SIZE_COL;
@@ -74,6 +74,14 @@ public class GameGrid {
     public void addHole(ImageButton btn, ImageView imageView) {
         this.holes.add(btn);
         this.holeCovers.add(imageView);
+    }
+
+    public ImageButton getHole(int idx){
+        return holes.get(idx);
+    }
+
+    public ArrayList<ImageButton> getHoles(){
+        return holes;
     }
 
     public void startGame(){

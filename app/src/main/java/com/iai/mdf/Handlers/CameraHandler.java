@@ -36,13 +36,12 @@ import android.view.TextureView;
 import android.widget.Toast;
 
 import com.iai.mdf.Activities.DataCollectionActivity;
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.Fragments.FragmentDataCollectionByVideo;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -135,7 +134,7 @@ public class CameraHandler {
 //        if(Build.MODEL.equalsIgnoreCase("Nexus 6P")){
 //            degree = 180;
 //        }
-        return Configuration.getInstance(ctxt).getImageRotation();
+        return DeviceConfiguration.getInstance(ctxt).getImageRotation();
     }
 
 
@@ -641,7 +640,7 @@ public class CameraHandler {
         mediaRecorder.setVideoFrameRate(VIDEO_FPS);    //frame rate
         mediaRecorder.setVideoEncodingBitRate(24 * 1024 * 1024);//
         mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);//视频编码格式
-        mediaRecorder.setOrientationHint(Configuration.getInstance(ctxt).getImageRotation());//输出视频播放的方向提示
+        mediaRecorder.setOrientationHint(DeviceConfiguration.getInstance(ctxt).getImageRotation());//输出视频播放的方向提示
 //        //设置记录会话的最大持续时间（毫秒）
 //        mediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_480P));
     }

@@ -7,6 +7,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.drawable.ColorDrawable;
 import android.media.Image;
 import android.media.ImageReader;
@@ -15,15 +16,16 @@ import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.Handler;
 import android.os.Looper;
-import android.os.SystemClock;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.util.Log;
 import android.util.Pair;
-import android.view.MotionEvent;
+import android.view.Gravity;
 import android.view.TextureView;
 import android.view.View;
 import android.view.Window;
+import android.view.WindowManager;
+import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -33,9 +35,10 @@ import android.widget.Toast;
 
 import com.akexorcist.roundcornerprogressbar.RoundCornerProgressBar;
 import com.iai.mdf.Activities.MainActivity;
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.DependenceClasses.GameGrid;
 import com.iai.mdf.Handlers.CameraHandler;
+import com.iai.mdf.Handlers.DrawHandler;
 import com.iai.mdf.Handlers.SocketHandler;
 import com.iai.mdf.R;
 
@@ -47,6 +50,7 @@ import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Point;
 
 import java.util.ArrayList;
+import java.util.LinkedList;
 
 /**
  * Created by mou on 3/23/18.
@@ -55,36 +59,40 @@ import java.util.ArrayList;
 public class GameMainActivity extends Activity {
 
     private final String LOG_TAG = "GameMainActivity";
-    public static final String KEY_GRID_SIZE = "grid_size";
-    public static final String KEY_SPEED = "speed";
-    public static final String KEY_MODE = "game_mode";
+    public static final String  KEY_GRID_SIZE = "grid_size";
+    public static final String  KEY_SPEED = "speed";
+    public static final String  KEY_MODE = "game_mode";
     public static final int     VALUE_MODE_TIMER = 1;
-    public static final String KEY_MAX_SCORE = "game_max_score";
-    private static final int GAME_DURATION = 1000 * 60;
+    public static final String  KEY_MAX_SCORE = "game_max_score";
+    public static final String  KEY_TRIGGER_MODE = "trigger_mode";
+    private static final int    GAME_DURATION = 1000 * 60;
 
     private SharedPreferences settings;
     private int GRID_SIZE;
     private int GAME_SPEED;
     private int GAME_MODE;
     private int GAME_MAX_SCORE;
+    private boolean GAME_GAZE_AUTO_TRIGGER;
 
 
-    private ImageView   imgServerConnect;
-    private ImageButton btnController;
-    private ImageButton btnExit;
+    private ImageView       imgServerConnect;
+    private ImageButton     btnController;
+    private ImageButton     btnHammer;
+    private ImageButton     btnExit;
     private View            table;
     private LinearLayout    tableRow1;
     private LinearLayout    tableRow2;
     private LinearLayout    tableRow3;
-    private TextView    txtScore;
+    private TextView        txtScore;
     private RoundCornerProgressBar progressBarTimer;
-    private GameGrid    gameHandler;
+    private GameGrid        gameHandler;
     private CountDownTimer  gameCounterDownTimer;
     private GameResultDialog gameResultDialog;
 
     private int         curScore;
 
-    private boolean isGameStarted = false;
+    private boolean     isGameStarted = false;
+    private boolean     isPreviewMode = false;
 
 
     @Override
@@ -92,7 +100,9 @@ public class GameMainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_game_main);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         hideBottomBar();
+
 
         initOpenCV();
         loadSettings();
@@ -114,11 +124,28 @@ public class GameMainActivity extends Activity {
                     imgServerConnect.setImageResource(R.drawable.game_main_server_timeout);
                     showToast("Connecting to the server...");
                     serverConnector.socketCreate();
+                } else if (!isGameStarted) {
+                    // when connection is made and game is not started,
+                    // switch between preview and game mode
+                    isPreviewMode = !isPreviewMode;
+                    if( isPreviewMode ){
+                        textureView.bringToFront();
+                        takeImageHandler.post(takeImageRunnable);
+                        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                                table.getHeight(),
+                                table.getWidth()
+                        );
+                        params.gravity = Gravity.CENTER;
+                        textureView.setLayoutParams(params);
+                    } else {
+                        table.bringToFront();
+                        takeImageHandler.removeCallbacks(takeImageRunnable);
+                    }
                 }
             }
         });
         // controller button
-        btnController = findViewById(R.id.activity_game_main_img_controller);
+        btnController = findViewById(R.id.activity_game_main_imgbtn_controller);
         btnController.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -130,8 +157,21 @@ public class GameMainActivity extends Activity {
                 isGameStarted = !isGameStarted;
             }
         });
+        // Hammer:  gaze manual trigger
+        btnHammer = findViewById(R.id.activity_game_main_imgbtn_hammer);
+        btnHammer.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if( isGameStarted && !GAME_GAZE_AUTO_TRIGGER ){
+                    clickTriggle(optimalGaze);
+                }
+            }
+        });
+        if( !GAME_GAZE_AUTO_TRIGGER ){
+            btnHammer.setVisibility(View.INVISIBLE);
+        }
         // exit button
-        btnExit = findViewById(R.id.activity_game_main_exit);
+        btnExit = findViewById(R.id.activity_game_main_imgbtn_exit);
         btnExit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -141,13 +181,23 @@ public class GameMainActivity extends Activity {
             }
         });
 
+
         // texture
         textureView = findViewById(R.id.activity_game_main_textureview);
+        textureView.setRotation((float) 270.0);
+
 
 
         // prepare to start
         initGame();
         connectServer();
+
+
+
+        frame_gaze_result = findViewById(R.id.activity_game_layout_dotHolder_result);
+        frame_gaze_result.bringToFront();
+        drawHandler = new DrawHandler(this, new int[]{confHandler.getScreenResoPWidth(),confHandler.getScreenResoPHeight()});
+
     }
 
 
@@ -189,6 +239,7 @@ public class GameMainActivity extends Activity {
         settings = getSharedPreferences(MainActivity.PREFERENCE_NAME, Context.MODE_PRIVATE);
         GAME_SPEED = settings.getInt(this.KEY_SPEED, 5);
         GAME_MAX_SCORE = settings.getInt(this.KEY_MAX_SCORE, 0);
+        GAME_GAZE_AUTO_TRIGGER = settings.getBoolean(this.KEY_TRIGGER_MODE, true);
     }
 
     private void initGameGrid(){
@@ -207,10 +258,16 @@ public class GameMainActivity extends Activity {
             }
         };
         table     = findViewById(R.id.activity_game_main_layout_table);
+        table.bringToFront();
         tableRow1 = findViewById(R.id.activity_game_main_table_row1);
         tableRow2 = findViewById(R.id.activity_game_main_table_row2);
         tableRow3 = findViewById(R.id.activity_game_main_table_row3);
         LinearLayout[] rows = new LinearLayout[] {tableRow1, tableRow2, tableRow3};
+        LinearLayout.LayoutParams rowParam = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                (float) 1 / rowNum
+        );
         LinearLayout.LayoutParams cellParam = new LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -219,7 +276,9 @@ public class GameMainActivity extends Activity {
                 RelativeLayout.LayoutParams.MATCH_PARENT,
                 RelativeLayout.LayoutParams.MATCH_PARENT);
         cellChildrenParam.addRule(RelativeLayout.CENTER_IN_PARENT, RelativeLayout.TRUE);
+
         for(int rowIdx = 0; rowIdx < rowNum; ++rowIdx) {
+            rows[rowIdx].setLayoutParams(rowParam);
             for (int colIdx = 0; colIdx < colNum; ++colIdx) {
                 // Creating a new RelativeLayout as a cell
                 RelativeLayout cell = new RelativeLayout(this);
@@ -314,6 +373,7 @@ public class GameMainActivity extends Activity {
     /****  Server ****/
     private SocketHandler serverConnector;
     private Toast toast;
+    private double[]    optimalGaze = new double[]{1000,0,0};
 
     private void connectServer(){
         SharedPreferences settings = getSharedPreferences(MainActivity.PREFERENCE_NAME, Context.MODE_PRIVATE);
@@ -333,7 +393,10 @@ public class GameMainActivity extends Activity {
                         JSONObject object = new JSONObject(str);
                         if (object != null ){
                             if (object.getBoolean("Valid")) {
-                                analyzeGaze(object);
+                                optimalGaze = analyzeGaze(object);
+                                if( GAME_GAZE_AUTO_TRIGGER ) {
+                                    clickTriggle(optimalGaze);
+                                }
                                 Log.d(LOG_TAG, object.toString());
                             } else {
                                 Log.d(LOG_TAG, "inValid");
@@ -377,7 +440,7 @@ public class GameMainActivity extends Activity {
     /****  Camera ****/
     private BaseLoaderCallback openCVLoaderCallback;
     private CameraHandler   cameraHandler;
-    private Configuration   confHandler = Configuration.getInstance(this);
+    private DeviceConfiguration confHandler = DeviceConfiguration.getInstance(this);
     private TextureView     textureView;
     private Handler         takeImageHandler = new Handler();
     private Runnable        takeImageRunnable;
@@ -437,69 +500,99 @@ public class GameMainActivity extends Activity {
 
 
     /***** Gaze Control *****/
-    private ArrayList<Pair<Float,Float>> prePoints = new ArrayList<>();
-    private final int   CLICK_THRESHOLD = 85;
-    private final int   NUM_OF_PRE_POINTS = 3;
+//    private ArrayList<Pair<Float,Float>> pointHistory = new ArrayList<>();
+    private LinkedList<Pair<Float,Float>> pointHistory = new LinkedList<>();
+    private final double     CLICK_THRESHOLD = 0.1;
+    private final int       NUM_OF_PRE_POINTS = 1;
 
-    private void analyzeGaze(JSONObject object){
+    private double[] analyzeGaze(JSONObject object){
         try {
-            int receivedIdx = object.getInt(SocketHandler.JSON_KEY_SEQ_NUMBER);
-            if( receivedIdx > prevReceivedGazeIndex ){
-                prevReceivedGazeIndex = receivedIdx;
-                double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
-                double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
-                float[] loc = new float[2];
-                loc[0] = (float)((portraitHori + confHandler.getCameraOffsetX())/confHandler.getScreenSizeX());
-                loc[1] = (float)((portraitVert + confHandler.getCameraOffsetY())/confHandler.getScreenSizeY());
-                prePoints.add(new Pair(loc[0], loc[1]));
-                if( prePoints.size()<NUM_OF_PRE_POINTS ){
-                    return;
-                } else if (prePoints.size()>NUM_OF_PRE_POINTS) {
-                    prePoints.remove(0);
-                }
-                // analyze last three points distribution
-                double aveX = 0;
-                double aveY = 0;
-                for(Pair<Float, Float> eachPoint:prePoints){
-                    aveX += eachPoint.first;
-                    aveY += eachPoint.second;
-                }
-                aveX /= NUM_OF_PRE_POINTS;
-                aveY /= NUM_OF_PRE_POINTS;
-                double diff = 0;
-                for(Pair<Float, Float> eachPoint : prePoints){
-                    diff += Math.sqrt((eachPoint.first - aveX)*(eachPoint.first - aveX)
-                            + (eachPoint.second - aveY)*(eachPoint.second - aveY));
-                }
-                diff /= 3;
-                Log.d(LOG_TAG, String.valueOf(diff));
-                if(diff < CLICK_THRESHOLD){
-                    // Obtain MotionEvent object
-                    long downTime = SystemClock.uptimeMillis();
-                    long eventTime = SystemClock.uptimeMillis() + 100;
-                    int metaState = 0;
-                    MotionEvent motionEvent = MotionEvent.obtain(
-                            downTime,
-                            eventTime,
-                            MotionEvent.ACTION_UP,
-                            (float) aveX,
-                            (float) aveY,
-                            metaState
-                    );
-                    // Dispatch touch event to view
-                    table.dispatchTouchEvent(motionEvent);
-                } else {
-                    Log.d(LOG_TAG, "Moving");
-                }
+            double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
+            double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
+            float[] loc = new float[2];
+            loc[0] = (float)((portraitHori + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePWidth());
+            loc[1] = (float)((portraitVert + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePHeight());
+            pointHistory.add(new Pair(loc[0], loc[1]));
+            if (pointHistory.size()>NUM_OF_PRE_POINTS) {
+                pointHistory.remove(0);
             }
+            // analyze last three points distribution
+            double avePX = 0;
+            double avePY = 0;
+            drawHandler.clear(frame_gaze_result);
+            for(Pair<Float, Float> eachPoint: pointHistory){
+                avePX += eachPoint.first;
+                avePY += eachPoint.second;
+//                drawExactResult( new float[]{eachPoint.first, eachPoint.second}, true, R.color.estimated_square_color);
+            }
+            avePX /= pointHistory.size();
+            avePY /= pointHistory.size();
+            if( isPreviewMode ) {
+                drawExactResult(new float[]{(float) avePX, (float) avePY}, true, R.color.desired_square_color);
+            }
+            double diff = 0;
+            for(Pair<Float, Float> eachPoint : pointHistory){
+                diff += Math.sqrt((eachPoint.first - avePX)*(eachPoint.first - avePX)
+                        + (eachPoint.second - avePY)*(eachPoint.second - avePY));
+            }
+            diff /= pointHistory.size();
+            Log.d(LOG_TAG, String.valueOf(diff));
+            return new double[]{diff, avePX, avePY};
+        } catch (JSONException e) {
+            e.printStackTrace();
+            return null;
+        }
+    }
+
+    private void    clickTriggle(double[] analRes){
+        if (analRes==null){
+            return;
+        }
+        double diff = analRes[0];
+        double avePX = analRes[1];
+        double avePY = analRes[2];
+        if(diff < CLICK_THRESHOLD
+                && avePX > 0 && avePY > 0
+                && avePX < (double)table.getHeight()/confHandler.getScreenResoPWidth()
+                && avePY < (double)table.getWidth()/confHandler.getScreenResoPHeight()){
+            Log.d(LOG_TAG, "Click");
+            int rowNum = GRID_SIZE / 10;
+            int colNum = GRID_SIZE % 10;
+            int btnRowIdx = rowNum - 1 - (int)(avePX / ((double)table.getHeight()/confHandler.getScreenResoPWidth()/rowNum));
+            int btnColIdx = (int)(avePY / ((double)table.getWidth()/confHandler.getScreenResoPHeight()/colNum));
+            if ( btnRowIdx*colNum + btnColIdx < gameHandler.getHoles().size()) {
+                gameHandler.getHole(btnRowIdx * colNum + btnColIdx).performClick();
+            }
+        } else {
+            Log.d(LOG_TAG, "Moving");
+        }
+    }
+
+    /***** TEMP *****/
+    private FrameLayout frame_gaze_result;
+    private DrawHandler drawHandler;
+//    private int[]       SCREEN_SIZE = new int[]{1440, 2392};
+    private void drawGaze(JSONObject object, boolean isHoldOn, int color){
+        try {
+            double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
+            double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
+            float[] loc = new float[2];
+            loc[0] = (float)((portraitHori + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePWidth());
+            loc[1] = (float)((portraitVert + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePHeight());
+            drawExactResult(loc, isHoldOn, color);
         } catch (JSONException e) {
             e.printStackTrace();
         }
     }
 
-
-
-
+    private void drawExactResult(float[] estimateGaze, boolean isHoldOn, int color){
+        float temp = estimateGaze[0];
+        estimateGaze[0] = estimateGaze[1];
+        estimateGaze[1] = 1 - temp;
+        int portraitX = (int)(confHandler.getScreenResoPHeight() * estimateGaze[0]);
+        int portraitY = (int)(confHandler.getScreenResoPWidth() * estimateGaze[1]);
+        drawHandler.fillRect(portraitX, portraitY, 80,80, frame_gaze_result, color, isHoldOn);
+    }
 
 
 

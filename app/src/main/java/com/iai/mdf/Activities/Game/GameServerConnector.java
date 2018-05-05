@@ -7,7 +7,7 @@ import android.os.Message;
 import android.util.Log;
 
 import com.iai.mdf.Activities.DataCollectionActivity;
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.Handlers.ImageProcessHandler;
 import com.iai.mdf.Handlers.TimerHandler;
 
@@ -136,7 +136,7 @@ public class GameServerConnector {
                 @Override
                 public void run() {
                     try {
-                        if( missingResponse < 15) {
+                        if( missingResponse < 40) {
                             missingResponse++;
                             dos.write(imageBytes);
                             Log.d(LOG_TAG, "Data Sent");
@@ -201,7 +201,7 @@ public class GameServerConnector {
     /******  Higher Level of API ******/
     private int             mFrameIndex = 0;
 
-    public void uploadImage(Image image, Configuration   confHandler){
+    public void uploadImage(Image image, DeviceConfiguration confHandler){
         Log.d(LOG_TAG, "Come on");
         Mat yuvMat = ImageProcessHandler.getBGRMatFromImage(image);
         Mat colorImg = new Mat(

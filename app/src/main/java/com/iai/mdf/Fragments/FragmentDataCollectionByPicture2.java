@@ -4,7 +4,6 @@ import android.content.pm.ActivityInfo;
 import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaScannerConnection;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -22,16 +21,13 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.iai.mdf.Activities.DataCollectionActivity;
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.Handlers.CameraHandler;
 import com.iai.mdf.Handlers.DrawHandler;
-import com.iai.mdf.Handlers.ImageFileHandler;
 import com.iai.mdf.Handlers.ImageProcessHandler;
 import com.iai.mdf.R;
 
 import org.opencv.android.BaseLoaderCallback;
-import org.opencv.android.LoaderCallbackInterface;
-import org.opencv.android.OpenCVLoader;
 import org.opencv.core.Core;
 import org.opencv.core.CvType;
 import org.opencv.core.Mat;
@@ -64,7 +60,7 @@ public class FragmentDataCollectionByPicture2 extends Fragment {
     private int dotCounter = 0;
     private boolean isPicSaved = true;
     private boolean isStarted = false;
-    private Configuration confHandler = Configuration.getInstance(getActivity());
+    private DeviceConfiguration confHandler = DeviceConfiguration.getInstance(getActivity());
     private String      FOLDER_NAME = null;
     private String      CUR_IMAGE_NAME = null;
 

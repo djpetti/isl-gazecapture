@@ -14,6 +14,7 @@ import android.view.LayoutInflater;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
@@ -23,7 +24,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
-import com.iai.mdf.DependenceClasses.Configuration;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.Handlers.CameraHandler;
 import com.iai.mdf.Handlers.DrawHandler;
 import com.iai.mdf.Handlers.SocketHandler;
@@ -78,7 +79,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
     private int         prevReceivedGazeIndex = 0;
     private String  socketIp = null;
     private int     socketPort;
-    private Configuration confHandler = Configuration.getInstance(this);
+    private DeviceConfiguration confHandler = DeviceConfiguration.getInstance(this);
 
 
 
@@ -88,6 +89,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
         setContentView(R.layout.activity_demo);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
         getSupportActionBar().hide();
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Bundle extras = getIntent().getExtras();
         socketIp = extras.getString(BUNDLE_KEY_IP);
         socketPort = extras.getInt(BUNDLE_KEY_PORT);
@@ -96,7 +98,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
         initOpenCV();
 
         SCREEN_SIZE = fetchScreenSize();
-        textureView = (TextureView) findViewById(R.id.activity_demo_preview_textureview);
+        textureView = findViewById(R.id.activity_demo_preview_textureview);
         // ensure texture fill the screen with a certain ratio
         TEXTURE_SIZE = SCREEN_SIZE;
         int expected_height = TEXTURE_SIZE[0]*DataCollectionActivity.Image_Size.getHeight()/DataCollectionActivity.Image_Size.getWidth();
@@ -351,18 +353,16 @@ public class DemoServerActivity1 extends AppCompatActivity {
 
     private void drawGaze(JSONObject object){
         try {
-            int receivedIdx = object.getInt(SocketHandler.JSON_KEY_SEQ_NUMBER);
-            if( receivedIdx > prevReceivedGazeIndex ){
-                prevReceivedGazeIndex = receivedIdx;
-                double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
-                double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
-                float[] loc = new float[2];
-//                loc[0] = (float)((portraitHori + deviceProfile.getCameraOffsetX())/deviceProfile.getScreenSizeX());
-//                loc[1] = (float)((portraitVert + deviceProfile.getCameraOffsetY())/deviceProfile.getScreenSizeY());
-                loc[0] = (float) (portraitHori + confHandler.getCameraOffsetX())/confHandler.getScreenSizeX();
-                loc[1] = (float) (portraitVert + confHandler.getCameraOffsetY())/confHandler.getScreenSizeY();
-                drawClassifiedResult(loc, toggleButton.isChecked());
-            }
+//            int receivedIdx = object.getInt(SocketHandler.JSON_KEY_SEQ_NUMBER);
+//            if( receivedIdx > prevReceivedGazeIndex ){
+//                prevReceivedGazeIndex = receivedIdx;
+            double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
+            double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
+            float[] loc = new float[2];
+            loc[0] = (float) (portraitHori + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePWidth();
+            loc[1] = (float) (portraitVert + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePHeight();
+            drawClassifiedResult(loc, toggleButton.isChecked());
+//            }
         } catch (JSONException e) {
             e.printStackTrace();
         }

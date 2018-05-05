@@ -32,7 +32,7 @@ public class GameMenuActivity extends Activity {
     private final String LOG_TAG = "GameMenuActivity";
 
 
-
+    private Button btnStart22;
     private Button btnStart33;
     private Button btnStart34;
     private ImageButton  btnSetting;
@@ -47,6 +47,20 @@ public class GameMenuActivity extends Activity {
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         hideBottomBar();
 
+        btnStart22 = findViewById(R.id.activity_game_mole_btn_start_22);
+        btnStart22.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d(LOG_TAG, "Game Begin");
+                Intent intent = new Intent(GameMenuActivity.this, GameMainActivity.class);
+                Bundle extras = new Bundle();
+                extras.putInt(GameMainActivity.KEY_GRID_SIZE, 22);
+                extras.putInt(GameMainActivity.KEY_MODE, GameMainActivity.VALUE_MODE_TIMER);
+                intent.putExtras(extras);
+                overridePendingTransition(0, 0);
+                startActivity(intent);
+            }
+        });
 
         btnStart33 = findViewById(R.id.activity_game_mole_btn_start_33);
         btnStart33.setOnClickListener(new View.OnClickListener() {
