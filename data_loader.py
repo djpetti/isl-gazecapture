@@ -23,11 +23,18 @@ class DataPoint(object):
 class DataLoader(object):
   """ Class that is responsible for loading and pre-processing data. """
 
-  def __init__(self, image_shape):
+  def __init__(self, records_file, batch_size, image_shape):
     """
     Args:
+      records_file: The TFRecords file to read data from.
+      batch_size: The size of batches to read.
       image_shape: The shape of images to load. """
     self._image_shape = image_shape
+    self._records_file = records_file
+    self._batch_size = batch_size
+
+    # Preprocessing pipeline stages.
+    self.__pipeline_stages = []
 
   def __decode_and_preprocess(self, features):
     # Unpack the reatures sequence.
@@ -46,12 +53,10 @@ class DataLoader(object):
     # Pre-process the image.
     return self._build_preprocessing_stage(data_point)
 
-  def __build_loader_stage(self, records_file, prefix, batch_size):
+  def __build_loader_stage(self, prefix):
     """ Builds the pipeline stages that actually loads data from the disk.
     Args:
-      records_file: The TFRecords file to load data from.
       prefix: The prefix for the feature names to load.
-      batch_size: The size of each batch to load.
     Returns:
       The features that it loaded from the file, as a sequence of tensors. """
     feature = {"%s/dots" % (prefix): tf.FixedLenFeature([2], tf.float32),
@@ -63,7 +68,7 @@ class DataLoader(object):
 
     # Create queue for filenames, which is a little silly since we only have one
     # file.
-    filename_queue = tf.train.string_input_producer([records_file])
+    filename_queue = tf.train.string_input_producer([self._records_file])
 
     # Define a reader and read the next record.
     reader = tf.TFRecordReader()
@@ -71,9 +76,9 @@ class DataLoader(object):
 
     # Prepare random batches.
     batch = tf.train.shuffle_batch([serialized_examples],
-                                   batch_size=batch_size,
-                                   capacity=batch_size * 10,
-                                   min_after_dequeue=batch_size / 3,
+                                   batch_size=self._batch_size,
+                                   capacity=self._batch_size * 10,
+                                   min_after_dequeue=self._batch_size / 3,
                                    num_threads=8)
 
     # Deserialize the example.
@@ -95,17 +100,18 @@ class DataLoader(object):
       data_point: The DataPoint object to use for preprocessing.
     Returns:
       The preprocessed image node. """
-    # TODO (danielp): Preprocessing.
+    # Run all the pipeline stages.
+    for stage in self.__pipeline_stages:
+      data_point.image = stage.run(data_point)
+
     return data_point.image
 
-  def _build_pipeline(self, records_file, prefix, batch_size):
+  def _build_pipeline(self, prefix):
     """ Builds the entire pipeline for loading and preprocessing data.
     Args:
-      records_file: The TFRecords file to load data from.
-      prefix: The prefix that is used for the feature names.
-      batch_size: The batch size to use. """
+      prefix: The prefix that is used for the feature names. """
     # Build the loader stage.
-    features = self.__build_loader_stage(records_file, prefix, batch_size)
+    features = self.__build_loader_stage(prefix)
 
     # Decode and pre-process in parallel.
     images = tf.map_fn(self.__decode_and_preprocess, features, dtype=tf.uint8,
@@ -128,28 +134,25 @@ class DataLoader(object):
       The node for the loaded labels. """
     return self.__y
 
+  def add_preprocessing_stage(self, stage):
+    """ Adds a new stage to the preprocessing pipeline.
+    Args:
+      stage: The stage to add. """
+    self.__pipeline_stages.append(stage)
+
+  def build(self):
+    """ Builds the graph. This must be called before using the loader. """
+    raise NotImplementedError("Must be implemented by subclass.")
+
+
 class TrainDataLoader(DataLoader):
   """ DataLoader for training data. """
 
-  def __init__(self, records_file, batch_size, image_shape):
-    """
-    Args:
-      records_file: The TFRecords file to load data from.
-      batch_size: The size of each batch to load.
-      image_shape: The shape of images to load. """
-    super(TrainDataLoader, self).__init__(image_shape)
-
-    self._build_pipeline(records_file, "train", batch_size)
+  def build(self):
+    self._build_pipeline("train")
 
 class TestDataLoader(DataLoader):
   """ DataLoader for testing data. """
 
-  def __init__(self, records_file, batch_size, image_shape):
-    """
-    Args:
-      records_file: The TFRecords file to load data from.
-      batch_size: The size of each batch to load.
-      image_shape: The shape of images to load. """
-    super(TestDataLoader, self).__init__(image_shape)
-
-    self._build_pipeline(records_file, "test", batch_size)
+  def build(self):
+    self._build_pipeline("test")
