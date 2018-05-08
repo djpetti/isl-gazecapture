@@ -1,5 +1,7 @@
 import tensorflow as tf
 
+import preprocess
+
 
 class DataPoint(object):
   """ Structure encapsulating an image and associated metadata. """
@@ -33,10 +35,15 @@ class DataLoader(object):
     self._records_file = records_file
     self._batch_size = batch_size
 
-    # Preprocessing pipeline stages.
-    self.__pipeline_stages = []
+    # Create a default preprocessing pipeline.
+    self.__pipeline = preprocess.Pipeline()
 
   def __decode_and_preprocess(self, features):
+    """ Target for map_fn that decodes and preprocesses individual images.
+    Args:
+      features: The input features that were loaded.
+    Returns:
+      A list of the preprocessed image nodes. """
     # Unpack the reatures sequence.
     jpeg, dot, face_size, leye_box, reye_box, grid_box = features
 
@@ -99,12 +106,17 @@ class DataLoader(object):
     Args:
       data_point: The DataPoint object to use for preprocessing.
     Returns:
-      The preprocessed image node. """
-    # Run all the pipeline stages.
-    for stage in self.__pipeline_stages:
-      data_point.image = stage.run(data_point)
+      The preprocessed image nodes. """
+    # Build the entire pipeline.
+    self.__pipeline.build(data_point)
+    data_points = self.__pipeline.get_outputs()
 
-    return data_point.image
+    # Extract the image nodes.
+    image_nodes = []
+    for data_point in data_points:
+      image_nodes.append(data_point.image)
+
+    return image_nodes
 
   def _build_pipeline(self, prefix):
     """ Builds the entire pipeline for loading and preprocessing data.
@@ -113,8 +125,11 @@ class DataLoader(object):
     # Build the loader stage.
     features = self.__build_loader_stage(prefix)
 
+    # Tensorflow expects us to tell it the shape of the output beforehand, so we
+    # need to compute that.
+    dtype = [tf.uint8] * self.__pipeline.get_num_outputs()
     # Decode and pre-process in parallel.
-    images = tf.map_fn(self.__decode_and_preprocess, features, dtype=tf.uint8,
+    images = tf.map_fn(self.__decode_and_preprocess, features, dtype=dtype,
                        back_prop=False, parallel_iterations=8)
 
     # Create the batches.
@@ -134,11 +149,13 @@ class DataLoader(object):
       The node for the loaded labels. """
     return self.__y
 
-  def add_preprocessing_stage(self, stage):
-    """ Adds a new stage to the preprocessing pipeline.
-    Args:
-      stage: The stage to add. """
-    self.__pipeline_stages.append(stage)
+  def get_pipeline(self):
+    """ Gets the preprocessing pipeline object so that preprocessing stages can
+    be added.
+    Returns:
+      The preprocessing pipeline. Add stages to this pipeline to control the
+      preprocessing step. """
+    return self.__pipeline
 
   def build(self):
     """ Builds the graph. This must be called before using the loader. """
