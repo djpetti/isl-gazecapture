@@ -107,6 +107,9 @@ class DataLoader(object):
       data_point: The DataPoint object to use for preprocessing.
     Returns:
       The preprocessed image nodes. """
+    # Convert the images to floats before preprocessing.
+    data_point.image = tf.cast(data_point.image, tf.float32)
+
     # Build the entire pipeline.
     self.__pipeline.build(data_point)
     data_points = self.__pipeline.get_outputs()
@@ -127,7 +130,7 @@ class DataLoader(object):
 
     # Tensorflow expects us to tell it the shape of the output beforehand, so we
     # need to compute that.
-    dtype = [tf.uint8] * self.__pipeline.get_num_outputs()
+    dtype = [tf.float32] * self.__pipeline.get_num_outputs()
     # Decode and pre-process in parallel.
     images = tf.map_fn(self.__decode_and_preprocess, features, dtype=dtype,
                        back_prop=False, parallel_iterations=8)
