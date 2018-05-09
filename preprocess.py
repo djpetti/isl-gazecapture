@@ -182,6 +182,42 @@ class RandomCropStage(PipelineStage):
   def get_num_outputs(self):
     return 1
 
+class RandomBrightnessStage(PipelineStage):
+  """ A pipeline stage that randomly changes the brightness of the image. It has
+  a single image output. """
+
+  def __init__(self, max_delta):
+    """
+    Args:
+      max_delta: The maximum amount to add to or remove from pixel values. """
+    self.__max_delta = max_delta
+
+  def build(self, data_point):
+    image = data_point.image
+    return tf.image.random_brightness(image, self.__max_delta)
+
+  def get_num_outputs(self):
+    return 1
+
+class RandomContrastStage(PipelineStage):
+  """ A pipeline stage that randomly changes the contrast of the image. It has
+  a single image output. """
+
+  def __init__(self, min_factor, max_factor):
+    """
+    Args:
+      min_factor: Minimum value of the contrast factor.
+      max_factor: Maximum value of the contrast factor. """
+    self.__min_factor = min_factor
+    self.__max_factor = max_factor
+
+  def build(self, data_point):
+    image = data_point.image
+    return tf.image.random_contrast(image, self.__min_factor, self.__max_factor)
+
+  def get_num_outputs(self):
+    return 1
+
 class EyeExtractionStage(PipelineStage):
   """ Extracts eye images from the face crop of the image. It outputs three
   images, in order: The left eye crop, the right eye crop, and the face crop.
