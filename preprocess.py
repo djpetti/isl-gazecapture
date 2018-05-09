@@ -36,6 +36,30 @@ class Pipeline(object):
 
     self.__output = data_points
 
+  def __is_leaf(self):
+    """ Returns: True if this pipeline has no descendents. """
+    return len(self.__sub_pipelines) == 0
+
+  def __get_outputs_and_leaves(self):
+    """
+    Returns:
+      A tuple, the first element of which is a list of outputs, and the second
+      of which is a list of leaf pipelines. """
+    if self.__is_leaf():
+      # This is the easy case. We just have ourselves to worry about.
+      return (self.__output, [self])
+
+    # In this case, we have to collect the output and leaves from every
+    # sub-pipeline.
+    outputs = []
+    leaves = []
+    for pipeline in self.__sub_pipelines:
+      pipe_outputs, pipe_leaves = pipeline.__get_outputs_and_leaves()
+      outputs.extend(pipe_outputs)
+      leaves.extend(pipe_leaves)
+
+    return (outputs, leaves)
+
   def add(self, stage):
     """ Adds a new stage to the pipeline.
     Args:
@@ -77,7 +101,7 @@ class Pipeline(object):
       self.__build_stage(stage)
 
     # Build the sub-pipelines.
-    if len(self.__sub_pipelines) > 0:
+    if not self.__is_leaf():
       for pipeline, output in zip(self.__sub_pipelines, self.__output):
         pipeline.build(output)
 
@@ -87,14 +111,7 @@ class Pipeline(object):
     Returns:
       A list of data_points corresponding to the "leaf" outputs from left to
       right. """
-    if len(self.__sub_pipelines) == 0:
-      # This is the easy case. We just have ourselves to worry about.
-      return self.__output
-
-    # In this case, we have to collect the outputs from every sub-pipeline.
-    outputs = []
-    for pipeline in self.__sub_pipelines:
-      outputs.extend(pipeline.get_outputs())
+    outputs, _ = self.__get_outputs_and_leaves()
     return outputs
 
   def get_num_outputs(self):
@@ -102,7 +119,7 @@ class Pipeline(object):
     sub-pipelines. This is safe to call at any time.
     Returns:
       The total number of outputs. """
-    if len(self.__sub_pipelines) == 0:
+    if self.__is_leaf():
       # No sub-pipelines, so we just have our own output.
       return 1
 
@@ -111,6 +128,16 @@ class Pipeline(object):
     for pipeline in self.__sub_pipelines:
       num_outputs += pipeline.get_num_outputs()
     return num_outputs
+
+  def get_leaf_pipelines(self):
+    """
+    Returns:
+      List of all pipelines that are descendents of this pipeline, but which have
+      no decendents of their own. This list can include the pipeline that this
+      method was called on. Elements in this list correspond to the elements
+      in the list returned by get_outputs(). """
+    _, leaves = self.__get_outputs_and_leaves()
+    return leaves
 
 class PipelineStage(object):
   """ Defines a stage in the preprocessing pipeline. These can be added

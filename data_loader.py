@@ -101,6 +101,20 @@ class DataLoader(object):
 
     return (image, dot, face_size, leye_box, reye_box, grid_box)
 
+  def __associate_with_pipelines(self, out_nodes):
+    """ Associates map_fn output nodes with their respective pipelines.
+    Args:
+      out_nodes: The output nodes from the map_fn call.
+    Returns:
+      A dictionary mapping pipelines to nodes. """
+    pipelines = self.__pipeline.get_leaf_pipelines()
+
+    mapping = {}
+    for pipeline, node in zip(pipelines, out_nodes):
+      mapping[pipeline] = node
+
+    return mapping
+
   def _build_preprocessing_stage(self, data_point):
     """ Performs preprocessing on an image node.
     Args:
@@ -137,13 +151,13 @@ class DataLoader(object):
 
     # Create the batches.
     dots = features[1]
-    self.__x = images
+    self.__x = self.__associate_with_pipelines(images)
     self.__y = dots
 
   def get_data(self):
     """
     Returns:
-      The node for the loaded data. """
+      The loaded data, as a dict indexed by pipelines. """
     return self.__x
 
   def get_labels(self):
