@@ -218,6 +218,83 @@ class RandomContrastStage(PipelineStage):
   def get_num_outputs(self):
     return 1
 
+class RandomHueStage(PipelineStage):
+  """ A pipeline stage that randomly changes the hue of the image. It has
+  a single image output. """
+
+  def __init__(self, max_delta):
+    """
+    Args:
+      max_delta: The maximum amount to change the hue channel by. """
+    self.__max_delta = max_delta
+
+  def build(self, data_point):
+    image = data_point.image
+    return tf.image.random_hue(image, self.__max_delta)
+
+  def get_num_outputs(self):
+    return 1
+
+class RandomSaturationStage(PipelineStage):
+  """ A pipeline stage that randomly changes the saturation of the image. It has
+  a single image output. """
+
+  def __init__(self, min_factor, max_factor):
+    """
+    Args:
+      min_factor: Minimum value of the saturation factor.
+      max_factor: Maximum value of the saturation factor. """
+    self.__min_factor = min_factor
+    self.__max_factor = max_factor
+
+  def build(self, data_point):
+    image = data_point.image
+    return tf.image.random_saturation(image, self.__min_factor,
+                                      self.__max_factor)
+
+  def get_num_outputs(self):
+    return 1
+
+class GrayscaleStage(PipelineStage):
+  """ A pipeline stage that converts input images to grayscale. It has a single
+  image output. """
+
+  def build(self, data_point):
+    image = data_point.image
+    return tf.image.rgb_to_grayscale(image)
+
+  def get_num_outputs(self):
+    return 1
+
+class ResizeStage(PipelineStage):
+  """ A pipeline stage that resizees input images. It has a single image output.
+  """
+
+  def __init__(self, size):
+    """
+    Args:
+      size: The size of the final image, as a tuple of (h, w). """
+    self.__size = size
+
+  def build(self, data_point):
+    image = data_point.image
+    return tf.image.resize_images(image, self.__size, align_corners=True)
+
+  def get_num_outputs(self):
+    return 1
+
+class NormalizationStage(PipelineStage):
+  """ Performs per-image normalization, linearly scaling it to have a zero mean
+  and unit norm. Has a single image output. """
+
+  def build(self, data_point):
+    image = data_point.image
+    return tf.image.per_image_standardization(image)
+
+  def get_num_outputs(self):
+    return 1
+
+
 class EyeExtractionStage(PipelineStage):
   """ Extracts eye images from the face crop of the image. It outputs three
   images, in order: The left eye crop, the right eye crop, and the face crop.
