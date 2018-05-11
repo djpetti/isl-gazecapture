@@ -316,8 +316,8 @@ class LargeVggNetwork(Network):
 
     # Get pretrained VGG model for use as a base.
     vgg = applications.vgg19.VGG19(include_top=False,
-                                   input_tensor=self._face_input)
-    vgg_out = vgg.outputs
+                                   input_shape=self._input_shape)
+    vgg_out = vgg(self._face_input)
 
     # Freeze all layers in VGG.
     for layer in vgg.layers:
@@ -377,20 +377,22 @@ class LargeVggNetwork(Network):
 
     # Concatenate eyes and put through a shared FC layer.
     eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
+    eye_drop = layers.Dropout(0.5)(eye_combined)
     fc_e1 = layers.Dense(128, activation="relu",
-                        kernel_regularizer=self._l2)(eye_combined)
+                        kernel_regularizer=self._l2)(eye_drop)
 
     # Face layers.
     face_flatten_f4 = layers.Flatten()(vgg_out)
 
+    face_drop = layers.Dropout(0.5)(face_flatten_f4)
     face_fc1 = layers.Dense(128, activation="relu",
                             kernel_regularizer=self._l2,
-                            trainable=trainable)(face_flatten_f4)
+                            trainable=trainable)(face_drop)
     face_fc2 = layers.Dense(64, activation="relu",
                             kernel_regularizer=self._l2)(face_fc1)
 
     # Face grid.
-    grid_flat = layers.Flatten()(self._grid_floats)
+    grid_flat = layers.Flatten()(self._grid_input)
     grid_fc1 = layers.Dense(256, activation="relu",
                             kernel_regularizer=self._l2,
                             trainable=trainable)(grid_flat)

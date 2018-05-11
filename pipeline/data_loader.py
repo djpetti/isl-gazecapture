@@ -84,7 +84,7 @@ class DataLoader(object):
     # Prepare random batches.
     batch = tf.train.shuffle_batch([serialized_examples],
                                    batch_size=self._batch_size,
-                                   capacity=self._batch_size * 20,
+                                   capacity=self._batch_size * 30,
                                    min_after_dequeue=self._batch_size / 3,
                                    num_threads=16)
 

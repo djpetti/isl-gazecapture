@@ -48,7 +48,7 @@ from itracker.common import config
 from pipeline import data_loader, preprocess, keras_utils
 
 
-batch_size = 128
+batch_size = 64
 # Shape of the input to the network.
 input_shape = (224, 224, 3)
 # Shape of the raw images from the dataset.
