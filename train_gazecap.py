@@ -28,7 +28,7 @@ _configure_logging()
 
 # This forks a lot of processes, so we want to import it as soon as possible,
 # when there is as little memory as possible in use.
-#from rpinets.myelin import data_loader
+from rpinets.myelin import data_loader
 
 from six.moves import cPickle as pickle
 import json
@@ -63,7 +63,7 @@ input_shape = (224, 224, 3)
 # Learning rates to set.
 learning_rates = [0.001, 0.0001]
 # How many iterations to train for at each learning rate.
-iterations = [114085, 300000]
+iterations = [51864, 300000]
 
 # Learning rate hyperparameters.
 momentum = 0.9
@@ -102,7 +102,7 @@ def create_bitmask_images(bboxes):
   # Scale to mask size.
   bboxes *= 25
   # It's one-indexed in the dataset.
-  bboxes = np.round(bboxes).astype(np.uint8) - 1
+  bboxes = np.round(bboxes).astype(np.int8) - 1
 
   bboxes = np.clip(bboxes, 0, 25)
 
@@ -456,8 +456,10 @@ def process_data(face_data, labels):
   # Process raw label names.
   dot_data, leye_data, reye_data, mask_bboxes = convert_labels(labels)
   # Randomly flip some images for data augmentation.
-  dot_data, leye_data, reye_data, mask_data, face_data = \
-      maybe_flip(dot_data, leye_data, reye_data, mask_data, face_data)
+  dot_data, leye_data, reye_data, mask_bboxes, face_data = \
+      maybe_flip(dot_data, leye_data, reye_data, mask_bboxes, face_data)
+  # Generate masks.
+  mask_data = create_bitmask_images(mask_bboxes)
   # Extract left and right eye crops.
   leye_crops, reye_crops = extract_eye_crops(face_data, leye_data, reye_data)
 
@@ -600,7 +602,7 @@ def fine_tune(load_model, ft_lrs):
     load_model: The model to load for fine-tuning.
     ft_lrs: List of tuples of learning rates and iteration counts for
             fine-tuning. """
-  model = build_network(fine_tune=True)
+  model = build_network()
   logging.info("Loading pretrained model '%s'." % (load_model))
   model.load_weights(load_model)
 
@@ -635,4 +637,4 @@ def fine_tune(load_model, ft_lrs):
   results_file.close()
 
 if __name__ == "__main__":
-  validate("eye_model_finetuned.hd5", 743)
+  main(load_model="eye_model_finetuned.hd5")

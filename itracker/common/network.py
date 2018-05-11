@@ -1,4 +1,5 @@
 from keras.models import Model, load_model
+import keras.applications as applications
 import keras.backend as K
 import keras.layers as layers
 import keras.optimizers as optimizers
@@ -65,7 +66,15 @@ def build_network(face_shape=None, fine_tune=False):
   gray_layer = layers.Lambda(lambda x: rgb_to_grayscale(x))
   left_eye_gray = gray_layer(left_eye_floats)
   right_eye_gray = gray_layer(right_eye_floats)
-  face_gray = gray_layer(face_scaled)
+
+  # Get pretrained VGG model for use as a base.
+  vgg = applications.vgg19.VGG19(include_top=False,
+                                 input_tensor=face_scaled)
+  vgg_out = vgg.outputs[0]
+
+  # Freeze all layers in VGG.
+  for layer in vgg.layers:
+    layer.trainable = False
 
   # Shared eye layers.
   conv_e1 = layers.Conv2D(144, (11, 11), strides=(4, 4), activation="relu",
@@ -121,40 +130,18 @@ def build_network(face_shape=None, fine_tune=False):
 
   # Concatenate eyes and put through a shared FC layer.
   eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
+  eye_combined_drop = layers.Dropout(0.5)(eye_combined)
   fc_e1 = layers.Dense(128, activation="relu",
                        kernel_regularizer=l2_reg,
-                       trainable=trainable)(eye_combined)
+                       trainable=trainable)(eye_combined_drop)
 
   # Face layers.
-  face_conv_f1 = layers.Conv2D(144, (11, 11), strides=(4, 4),
-                               activation="relu",
-                               kernel_regularizer=l2_reg,
-                               trainable=trainable)(face_gray)
-  face_pool_f1 = layers.MaxPooling2D(pool_size=(3, 3),
-                                     strides=(2, 2))(face_conv_f1)
-  face_norm_f1 = layers.BatchNormalization(trainable=trainable)(face_pool_f1)
-
-  face_pad_f2 = layers.ZeroPadding2D(padding=(2, 2))(face_norm_f1)
-  face_conv_f2 = layers.Conv2D(384, (5, 5), activation="relu",
-                               kernel_regularizer=l2_reg,
-                               trainable=trainable)(face_pad_f2)
-  face_pool_f2 = layers.MaxPooling2D(pool_size=(3, 3),
-                                     strides=(2, 2))(face_conv_f2)
-  face_norm_f2 = layers.BatchNormalization(trainable=trainable)(face_pool_f2)
-
-  face_pad_f3 = layers.ZeroPadding2D(padding=(1, 1))(face_norm_f2)
-  face_conv_f3 = layers.Conv2D(576, (3, 3), activation="relu",
-                               kernel_regularizer=l2_reg,
-                               trainable=trainable)(face_pad_f3)
-
-  face_conv_f4 = layers.Conv2D(64, (1, 1), activation="relu",
-                               kernel_regularizer=l2_reg,
-                               trainable=trainable)(face_conv_f3)
-  face_flatten_f4 = layers.Flatten()(face_conv_f4)
+  face_flatten_f4 = layers.Flatten()(vgg_out)
+  face_flatten_drop = layers.Dropout(0.5)(face_flatten_f4)
 
   face_fc1 = layers.Dense(128, activation="relu",
                           kernel_regularizer=l2_reg,
-                          trainable=trainable)(face_flatten_f4)
+                          trainable=trainable)(face_flatten_drop)
   face_fc2 = layers.Dense(64, activation="relu",
                           kernel_regularizer=l2_reg,
                           trainable=trainable)(face_fc1)
