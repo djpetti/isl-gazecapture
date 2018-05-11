@@ -361,21 +361,30 @@ class FaceMaskStage(PipelineStage):
     box_sq -= tf.constant([1, 1, 0, 0])
 
     # Create the inner section.
+    mask_x = box_sq[0]
+    mask_y = box_sq[1]
     mask_w = box_sq[2]
     mask_h = box_sq[3]
+
+    # Keep the padding in range.
+    mask_x = tf.clip_by_value(mask_x, 0, 24)
+    mask_y = tf.clip_by_value(mask_y, 0, 24)
+    mask_w = tf.clip_by_value(mask_w, 0, 25 - mask_x)
+    mask_h = tf.clip_by_value(mask_h, 0, 25 - mask_y)
+
     inner_shape = tf.stack((mask_h, mask_w), axis=0)
     inner = tf.ones(inner_shape, dtype=tf.float32)
 
     # Compute how much we have to pad by.
-    pad_l = box_sq[0]
+    pad_l = mask_x
     pad_r = 25 - (pad_l + mask_w)
-    pad_t = box_sq[1]
+    pad_t = mask_y
     pad_b = 25 - (pad_t + mask_h)
 
     # Pad the inner section to create the mask.
     pad_x = tf.stack((pad_l, pad_r), axis=0)
     pad_y = tf.stack((pad_t, pad_b), axis=0)
-    paddings = tf.stack((pad_x, pad_y), axis=0)
+    paddings = tf.stack((pad_y, pad_x), axis=0)
     mask = tf.pad(inner, paddings)
 
     return (mask, image)

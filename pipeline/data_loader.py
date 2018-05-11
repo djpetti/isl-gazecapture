@@ -84,9 +84,9 @@ class DataLoader(object):
     # Prepare random batches.
     batch = tf.train.shuffle_batch([serialized_examples],
                                    batch_size=self._batch_size,
-                                   capacity=self._batch_size * 10,
+                                   capacity=self._batch_size * 20,
                                    min_after_dequeue=self._batch_size / 3,
-                                   num_threads=8)
+                                   num_threads=16)
 
     # Deserialize the example.
     features = tf.parse_example(batch, features=feature)
@@ -147,7 +147,7 @@ class DataLoader(object):
     dtype = [tf.float32] * self.__pipeline.get_num_outputs()
     # Decode and pre-process in parallel.
     images = tf.map_fn(self.__decode_and_preprocess, features, dtype=dtype,
-                       back_prop=False, parallel_iterations=8)
+                       back_prop=False, parallel_iterations=16)
 
     # Create the batches.
     dots = features[1]

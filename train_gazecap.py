@@ -54,6 +54,11 @@ input_shape = (224, 224, 3)
 # Shape of the raw images from the dataset.
 raw_shape = (400, 400, 3)
 
+# How many batches to run between testing intervals.
+train_interval = 20
+# How many batches to run during testing.
+test_interval = 3
+
 # Learning rates to set.
 learning_rates = [0.001, 0.0001]
 # How many iterations to train for at each learning rate.
@@ -66,18 +71,20 @@ momentum = 0.9
 save_file = "eye_model_finetuned.hd5"
 synsets_save_file = "synsets.pkl"
 # Location of the dataset files.
-dataset_base = "/training_data/gazecap_tfrecords/gazecapture_%s.tfrecords"
-train_dataset_file = base % ("train")
-test_dataset_file = base % ("test")
-val_dataset_file = base % ("val")
+dataset_base = \
+    "/training_data/daniel/gazecap_tfrecords/gazecapture_%s.tfrecord"
+train_dataset_file = dataset_base % ("train")
+test_dataset_file = dataset_base % ("test")
+val_dataset_file = dataset_base % ("val")
 
 # L2 regularizer for weight decay.
 l2_reg = regularizers.l2(0.0005)
 
 # Configure GPU VRAM usage.
-config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 1.0
-set_session(tf.Session(config=config))
+tf_config = tf.ConfigProto()
+tf_config.gpu_options.per_process_gpu_memory_fraction = 1.0
+session = tf.Session(config=tf_config)
+set_session(session)
 
 
 def distance_metric(y_true, y_pred):
@@ -103,7 +110,7 @@ def fuse_loaders(train_loader, train_pipelines, test_loader, test_pipelines):
     test_pipelines: The pipelines associated with the test loader.
   Returns:
     The fused outputs, in the same order as the pipeline inputs, with the labels
-    at the end, as well as the selection placeholder. """
+    at the end. """
   train_data = train_loader.get_data()
   train_labels = train_loader.get_labels()
   test_data = test_loader.get_data()
@@ -128,7 +135,7 @@ def build_pipeline():
   """ Builds the preprocessing pipeline.
   Returns:
     The fused output nodes from the loaders, in order: leye, reye, face, grid,
-    dots, as well as the selection placeholder. """
+    dots. """
   def add_stages(loader):
     """ For now, we configure the training and testing loaders the same way.
     This is a convenience function to do that.
@@ -188,7 +195,7 @@ def build_pipeline():
     # Build the loader graph.
     loader.build()
 
-    return (leye, reye, face, grid)
+    return (leye, reye, face, mask)
 
   train_loader = data_loader.TrainDataLoader(train_dataset_file, batch_size,
                                              raw_shape)
@@ -198,13 +205,13 @@ def build_pipeline():
   train_pipelines = add_stages(train_loader)
   test_pipelines = add_stages(test_loader)
 
-  return fuse_loaders(train_loader, test_loader)
+  return fuse_loaders(train_loader, train_pipelines,
+                      test_loader, test_pipelines)
 
-def train_section(model, data, learning_rate, iters, labels):
+def train_section(model, learning_rate, iters, labels):
   """ Trains for a number of iterations at one learning rate.
   Args:
     model: The model to train.
-    data: The data manager to use.
     learning_rate: The learning rate to train at.
     iters: Number of iterations to train for.
     labels: Tensor for the labels.
@@ -215,33 +222,25 @@ def train_section(model, data, learning_rate, iters, labels):
   # Set the learning rate.
   opt = optimizers.SGD(lr=learning_rate, momentum=momentum)
   model.compile(optimizer=opt, loss=distance_metric, metrics=[distance_metric],
-                targe_tensors=labels)
+                target_tensors=[labels])
 
   training_loss = []
   testing_acc = []
 
-  for i in range(0, iters / load_batches):
+  for i in range(0, iters / train_interval):
     # Train the model.
-    history = model.fit(epochs=1, batch_size=batch_size)
+    history = model.fit(epochs=1, steps_per_epoch=train_interval)
 
     training_loss.extend(history.history["loss"])
     logging.info("Training loss: %s" % (history.history["loss"]))
 
-    if not i % 10:
-      testing_data, testing_labels = data.get_test_set()
-      leye_crops, reye_crops, face_crops, mask_data, dot_data = \
-          process_data(testing_data, testing_labels)
+    loss, accuracy = model.evaluate(steps=test_interval)
 
-      loss, accuracy = model.evaluate([leye_crops, reye_crops, face_crops,
-                                       mask_data],
-                                      dot_data,
-                                      batch_size=batch_size)
+    logging.info("Loss: %f, Accuracy: %f" % (loss, accuracy))
+    testing_acc.append(accuracy)
 
-      logging.info("Loss: %f, Accuracy: %f" % (loss, accuracy))
-      testing_acc.append(accuracy)
-
-      # Save the trained model.
-      model.save_weights(save_file)
+    # Save the trained model.
+    model.save_weights(save_file)
 
   return (training_loss, testing_acc)
 
@@ -250,20 +249,22 @@ def main(load_model=None):
   Args:
     load_model: A pretrained model to load, if specified. """
   # Create the training and testing pipelines.
-  input_tensors, is_test = build_pipeline()
+  input_tensors = build_pipeline()
   data_tensors = input_tensors[:4]
   label_tensor = input_tensors[4]
 
   # Create the model.
-  net = config.NET_ARCH(data_tensors=data_tensors)
-  model = net.build_model()
+  eye_shape = (input_shape[0], input_shape[1], 1)
+  net = config.NET_ARCH(input_shape, eye_shape=eye_shape,
+                        data_tensors=data_tensors)
+  model = net.build()
   if load_model:
     logging.info("Loading pretrained model '%s'." % (load_model))
     model.load_weights(load_model)
 
-  if os.path.exists(synsets_save_file):
-    logging.info("Loading existing synsets...")
-    data.load(synsets_save_file)
+  # Create a coordinator and run queues.
+  coord = tf.train.Coordinator()
+  threads = tf.train.start_queue_runners(coord=coord, sess=session)
 
   training_acc = []
   training_loss = []
@@ -271,10 +272,13 @@ def main(load_model=None):
 
   # Train at each learning rate.
   for lr, iters in zip(learning_rates, iterations):
-    loss, acc = train_section(model, data, lr, iters, label_tensor)
+    loss, acc = train_section(model, lr, iters, label_tensor)
 
     training_loss.extend(loss)
     testing_acc.extend(acc)
+
+  coord.request_stop()
+  coord.join(threads)
 
   print "Saving results..."
   results_file = open("gazecapture_results.json", "w")

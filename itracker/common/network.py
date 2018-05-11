@@ -1,4 +1,5 @@
 from keras.models import Model, load_model
+import keras.applications as applications
 import keras.backend as K
 import keras.layers as layers
 import keras.optimizers as optimizers
@@ -7,21 +8,26 @@ import keras.regularizers as regularizers
 import tensorflow as tf
 
 
-# Shape of the inputs to the network.
-INPUT_SHAPE = (224, 224, 3)
-
-
 class Network(object):
   """ Represents a network. """
 
-  def __init__(self, fine_tune=False, data_tensors=None):
+  def __init__(self, input_shape, eye_shape=None, fine_tune=False,
+               data_tensors=None):
     """ Creates a new network.
     Args:
+      input_shape: The input shape to the network.
+      eye_shape: Specify the shape of the eye inputs, if it is different from
+                 face input shape.
       fine_tune: Whether we are fine-tuning the model.
       data_tensors: If specified, the set of output tensors from the pipeline,
                     which will be used to build the model. """
     self.__data_tensors = data_tensors
     self._fine_tune = fine_tune
+    self._input_shape = input_shape
+
+    self._eye_shape = self._input_shape
+    if eye_shape is not None:
+      self._eye_shape = eye_shape
 
   def _build_common(self):
     """ Build the network components that are common to all. """
@@ -36,11 +42,11 @@ class Network(object):
       leye, reye, face, grid = self.__data_tensors
 
     # Create inputs.
-    self._left_eye_input = layers.Input(shape=INPUT_SHAPE, tensor=leye,
+    self._left_eye_input = layers.Input(shape=self._eye_shape, tensor=leye,
                                         name="left_eye_input")
-    self._right_eye_input = layers.Input(shape=INPUT_SHAPE, tensor=reye,
+    self._right_eye_input = layers.Input(shape=self._eye_shape, tensor=reye,
                                          name="right_eye_input")
-    self._face_input = layers.Input(shape=INPUT_SHAPE, tensor=face,
+    self._face_input = layers.Input(shape=self._input_shape, tensor=face,
                                     name="face_input")
     self._grid_input = layers.Input(shape=(25, 25), tensor=grid,
                                     name="grid_input")
@@ -284,7 +290,7 @@ class LargeNetwork(Network):
                             trainable=trainable)(face_fc1)
 
     # Face grid.
-    grid_flat = layers.Flatten()(self._grid_floats)
+    grid_flat = layers.Flatten()(self._grid_input)
     grid_fc1 = layers.Dense(256, activation="relu",
                             kernel_regularizer=self._l2,
                             trainable=trainable)(grid_flat)
@@ -301,7 +307,7 @@ class LargeNetwork(Network):
 
     return all_fc2
 
-class LargeVggNetwork(BwNetwork):
+class LargeVggNetwork(Network):
   """ Extension of LargeNetwork that uses a pretrained VGG network to process
   faces. """
 
@@ -309,8 +315,8 @@ class LargeVggNetwork(BwNetwork):
     trainable = not self._fine_tune
 
     # Get pretrained VGG model for use as a base.
-    vgg = keras.applications.vgg19.VGG19(include_top=False,
-                                        input_tensor=self._face_floats)
+    vgg = applications.vgg19.VGG19(include_top=False,
+                                   input_tensor=self._face_input)
     vgg_out = vgg.outputs
 
     # Freeze all layers in VGG.
