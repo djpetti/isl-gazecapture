@@ -190,3 +190,9 @@ class TestDataLoader(DataLoader):
 
   def build(self):
     self._build_pipeline("test")
+
+class ValidDataLoader(DataLoader):
+  """ DataLoader for validation data. """
+
+  def build(self):
+    self._build_pipeline("val")

@@ -182,6 +182,26 @@ class RandomCropStage(PipelineStage):
   def get_num_outputs(self):
     return 1
 
+class CenterCropStage(PipelineStage):
+  """ A pipeline stage that extracts the central crop ofthe image. It has a
+  single image output. """
+
+  def __init__(self, crop_fraction):
+    """
+    Args:
+      crop_fraction: The fraction of the image to retain, in the range from 0.0
+                     to 1.0. """
+    self.__crop_fraction = crop_fraction
+
+  def build(self, data_point):
+    image = data_point.image
+
+    # Extract the crop.
+    return tf.image.central_crop(image, self.__crop_fraction)
+
+  def get_num_outputs(self):
+    return 1
+
 class RandomBrightnessStage(PipelineStage):
   """ A pipeline stage that randomly changes the brightness of the image. It has
   a single image output. """
