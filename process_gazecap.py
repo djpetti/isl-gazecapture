@@ -2,9 +2,9 @@
 
 
 import argparse
-
 import json
 import os
+import random
 import shutil
 
 import cv2
@@ -18,6 +18,161 @@ import tensorflow as tf
 NUM_TEST_SESSIONS = 150
 NUM_VAL_SESSIONS = 50
 
+
+class FrameRandomizer(object):
+  """ Class that stores and randomizes frame data. """
+
+  class Session(object):
+    """ Represents a training session. """
+
+    def __init__(self, **kwargs):
+      # The combined metadata features for the session.
+      self.label_features = kwargs.get("label_features")
+      # The loaded frame information for the session.
+      self.frame_info = kwargs.get("frame_info")
+      # Whether each image is valid or not.
+      self.valid = kwargs.get("valid")
+      # The bbox information for each face.
+      self.face_bboxes = kwargs.get("face_bboxes")
+
+      # The frame directory for the session.
+      self.frame_dir = kwargs.get("frame_dir")
+
+    def __shuffle_list(self, to_shuffle, indices):
+      """ Shuffles a list in-place.
+      Args:
+        to_shuffle: The list to shuffle.
+        indices: The list of which indices go where. """
+      old = to_shuffle[:]
+      if type(to_shuffle) == np.ndarray:
+        old = np.array(to_shuffle, copy=True)
+      for i, index in enumerate(indices):
+        to_shuffle[i] = old[index]
+
+    def __load_crop(self, frame, face_bbox):
+      """ Loads and crops the face image.
+      Args:
+        frame: The name of the frame file.
+        face_bbox: The face bounding box data. """
+      frame_path = os.path.join(self.frame_dir, frame)
+
+      image = cv2.imread(frame_path)
+      if image is None:
+        raise RuntimeError("Failed to read image: %s" % (frame_path))
+
+      # Extract the crop.
+      return extract_face_crop(image, face_bbox)
+
+    def shuffle(self):
+      """ Shuffles all examples in the session. """
+      indices = range(0, len(self.valid))
+      random.shuffle(indices)
+
+      # Shuffle each list.
+      self.__shuffle_list(self.label_features, indices)
+      self.__shuffle_list(self.frame_info, indices)
+      self.__shuffle_list(self.valid, indices)
+      self.__shuffle_list(self.face_bboxes, indices)
+
+    def get_random(self):
+      """ Gets the next random example, assuming they have already been
+      shuffled. It raises a ValueError if there are no more examples.
+      Returns:
+        The next random example, including the features, frame information, and
+        extracted face crop. """
+      valid = False
+      features = None
+      frame_info = None
+
+      # Skip any frames that are not valid.
+      while not valid:
+        if len(self.label_features) == 0:
+          raise ValueError("No more examples.")
+
+        features = self.label_features.pop()
+        frame_info = self.frame_info.pop()
+        # Can't pop from a Numpy array, but we can look at the end.
+        face_bbox = self.face_bboxes[len(self.label_features)]
+        valid = self.valid[len(self.label_features)]
+
+      # Extract the face crop.
+      crop = self.__load_crop(frame_info, face_bbox)
+
+      return (features, crop)
+
+    def num_valid(self):
+      """
+      Returns:
+        The number of valid images in the session. """
+      num_valid = 0
+      for image in self.valid:
+        if image:
+          num_valid += 1
+
+      return num_valid
+
+  def __init__(self):
+    # Create dictionary of sessions.
+    self.__sessions = {}
+    self.__total_examples = 0
+
+  def add_session_data(self, frame_dir, crop_info, label_features,
+                       frame_info, valid):
+    """ Add data for one session.
+    Args:
+      frame_dir: The directory containing the raw frames.
+      crop_info: The face crop information.
+      label_features: The features created for the image metadata.
+      frame_info: The frame filename information.
+      valid: Whether the corresponding images are valid or not. """
+    session = self.Session()
+    session.frame_dir = frame_dir
+    face_bboxes = extract_crop_data(crop_info)
+    face_bboxes = np.stack(face_bboxes, axis=1)
+    session.face_bboxes = face_bboxes
+    session.label_features = label_features
+    session.frame_info = frame_info
+    session.valid = valid
+
+    self.__total_examples += session.num_valid()
+
+    # Pre-shuffle all examples in the session.
+    session.shuffle()
+
+    # Index the session by incrementing key, so we can easily select it
+    # randomly.
+    self.__sessions[len(self.__sessions)] = session
+
+  def get_random_example(self):
+    """ Draws a random example from the session pool. It raises a ValueError if
+    there is no more data left.
+    Returns:
+      The next random example, including the features and extracted face crop. """
+    if len(self.__sessions) == 0:
+      # No more data.
+      raise ValueError("Session pool has no more data.")
+
+    # First, pick a random session.
+    keys = self.__sessions.keys()
+    session_key = keys[random.randint(0, len(keys) - 1)]
+    session = self.__sessions[session_key]
+
+    # Now, pick a random example from within that session.
+    try:
+      features, crop = session.get_random()
+    except ValueError:
+      # No more frames from that session. Remove it from consideration.
+      self.__sessions.pop(session_key)
+      # Try a different one.
+      return self.get_random_example()
+
+    return (features, crop)
+
+  def get_num_examples(self):
+    """
+    Returns:
+      The total number of examples. """
+    return self.__total_examples
 
 def _int64_feature(value):
 	""" Converts a list to an int64 feature.
@@ -60,46 +215,37 @@ def extract_crop_data(crop_info):
   y_crop = np.asarray(y_crop, dtype=np.float32)
   w_crop = np.asarray(w_crop, dtype=np.float32)
   h_crop = np.asarray(h_crop, dtype=np.float32)
-  crop_valid = np.asarray(crop_valid, dtype=np.uint8)
+  crop_valid = np.asarray(crop_valid, dtype=np.float32)
 
   return x_crop, y_crop, w_crop, h_crop, crop_valid
 
-def extract_face_crops(images, face_data):
+def extract_face_crop(image, face_data):
   """ Extract the face crop from an image.
   Args:
-    images: A list of the images to process.
-    face_data: The crop data for the face.
+    image: The image to process.
+    face_data: The crop data for this image.
   Returns:
-    A cropped version of the images, in the same order. A None value in this
+    A cropped version of the image. A None value in this
     list indicates a face crop that was not valid. """
-  face_x, face_y, face_w, face_h, _ = extract_crop_data(face_data)
-  crops = []
+  face_x, face_y, face_w, face_h, _ = face_data
 
-  for i in range(0, len(images)):
-    if images[i] is None:
-      # Frame is invalid.
-      crops.append(None)
-      continue
+  start_x = int(face_x)
+  end_x = start_x + int(face_w)
+  start_y = int(face_y)
+  end_y = start_y + int(face_h)
 
-    start_x = int(face_x[i])
-    end_x = start_x + int(face_w[i])
-    start_y = int(face_y[i])
-    end_y = start_y + int(face_h[i])
+  start_x = max(0, start_x)
+  end_x = min(image.shape[1], end_x)
+  start_y = max(0, start_y)
+  end_y = min(image.shape[0], end_y)
 
-    start_x = max(0, start_x)
-    end_x = min(images[i].shape[1], end_x)
-    start_y = max(0, start_y)
-    end_y = min(images[i].shape[0], end_y)
+  # Crop the image.
+  crop = image[start_y:end_y, start_x:end_x]
 
-    # Crop the image.
-    crop = images[i][start_y:end_y, start_x:end_x]
+  # Resize the crop.
+  crop = cv2.resize(crop, (400, 400))
 
-    # Resize the crop.
-    crop = cv2.resize(crop, (400, 400))
-
-    crops.append(crop)
-
-  return crops
+  return crop
 
 def generate_label_features(dot_info, grid_info, face_info, left_eye_info,
                             right_eye_info):
@@ -170,18 +316,27 @@ def generate_label_features(dot_info, grid_info, face_info, left_eye_info,
 
   return features, valid
 
-def save_images(frames, label_features, split, writer):
+def save_images(randomizer, split, writer):
   """ Copies the processed images to an output directory, with the correct
   names.
   Args:
-    frames: The processed frames.
-    label_features: The generated label features, in order.
+    randomizer: The FrameRandomizer containing our data.
     split: The name of the split.
     writer: The records writer to write the data with. """
-  for frame, features in zip(frames, label_features):
-    if frame is None:
-      # This means that the frame is invalid.
-      continue
+  i = 0
+  last_percentage = 0.0
+  while True:
+    try:
+      features, frame = randomizer.get_random_example()
+    except ValueError:
+      # No more frames to read.
+      break
+
+    # Calculate percentage complete.
+    percent = float(i) / randomizer.get_num_examples() * 100
+    if percent - last_percentage > 0.01:
+      print "Processing %s split. (%.2f%% done)" % (split, percent)
+      last_percentage = percent
 
     # Compress and serialize the image.
     ret, encoded = cv2.imencode(".jpg", frame)
@@ -204,39 +359,13 @@ def save_images(frames, label_features, split, writer):
     # Write it out.
     writer.write(example.SerializeToString())
 
-def load_images(frame_dir, frame_info, valid):
-  """ Loads images from the frame directory.
-  Args:
-    frame_dir: The directory to load images from.
-    frame_info: The list of frame names.
-    valid: List indicating whether each frame is valid.
-  Returns:
-    A list of the loaded frames. Frames that are None aren't valid, and weren't
-    loaded. """
-  images = []
+    i += 1
 
-  for i, frame in enumerate(frame_info):
-    if not valid[i]:
-      # Frame is invalid anyway, don't bother loading it.
-      images.append(None)
-      continue
-
-    frame_path = os.path.join(frame_dir, frame)
-
-    image = cv2.imread(frame_path)
-    if image is None:
-      raise RuntimeError("Failed to read image: %s" % (frame_path))
-
-    images.append(image)
-
-  return images
-
-def process_session(session_dir, split, writer):
+def process_session(session_dir, randomizer):
   """ Process a session worth of data.
   Args:
     session_dir: The directory of the session.
-    split: The name of the split.
-    writer: The records writer to write the loaded data with.
+    writer: The FrameRandomizer to randomize data with.
   Returns:
     True if it saved some valid data, false if there was no valid data. """
   session_name = session_dir.split("/")[-1]
@@ -279,13 +408,10 @@ def process_session(session_dir, split, writer):
     # No valid data, no point in continuing.
     return False
 
-  # Load images and crop faces.
+  # Add it to the randomizer.
   frame_dir = os.path.join(session_dir, "frames")
-  frames = load_images(frame_dir, frame_info, valid)
-  face_crops = extract_face_crops(frames, face_info)
-
-  # Copy images.
-  save_images(face_crops, label_features, split, writer)
+  randomizer.add_session_data(frame_dir, face_info, label_features,
+                              frame_info, valid)
 
   return True
 
@@ -314,7 +440,14 @@ def process_dataset(dataset_dir, output_dir, start_at=None):
   test_writer = tf.python_io.TFRecordWriter(test_record)
   val_writer = tf.python_io.TFRecordWriter(val_record)
 
+  # Create randomizers for each split.
+  train_randomizer = FrameRandomizer()
+  test_randomizer = FrameRandomizer()
+  val_randomizer = FrameRandomizer()
+
   sessions = os.listdir(dataset_dir)
+
+  print "Analyzing dataset..."
 
   # Process each session one by one.
   process = False
@@ -335,32 +468,33 @@ def process_dataset(dataset_dir, output_dir, start_at=None):
 
       continue
 
-    # Calculate percentage complete.
-    percent = float(i) / len(sessions) * 100
-    print "(%.2f%%) Processing session %s..." % (percent, item)
-
     # Determine which split this belongs in.
-    split = None
     writer = None
+    randomizer = None
     used_test = False
     used_val = False
     if num_test < NUM_TEST_SESSIONS:
-      split = "test"
       writer = test_writer
+      randomizer = test_randomizer
       used_test = True
     elif num_val < NUM_VAL_SESSIONS:
-      split = "val"
       writer = val_writer
+      randomizer = val_randomizer
       used_val = True
     else:
       writer = train_writer
-      split = "train"
+      randomizer = train_randomizer
 
-    if process_session(item_path, split, writer):
+    if process_session(item_path, randomizer):
       if used_test:
         num_test += 1
       elif used_val:
         num_val += 1
+
+  # Write out everything.
+  save_images(val_randomizer, "val", val_writer)
+  save_images(test_randomizer, "test", test_writer)
+  save_images(train_randomizer, "train", train_writer)
 
   train_writer.close()
   test_writer.close()
