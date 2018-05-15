@@ -60,9 +60,9 @@ train_interval = 20
 test_interval = 3
 
 # Learning rates to set.
-learning_rates = [0.0001]
+learning_rates = [0.0001, 0.00001]
 # How many iterations to train for at each learning rate.
-iterations = [20000]
+iterations = [100000, 100000]
 
 # Learning rate hyperparameters.
 momentum = 0.9
