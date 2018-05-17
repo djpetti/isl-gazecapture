@@ -113,8 +113,22 @@ class FrameRandomizer(object):
 
   def __init__(self):
     # Create dictionary of sessions.
-    self.__sessions = {}
+    self.__sessions = []
     self.__total_examples = 0
+
+    # This is a list of indices representing all sessions in the dataset in
+    # random order.
+    self.__random_sessions = None
+
+  def __build_random_sessions(self):
+    """ Builds the random sessions list after all sessions have been added. """
+    self.__random_sessions = []
+
+    for i, session in enumerate(self.__sessions):
+      self.__random_sessions.extend([i] * session.num_valid())
+
+    # Shuffle all of them.
+    random.shuffle(self.__random_sessions)
 
   def add_session_data(self, frame_dir, crop_info, label_features,
                        frame_info, valid):
@@ -139,9 +153,7 @@ class FrameRandomizer(object):
     # Pre-shuffle all examples in the session.
     session.shuffle()
 
-    # Index the session by incrementing key, so we can easily select it
-    # randomly.
-    self.__sessions[len(self.__sessions)] = session
+    self.__sessions.append(session)
 
   def get_random_example(self):
     """ Draws a random example from the session pool. It raises a ValueError if
@@ -152,19 +164,16 @@ class FrameRandomizer(object):
       # No more data.
       raise ValueError("Session pool has no more data.")
 
+    if not self.__random_sessions:
+      # Build the session pick list.
+      self.__build_random_sessions()
+
     # First, pick a random session.
-    keys = self.__sessions.keys()
-    session_key = keys[random.randint(0, len(keys) - 1)]
+    session_key = self.__random_sessions.pop()
     session = self.__sessions[session_key]
 
     # Now, pick a random example from within that session.
-    try:
-      features, crop = session.get_random()
-    except ValueError:
-      # No more frames from that session. Remove it from consideration.
-      self.__sessions.pop(session_key)
-      # Try a different one.
-      return self.get_random_example()
+    features, crop = session.get_random()
 
     return (features, crop)
 
