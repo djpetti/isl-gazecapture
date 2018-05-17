@@ -456,8 +456,6 @@ def process_dataset(dataset_dir, output_dir, start_at=None):
 
   sessions = os.listdir(dataset_dir)
 
-  print "Analyzing dataset..."
-
   # Process each session one by one.
   process = False
   for i, item in enumerate(sessions):
@@ -476,6 +474,10 @@ def process_dataset(dataset_dir, output_dir, start_at=None):
         num_val += 1
 
       continue
+
+    # Print percentage complete.
+    percent = float(i) / len(sessions) * 100
+    print "Analyzing dataset. (%.2f%% done)" % (percent)
 
     # Determine which split this belongs in.
     writer = None
