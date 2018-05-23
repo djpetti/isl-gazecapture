@@ -26,10 +26,13 @@ def _configure_logging():
 _configure_logging()
 
 
+<<<<<<< HEAD
 # This forks a lot of processes, so we want to import it as soon as possible,
 # when there is as little memory as possible in use.
 from rpinets.myelin import data_loader
 
+=======
+>>>>>>> origin/feature/exp_architectures
 from six.moves import cPickle as pickle
 import json
 import os
@@ -49,21 +52,38 @@ import cv2
 
 import numpy as np
 
+from itracker.common import config
+from pipeline import data_loader, preprocess, keras_utils
+
 
 batch_size = 64
+<<<<<<< HEAD
 # How many batches to have loaded into VRAM at once.
 load_batches = 5
 # Shape of the input images.
 image_shape = (400, 400, 3)
 # Shape of the extracted patches.
 patch_shape = (390, 390)
+=======
+>>>>>>> origin/feature/exp_architectures
 # Shape of the input to the network.
 input_shape = (224, 224, 3)
+# Shape of the raw images from the dataset.
+raw_shape = (400, 400, 3)
+
+# How many batches to run between testing intervals.
+train_interval = 20
+# How many batches to run during testing.
+test_interval = 3
 
 # Learning rates to set.
-learning_rates = [0.001, 0.0001]
+learning_rates = [0.0001, 0.00001]
 # How many iterations to train for at each learning rate.
+<<<<<<< HEAD
 iterations = [51864, 300000]
+=======
+iterations = [100000, 100000]
+>>>>>>> origin/feature/exp_architectures
 
 # Learning rate hyperparameters.
 momentum = 0.9
@@ -72,6 +92,7 @@ momentum = 0.9
 save_file = "eye_model_finetuned.hd5"
 synsets_save_file = "synsets.pkl"
 # Location of the dataset files.
+<<<<<<< HEAD
 dataset_files = "/training_data/gazecap_myelin/dataset"
 # Location of the cache files.
 cache_dir = "/training_data/gazecap_myelin"
@@ -82,11 +103,19 @@ valid_cache_dir = "/training_data/gazecap_myelin_val"
 # Fine-tuning data.
 ft_dataset_files = "/training_data/gazecap_myelin/dataset"
 ft_cache_dir = "/training_data/gazecap_myelin"
+=======
+dataset_base = \
+    "/training_data/daniel/gazecap_tfrecords/gazecapture_%s.tfrecord"
+train_dataset_file = dataset_base % ("train")
+test_dataset_file = dataset_base % ("test")
+valid_dataset_file = dataset_base % ("val")
+>>>>>>> origin/feature/exp_architectures
 
 # L2 regularizer for weight decay.
 l2_reg = regularizers.l2(0.0005)
 
 # Configure GPU VRAM usage.
+<<<<<<< HEAD
 config = tf.ConfigProto()
 config.gpu_options.per_process_gpu_memory_fraction = 1.0
 set_session(tf.Session(config=config))
@@ -108,198 +137,13 @@ def create_bitmask_images(bboxes):
 
   # Create the background.
   frames = np.zeros((bboxes.shape[0], 25, 25))
+=======
+tf_config = tf.ConfigProto()
+tf_config.gpu_options.per_process_gpu_memory_fraction = 1.0
+session = tf.Session(config=tf_config)
+set_session(session)
+>>>>>>> origin/feature/exp_architectures
 
-  for i in range(0, bboxes.shape[0]):
-    # Create the interior image.
-    x, y, w, h = bboxes[i];
-    face_box = np.ones((h, w))
-
-    # Superimpose it correctly.
-    frames[i, y:y + h, x:x + w] = face_box
-
-  return frames
-
-def convert_labels(labels):
-  """ Convert the raw labels from the dataset into matrices that can be fed into
-  the loss function.
-  Args:
-    labels: The labels to convert.
-  Returns:
-    The converted label gaze points, left eye crop points, right eye crop
-    points, and face masks box points. """
-  dots = []
-  leye_crops = []
-  reye_crops = []
-  face_masks = []
-  for label in labels:
-    # Extract eye crop data from the filenames.
-    split = label.rstrip(".jpg").split("_")
-    all_data = np.asarray(split[3:17], dtype=np.float32)
-
-    eye_crops = all_data[6:]
-    # We occasionally get values that are slightly out-of-bounds.
-    eye_crops = np.clip(eye_crops, 0, 1)
-
-    # Extract dot position.
-    dots.append(all_data[0:2])
-    # Extract left eye crops.
-    leye_crops.append(eye_crops[0:4])
-    # Extract right eye crops.
-    reye_crops.append(eye_crops[4:8])
-    # Extract bitmask.
-    face_masks.append(all_data[2:6])
-
-  dot_stack = np.stack(dots, axis=0)
-  leye_stack = np.stack(leye_crops, axis=0)
-  reye_stack = np.stack(reye_crops, axis=0)
-  face_stack = np.stack(face_masks, axis=0)
-
-  return (dot_stack, leye_stack, reye_stack, face_stack)
-
-def maybe_flip(dot_data, leye_data, reye_data, mask_data, face_data):
-  """ Randomly flips images and dots as a data augmentation procedure.
-  Args:
-    dot_data: The ground-truth dot locations.
-    leye_data: The left eye bounding boxes.
-    reye_data: The right eye bounding boaxes.
-    mask_data: The face mask boxes.
-    face_data: The face crops.
-  Returns:
-    Modified arguments in the same order. """
-  # Multiplicand for flipping boxes.
-  batch_size = dot_data.shape[0]
-  box_flip = np.ones((batch_size, 4), dtype=np.int8)
-  selections = np.random.choice([-1, 1], batch_size).astype(np.int8)
-  selections_mask = 1 - np.clip(selections, 0, 1)
-  selections_mask = selections_mask.astype(np.uint8)
-  selections_mask_exp_1 = np.expand_dims(selections_mask, 1)
-  box_flip[:, 0] *= selections
-
-  # Multiplicand for flipping dots.
-  dot_flip = box_flip[:, :2]
-
-  # Start by subtracting the frame center from all boxes, so we can flip around
-  # zero.
-  leye_data[:, 0] -= 0.5
-  reye_data[:, 0] -= 0.5
-  mask_data[:, 0] -= 0.5
-
-  # Now, flip the boxes around zero.
-  leye_data *= box_flip
-  reye_data *= box_flip
-  mask_data *= box_flip
-
-  # Add the frame center back to all the boxes.
-  leye_data[:, 0] += 0.5
-  reye_data[:, 0] += 0.5
-  mask_data[:, 0] += 0.5
-
-  # We need to subtract the width too, so that it's truly flipped.
-  leye_data[:, 0] -= leye_data[:, 2] * selections_mask
-  reye_data[:, 0] -= reye_data[:, 2] * selections_mask
-  mask_data[:, 0] -= mask_data[:, 2] * selections_mask
-
-  # For the ones that were flipped, we need to switch the left and right eye
-  # data.
-  left_flipped = leye_data * selections_mask_exp_1
-  left_not_flipped = leye_data * (1 - selections_mask_exp_1)
-  right_flipped = reye_data * selections_mask_exp_1
-  right_not_flipped = reye_data * (1 - selections_mask_exp_1)
-  leye_data = left_not_flipped + right_flipped
-  reye_data = right_not_flipped + left_flipped
-
-  # Flip the dots.
-  dot_data *= dot_flip
-
-  # Mask for flipping the face.
-  face_mask = selections.astype(np.object)
-  face_mask[face_mask == 1] = None
-
-  # Flip the faces.
-  same_slice = slice(None, None, None)
-  flips = [(same_slice, slice(None, None, face_mask[i]), same_slice) \
-           for i in range(0, face_data.shape[0])]
-  face_flipped = np.array([img[flip] for img, flip in zip(face_data, flips)])
-
-  # The original face_data should only have the correct elements flipped.
-  return (dot_data, leye_data, reye_data, mask_data, face_flipped)
-
-def extract_eye_crops(face_crops, leye_crops, reye_crops):
-  """ Extracts the eye crops from the input face crops.
-  Args:
-    face_crops: The input face crops.
-    leye_crops: The coordinates for the left eye crops.
-    reye_crops: The coordinates for the right eye crops.
-  Returns:
-    The extracted left and right eye crops. """
-  def get_crops(face_crops, crop_pixels):
-    """ Does the actual crop extraction.
-    Args:
-      face_crops: The face crops to extract from.
-      crop_pixels: The pixel-converted crop coordinates.
-    Returns:
-      An array of the crops. """
-    crops = []
-
-    for i in range(0, face_crops.shape[0]):
-      face_crop = face_crops[i]
-      ex, ey, ew, eh = crop_pixels[i]
-
-      cropped = face_crop[ey:ey + eh, ex:ex + ew]
-      # Resize crops.
-      cropped = cv2.resize(cropped, (224, 224))
-      crops.append(cropped)
-
-    return np.stack(crops, axis=0)
-
-  # Determine the width and height of the face crops.
-  _, h_face, w_face, _ = face_crops.shape
-
-  # Make sure everything is in range.
-  leye_crops = np.clip(leye_crops, 0.0, 1.0)
-  reye_crops = np.clip(reye_crops, 0.0, 1.0)
-
-  # Calculate the actual pixels at which to crop.
-  face_sizes = np.array([w_face, h_face, w_face, h_face])
-  leye_pixels = leye_crops * face_sizes
-  reye_pixels = reye_crops * face_sizes
-
-  leye_pixels = leye_pixels.astype(np.uint16)
-  reye_pixels = reye_pixels.astype(np.uint16)
-
-  # Do the cropping.
-  leye_extracted = get_crops(face_crops, leye_pixels)
-  reye_extracted = get_crops(face_crops, reye_pixels)
-
-  return (leye_extracted, reye_extracted)
-
-def rescale_face(face_crops):
-  """ Rescales a set of face crops to 224 x 224.
-  Args:
-    face_crops: The face crops to rescale.
-  Returns:
-    The new face crops, resized to 224 x 224. """
-  # Output array.
-  output = np.empty((face_crops.shape[0], 224, 224, 3))
-
-  for i, crop in enumerate(face_crops):
-    output[i] = cv2.resize(crop, (224, 224))
-
-  return output
-
-def rgb_to_grayscale(image_tensor):
-  """ Converts a tensor of RGB images to grayscale. This is meant to be used in
-  a Keras Lambda layer.
-  Args:
-    image_tensor: The tensor of images to convert.
-  Returns:
-    The same tensor, with all images converted to grayscale. """
-  # Weight each channel before averaging.
-  luma_weights = tf.constant([[0.21], [0.72], [0.07]])
-  # Average using a single contraction operation.
-  grayscale = tf.tensordot(image_tensor, luma_weights, axes=[[3], [0]])
-
-  return grayscale
 
 def distance_metric(y_true, y_pred):
   """ Calculates the euclidean distance between the two labels and the
@@ -315,12 +159,15 @@ def distance_metric(y_true, y_pred):
   total = K.sum(sqr, axis=1)
   return K.sqrt(total)
 
-def build_network(fine_tune=False):
-  """ Builds the network.
+def fuse_loaders(train_loader, train_pipelines, test_loader, test_pipelines):
+  """ Fuses the outputs from the training and testing loaders.
   Args:
-    fine_tune: Whether we are fine-tuning the model. If so, only the last layer
-               will be trainable.
+    train_loader: The training loader.
+    train_pipelines: The pipelines associated with the train loader.
+    test_loader: The testing loader.
+    test_pipelines: The pipelines associated with the test loader.
   Returns:
+<<<<<<< HEAD
     The built network, ready to train. """
   trainable = not fine_tune
 
@@ -447,10 +294,36 @@ def build_network(fine_tune=False):
 
 def process_data(face_data, labels):
   """ Helper that performs all the pre-processing on the input data.
+=======
+    The fused outputs, in the same order as the pipeline inputs, with the labels
+    at the end. """
+  train_data = train_loader.get_data()
+  train_labels = train_loader.get_labels()
+  test_data = test_loader.get_data()
+  test_labels = test_loader.get_labels()
+
+  # Extract the corresponding outputs for the pipelines.
+  train_outputs = []
+  for pipeline in train_pipelines:
+    train_outputs.append(train_data[pipeline])
+  # Add the labels too.
+  train_outputs.append(train_labels)
+
+  test_outputs = []
+  for pipeline in test_pipelines:
+    test_outputs.append(test_data[pipeline])
+  test_outputs.append(test_labels)
+
+  # Fuse the outputs.
+  return keras_utils.fuse_loaders(train_outputs, test_outputs)
+
+def add_train_stages(loader):
+  """ Convenience function to configure train loader.
+>>>>>>> origin/feature/exp_architectures
   Args:
-    face_data: The raw training face crops.
-    labels: The raw labels.
+    loader: The DataLoader to configure.
   Returns:
+<<<<<<< HEAD
     The converted left eye crops, right eye crops, face crops, face grids, and
     ground-truth dot locations. """
   # Process raw label names.
@@ -466,53 +339,176 @@ def process_data(face_data, labels):
   return (leye_crops, reye_crops, face_data, mask_data, dot_data)
 
 def train_section(model, data, learning_rate, iters):
+=======
+    A tuple of the pipelines created for the loader. """
+  pipeline = loader.get_pipeline()
+
+  # Extract eye crops.
+  extract_stage = preprocess.EyeExtractionStage()
+  leye, reye, face = pipeline.add(extract_stage)
+
+  # Extract face mask.
+  mask_stage = preprocess.FaceMaskStage()
+  mask, face = face.add(mask_stage)
+
+  # Random cropping.
+  crop_stage = preprocess.RandomCropStage((390, 390))
+  face_crop_stage = preprocess.RandomCropStage((360, 360))
+  leye.add(crop_stage)
+  reye.add(crop_stage)
+  face.add(face_crop_stage)
+
+  # Random adjustments.
+  brightness_stage = preprocess.RandomBrightnessStage(50)
+  contrast_stage = preprocess.RandomContrastStage(0.9, 1.4)
+  hue_stage = preprocess.RandomHueStage(0.1)
+  saturation_stage = preprocess.RandomSaturationStage(0.9, 1.1)
+  grayscale_stage = preprocess.GrayscaleStage()
+
+  leye.add(brightness_stage)
+  leye.add(contrast_stage)
+  leye.add(grayscale_stage)
+
+  reye.add(brightness_stage)
+  reye.add(contrast_stage)
+  reye.add(grayscale_stage)
+
+  face.add(brightness_stage)
+  face.add(contrast_stage)
+  face.add(hue_stage)
+  face.add(saturation_stage)
+
+  # Normalization and final sizing.
+  norm_stage = preprocess.NormalizationStage()
+  output_size = input_shape[:2]
+  resize_stage = preprocess.ResizeStage(output_size)
+  leye.add(norm_stage)
+  reye.add(norm_stage)
+  face.add(norm_stage)
+
+  leye.add(resize_stage)
+  reye.add(resize_stage)
+  face.add(resize_stage)
+
+  # Build the loader graph.
+  loader.build()
+
+  return (leye, reye, face, mask)
+
+def add_test_stages(loader):
+  """ Convenience function to configure test and validation loaders.
+  Args:
+    loader: The DataLoader to configure.
+  Returns:
+    A tuple of the pipelines created for the loader. """
+  pipeline = loader.get_pipeline()
+
+  # Extract eye crops.
+  extract_stage = preprocess.EyeExtractionStage()
+  leye, reye, face = pipeline.add(extract_stage)
+
+  # Extract face mask.
+  mask_stage = preprocess.FaceMaskStage()
+  mask, face = face.add(mask_stage)
+
+  # Take the central crops.
+  crop_stage = preprocess.CenterCropStage(0.975)
+  face_crop_stage = preprocess.CenterCropStage(0.9)
+  leye.add(crop_stage)
+  reye.add(crop_stage)
+  face.add(face_crop_stage)
+
+  # Grayscale.
+  grayscale_stage = preprocess.GrayscaleStage()
+  leye.add(grayscale_stage)
+  reye.add(grayscale_stage)
+
+  # Normalization and final sizing.
+  norm_stage = preprocess.NormalizationStage()
+  output_size = input_shape[:2]
+  resize_stage = preprocess.ResizeStage(output_size)
+  leye.add(norm_stage)
+  reye.add(norm_stage)
+  face.add(norm_stage)
+
+  leye.add(resize_stage)
+  reye.add(resize_stage)
+  face.add(resize_stage)
+
+  # Build the loader graph.
+  loader.build()
+
+  return (leye, reye, face, mask)
+
+
+def build_pipeline():
+  """ Builds the preprocessing pipeline.
+  Returns:
+    The fused output nodes from the loaders, in order: leye, reye, face, grid,
+    dots. """
+  train_loader = data_loader.TrainDataLoader(train_dataset_file, batch_size,
+                                             raw_shape)
+  test_loader = data_loader.TestDataLoader(test_dataset_file, batch_size,
+                                           raw_shape)
+
+  train_pipelines = add_train_stages(train_loader)
+  test_pipelines = add_test_stages(test_loader)
+
+  return fuse_loaders(train_loader, train_pipelines,
+                      test_loader, test_pipelines)
+
+def build_valid_pipeline():
+  """ Builds the preprocessing pipeline for the validation split.
+  Returns:
+    The leye, reye, face, grid, and dots nodes for the validation loader. """
+  valid_loader = data_loader.ValidDataLoader(valid_dataset_file, batch_size,
+                                             raw_shape)
+
+  valid_pipelines = add_test_stages(valid_loader)
+
+  # Extract the associated output nodes.
+  data = valid_loader.get_data()
+  nodes = []
+  for pipeline in valid_pipelines:
+    nodes.append(data[pipeline])
+  nodes.append(valid_loader.get_labels())
+
+  return nodes
+
+def train_section(model, learning_rate, iters, labels):
+>>>>>>> origin/feature/exp_architectures
   """ Trains for a number of iterations at one learning rate.
   Args:
     model: The model to train.
-    data: The data manager to use.
     learning_rate: The learning rate to train at.
     iters: Number of iterations to train for.
+    labels: Tensor for the labels.
   Returns:
     Training loss and testing accuracy for this section. """
   print "\nTraining at %f for %d iters.\n" % (learning_rate, iters)
 
   # Set the learning rate.
   opt = optimizers.SGD(lr=learning_rate, momentum=momentum)
-  model.compile(optimizer=opt, loss=distance_metric, metrics=[distance_metric])
+  model.compile(optimizer=opt, loss=distance_metric, metrics=[distance_metric],
+                target_tensors=[labels])
 
   training_loss = []
   testing_acc = []
 
-  for i in range(0, iters / load_batches):
-    # Get a new chunk of training data.
-    training_data, training_labels = data.get_train_set()
-    leye_crops, reye_crops, face_crops, mask_data, dot_data = \
-        process_data(training_data, training_labels)
-
+  for i in range(0, iters / train_interval):
     # Train the model.
-    history = model.fit([leye_crops, reye_crops, face_crops, mask_data],
-                        dot_data,
-                        epochs=1,
-              					batch_size=batch_size)
+    history = model.fit(epochs=1, steps_per_epoch=train_interval)
 
     training_loss.extend(history.history["loss"])
     logging.info("Training loss: %s" % (history.history["loss"]))
 
-    if not i % 10:
-      testing_data, testing_labels = data.get_test_set()
-      leye_crops, reye_crops, face_crops, mask_data, dot_data = \
-          process_data(testing_data, testing_labels)
+    loss, accuracy = model.evaluate(steps=test_interval)
 
-      loss, accuracy = model.evaluate([leye_crops, reye_crops, face_crops,
-                                       mask_data],
-                                      dot_data,
-                                      batch_size=batch_size)
+    logging.info("Loss: %f, Accuracy: %f" % (loss, accuracy))
+    testing_acc.append(accuracy)
 
-      logging.info("Loss: %f, Accuracy: %f" % (loss, accuracy))
-      testing_acc.append(accuracy)
-
-      # Save the trained model.
-      model.save_weights(save_file)
+    # Save the trained model.
+    model.save_weights(save_file)
 
   return (training_loss, testing_acc)
 
@@ -520,22 +516,23 @@ def main(load_model=None):
   """
   Args:
     load_model: A pretrained model to load, if specified. """
-  model = build_network()
+  # Create the training and testing pipelines.
+  input_tensors = build_pipeline()
+  data_tensors = input_tensors[:4]
+  label_tensor = input_tensors[4]
+
+  # Create the model.
+  eye_shape = (input_shape[0], input_shape[1], 1)
+  net = config.NET_ARCH(input_shape, eye_shape=eye_shape,
+                        data_tensors=data_tensors)
+  model = net.build()
   if load_model:
     logging.info("Loading pretrained model '%s'." % (load_model))
     model.load_weights(load_model)
 
-  data = data_loader.DataManagerLoader(batch_size, load_batches, image_shape,
-                                       cache_dir, dataset_files,
-                                       patch_shape=patch_shape,
-                                       pca_stddev=50,
-                                       patch_flip=False,
-                                       raw_labels=True)
-
-  if os.path.exists(synsets_save_file):
-    logging.info("Loading existing synsets...")
-    data.load(synsets_save_file)
-
+  # Create a coordinator and run queues.
+  coord = tf.train.Coordinator()
+  threads = tf.train.start_queue_runners(coord=coord, sess=session)
 
   training_acc = []
   training_loss = []
@@ -543,55 +540,57 @@ def main(load_model=None):
 
   # Train at each learning rate.
   for lr, iters in zip(learning_rates, iterations):
-    loss, acc = train_section(model, data, lr, iters)
+    loss, acc = train_section(model, lr, iters, label_tensor)
 
     training_loss.extend(loss)
     testing_acc.extend(acc)
 
-  data.exit_gracefully()
+  coord.request_stop()
+  coord.join(threads)
 
   print "Saving results..."
   results_file = open("gazecapture_results.json", "w")
   json.dump((training_loss, testing_acc, training_acc), results_file)
   results_file.close()
 
-def validate(load_model, iterations):
-  """ Validates the network.
+def validate(load_model, iters):
+  """ Validates an existing model.
   Args:
-    load_model: A pretrained model to validate.
-    iterations: How many iterations to validate for. """
-  model = build_network()
+    load_model: The model to load.
+    iters: How many iterations to validate for. """
+  # Create the validation pipeline.
+  input_tensors = build_valid_pipeline()
+  data_tensors = input_tensors[:4]
+  label_tensor = input_tensors[4]
+
+  # Create the model.
+  eye_shape = (input_shape[0], input_shape[1], 1)
+  net = config.NET_ARCH(input_shape, eye_shape=eye_shape,
+                        data_tensors=data_tensors)
+  model = net.build()
   logging.info("Loading pretrained model '%s'." % (load_model))
   model.load_weights(load_model)
 
-  # We don't actually train, but we need the compiled model for testing.
-  opt = optimizers.SGD(lr=0.01, momentum=0.9)
-  model.compile(optimizer=opt, loss=distance_metric, metrics=[distance_metric])
+  # Compile the model. The learning settings don't really matter, since we're
+  # not training.
+  opt = optimizers.SGD(lr=0.001, momentum=0.9)
+  model.compile(optimizer=opt, loss=distance_metric, metrics=[distance_metric],
+                target_tensors=[label_tensor])
 
-  data = data_loader.SequentialDataManagerLoader(batch_size, load_batches,
-                                                 image_shape, valid_cache_dir,
-                                                 valid_dataset_files,
-                                                 patch_shape=patch_shape,
-                                                 pca_stddev=50,
-                                                 patch_flip=False,
-                                                 raw_labels=True)
+  # Create a coordinator and run queues.
+  coord = tf.train.Coordinator()
+  threads = tf.train.start_queue_runners(coord=coord, sess=session)
 
   testing_acc = []
 
-  # Train at each learning rate.
-  for i in range(0, iterations):
-    testing_data, testing_labels = data.get_test_set()
-    leye_crops, reye_crops, face_crops, mask_data, dot_data = \
-        process_data(testing_data, testing_labels)
-
-    loss, accuracy = model.evaluate([leye_crops, reye_crops, face_crops,
-                                      mask_data],
-                                    dot_data,
-                                    batch_size=batch_size)
+  # Validate.
+  for _ in range(0, iters):
+    loss, accuracy = model.evaluate(steps=test_interval)
 
     logging.info("Loss: %f, Accuracy: %f" % (loss, accuracy))
     testing_acc.append(accuracy)
 
+<<<<<<< HEAD
   print "Mean accuracy: %f" % (np.mean(testing_acc))
 
   data.exit_gracefully()
@@ -616,25 +615,13 @@ def fine_tune(load_model, ft_lrs):
   if os.path.exists(synsets_save_file):
     logging.info("Loading existing synsets...")
     data.load(synsets_save_file)
+=======
+  print "Total accuracy: %f" % (np.mean(testing_acc))
+>>>>>>> origin/feature/exp_architectures
 
+  coord.request_stop()
+  coord.join(threads)
 
-  training_acc = []
-  training_loss = []
-  testing_acc = []
-
-  # Train at each learning rate.
-  for lr, iters in ft_lrs:
-    loss, acc = train_section(model, data, lr, iters)
-
-    training_loss.extend(loss)
-    testing_acc.extend(acc)
-
-  data.exit_gracefully()
-
-  print "Saving results..."
-  results_file = open("gazecapture_results.json", "w")
-  json.dump((training_loss, testing_acc, training_acc), results_file)
-  results_file.close()
 
 if __name__ == "__main__":
   main(load_model="eye_model_finetuned.hd5")
