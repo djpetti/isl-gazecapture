@@ -1,6 +1,7 @@
 #!/usr/bin/python
 
 
+import argparse
 import logging
 
 
@@ -26,13 +27,6 @@ def _configure_logging():
 _configure_logging()
 
 
-<<<<<<< HEAD
-# This forks a lot of processes, so we want to import it as soon as possible,
-# when there is as little memory as possible in use.
-from rpinets.myelin import data_loader
-
-=======
->>>>>>> origin/feature/exp_architectures
 from six.moves import cPickle as pickle
 import json
 import os
@@ -57,33 +51,22 @@ from pipeline import data_loader, preprocess, keras_utils
 
 
 batch_size = 64
-<<<<<<< HEAD
-# How many batches to have loaded into VRAM at once.
-load_batches = 5
-# Shape of the input images.
-image_shape = (400, 400, 3)
-# Shape of the extracted patches.
-patch_shape = (390, 390)
-=======
->>>>>>> origin/feature/exp_architectures
 # Shape of the input to the network.
 input_shape = (224, 224, 3)
 # Shape of the raw images from the dataset.
 raw_shape = (400, 400, 3)
 
 # How many batches to run between testing intervals.
-train_interval = 20
+train_interval = 80
 # How many batches to run during testing.
-test_interval = 3
+test_interval = 12
 
 # Learning rates to set.
-learning_rates = [0.0001, 0.00001]
+learning_rates = [0.001, 0.0001, 0.00001]
 # How many iterations to train for at each learning rate.
-<<<<<<< HEAD
-iterations = [51864, 300000]
-=======
-iterations = [100000, 100000]
->>>>>>> origin/feature/exp_architectures
+iterations = [100000, 100000, 100000]
+# How many iterations to validate for.
+valid_iters = 350
 
 # Learning rate hyperparameters.
 momentum = 0.9
@@ -92,57 +75,20 @@ momentum = 0.9
 save_file = "eye_model_finetuned.hd5"
 synsets_save_file = "synsets.pkl"
 # Location of the dataset files.
-<<<<<<< HEAD
-dataset_files = "/training_data/gazecap_myelin/dataset"
-# Location of the cache files.
-cache_dir = "/training_data/gazecap_myelin"
-
-# Validation data.
-valid_dataset_files = "/training_data/gazecap_myelin_val/dataset"
-valid_cache_dir = "/training_data/gazecap_myelin_val"
-# Fine-tuning data.
-ft_dataset_files = "/training_data/gazecap_myelin/dataset"
-ft_cache_dir = "/training_data/gazecap_myelin"
-=======
 dataset_base = \
     "/training_data/daniel/gazecap_tfrecords/gazecapture_%s.tfrecord"
 train_dataset_file = dataset_base % ("train")
 test_dataset_file = dataset_base % ("test")
 valid_dataset_file = dataset_base % ("val")
->>>>>>> origin/feature/exp_architectures
 
 # L2 regularizer for weight decay.
 l2_reg = regularizers.l2(0.0005)
 
 # Configure GPU VRAM usage.
-<<<<<<< HEAD
-config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 1.0
-set_session(tf.Session(config=config))
-
-
-def create_bitmask_images(bboxes):
-  """ Creates the bitmask images from the bbox points.
-  Args:
-    bboxes: A matrix of bounding boxes, where each box is a row vector of x, y,
-            width, and height.
-  Returns:
-    The generated bitmask image. """
-  # Scale to mask size.
-  bboxes *= 25
-  # It's one-indexed in the dataset.
-  bboxes = np.round(bboxes).astype(np.int8) - 1
-
-  bboxes = np.clip(bboxes, 0, 25)
-
-  # Create the background.
-  frames = np.zeros((bboxes.shape[0], 25, 25))
-=======
 tf_config = tf.ConfigProto()
 tf_config.gpu_options.per_process_gpu_memory_fraction = 1.0
 session = tf.Session(config=tf_config)
 set_session(session)
->>>>>>> origin/feature/exp_architectures
 
 
 def distance_metric(y_true, y_pred):
@@ -167,134 +113,6 @@ def fuse_loaders(train_loader, train_pipelines, test_loader, test_pipelines):
     test_loader: The testing loader.
     test_pipelines: The pipelines associated with the test loader.
   Returns:
-<<<<<<< HEAD
-    The built network, ready to train. """
-  trainable = not fine_tune
-
-  left_eye_input = layers.Input(shape=input_shape, name="left_eye_input")
-  right_eye_input = layers.Input(shape=input_shape, name="right_eye_input")
-  # The face crop gets resized on-the-fly.
-  face_shape = (patch_shape[0], patch_shape[1], input_shape[2])
-  face_input = layers.Input(shape=face_shape, name="face_input")
-  grid_input = layers.Input(shape=(25, 25), name="grid_input")
-
-  left_eye_floats = K.cast(left_eye_input, "float32")
-  right_eye_floats = K.cast(right_eye_input, "float32")
-  face_floats = K.cast(face_input, "float32")
-  grid_floats = K.cast(grid_input, "float32")
-
-  # Resize face.
-  scale_layer = layers.Lambda(lambda x: tf.image.resize_images(x, (224, 224)))
-  face_scaled = scale_layer(face_floats)
-
-  # Convert everything to grayscale.
-  gray_layer = layers.Lambda(lambda x: rgb_to_grayscale(x))
-  left_eye_gray = gray_layer(left_eye_floats)
-  right_eye_gray = gray_layer(right_eye_floats)
-
-  # Get pretrained VGG model for use as a base.
-  vgg = applications.vgg19.VGG19(include_top=False,
-                                 input_tensor=face_scaled)
-  vgg_out = vgg.outputs[0]
-
-  # Freeze all layers in VGG.
-  for layer in vgg.layers:
-    layer.trainable = False
-
-  # Shared eye layers.
-  conv_e1 = layers.Conv2D(144, (11, 11), strides=(4, 4), activation="relu",
-                          kernel_regularizer=l2_reg, trainable=trainable)
-  pool_e1 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
-  norm_e1 = layers.BatchNormalization(trainable=trainable)
-
-  pad_e2 = layers.ZeroPadding2D(padding=(2, 2))
-  conv_e2 = layers.Conv2D(384, (5, 5), activation="relu",
-                          kernel_regularizer=l2_reg, trainable=trainable)
-  pool_e2 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
-  norm_e2 = layers.BatchNormalization(trainable=trainable)
-
-  pad_e3 = layers.ZeroPadding2D(padding=(1, 1))
-  conv_e3 = layers.Conv2D(576, (3, 3), activation="relu",
-                          kernel_regularizer=l2_reg, trainable=trainable)
-
-  conv_e4 = layers.Conv2D(64, (1, 1), activation="relu",
-                          kernel_regularizer=l2_reg, trainable=trainable)
-  flatten_e4 = layers.Flatten()
-
-  # Left eye stack.
-  leye_conv_e1 = conv_e1(left_eye_gray)
-  leye_pool_e1 = pool_e1(leye_conv_e1)
-  leye_norm_e1 = norm_e1(leye_pool_e1)
-
-  leye_pad_e2 = pad_e2(leye_norm_e1)
-  leye_conv_e2 = conv_e2(leye_pad_e2)
-  leye_pool_e2 = pool_e2(leye_conv_e2)
-  leye_norm_e2 = norm_e2(leye_pool_e2)
-
-  leye_pad_e3 = pad_e3(leye_norm_e2)
-  leye_conv_e3 = conv_e3(leye_pad_e3)
-
-  leye_conv_e4 = conv_e4(leye_conv_e3)
-  leye_flatten_e4 = flatten_e4(leye_conv_e4)
-
-  # Right eye stack.
-  reye_conv_e1 = conv_e1(right_eye_gray)
-  reye_pool_e1 = pool_e1(reye_conv_e1)
-  reye_norm_e1 = norm_e1(reye_pool_e1)
-
-  reye_pad_e2 = pad_e2(reye_norm_e1)
-  reye_conv_e2 = conv_e2(reye_pad_e2)
-  reye_pool_e2 = pool_e2(reye_conv_e2)
-  reye_norm_e2 = norm_e2(reye_pool_e2)
-
-  reye_pad_e3 = pad_e3(reye_norm_e2)
-  reye_conv_e3 = conv_e3(reye_pad_e3)
-
-  reye_conv_e4 = conv_e4(reye_conv_e3)
-  reye_flatten_e4 = flatten_e4(reye_conv_e4)
-
-  # Concatenate eyes and put through a shared FC layer.
-  eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
-  eye_combined_drop = layers.Dropout(0.5)(eye_combined)
-  fc_e1 = layers.Dense(128, activation="relu",
-                       kernel_regularizer=l2_reg)(eye_combined_drop)
-
-  # Face layers.
-  face_flatten_f4 = layers.Flatten()(vgg_out)
-  face_flatten_drop = layers.Dropout(0.5)(face_flatten_f4)
-
-  face_fc1 = layers.Dense(128, activation="relu",
-                          kernel_regularizer=l2_reg,
-                          trainable=trainable)(face_flatten_drop)
-  face_fc2 = layers.Dense(64, activation="relu",
-                          kernel_regularizer=l2_reg)(face_fc1)
-
-  # Face grid.
-  grid_flat = layers.Flatten()(grid_floats)
-  grid_fc1 = layers.Dense(256, activation="relu",
-                          kernel_regularizer=l2_reg,
-                          trainable=trainable)(grid_flat)
-  grid_fc2 = layers.Dense(128, activation="relu",
-                          kernel_regularizer=l2_reg,
-                          trainable=trainable)(grid_fc1)
-
-  # Concat everything and put through a final FF layer.
-  all_concat = layers.Concatenate()([fc_e1, face_fc2, grid_fc2])
-  all_fc1 = layers.Dense(128, activation="relu",
-                         kernel_regularizer=l2_reg)(all_concat)
-  all_fc2 = layers.Dense(2, kernel_regularizer=l2_reg)(all_fc1)
-
-  # Build the model.
-  model = Model(inputs=[left_eye_input, right_eye_input, face_input,
-                        grid_input],
-                outputs=all_fc2)
-  model.summary()
-
-  return model
-
-def process_data(face_data, labels):
-  """ Helper that performs all the pre-processing on the input data.
-=======
     The fused outputs, in the same order as the pipeline inputs, with the labels
     at the end. """
   train_data = train_loader.get_data()
@@ -319,27 +137,9 @@ def process_data(face_data, labels):
 
 def add_train_stages(loader):
   """ Convenience function to configure train loader.
->>>>>>> origin/feature/exp_architectures
   Args:
     loader: The DataLoader to configure.
   Returns:
-<<<<<<< HEAD
-    The converted left eye crops, right eye crops, face crops, face grids, and
-    ground-truth dot locations. """
-  # Process raw label names.
-  dot_data, leye_data, reye_data, mask_bboxes = convert_labels(labels)
-  # Randomly flip some images for data augmentation.
-  dot_data, leye_data, reye_data, mask_bboxes, face_data = \
-      maybe_flip(dot_data, leye_data, reye_data, mask_bboxes, face_data)
-  # Generate masks.
-  mask_data = create_bitmask_images(mask_bboxes)
-  # Extract left and right eye crops.
-  leye_crops, reye_crops = extract_eye_crops(face_data, leye_data, reye_data)
-
-  return (leye_crops, reye_crops, face_data, mask_data, dot_data)
-
-def train_section(model, data, learning_rate, iters):
-=======
     A tuple of the pipelines created for the loader. """
   pipeline = loader.get_pipeline()
 
@@ -441,14 +241,16 @@ def add_test_stages(loader):
   return (leye, reye, face, mask)
 
 
-def build_pipeline():
+def build_pipeline(args):
   """ Builds the preprocessing pipeline.
+  Args:
+    args: The parsed command line arguments.
   Returns:
     The fused output nodes from the loaders, in order: leye, reye, face, grid,
     dots. """
-  train_loader = data_loader.TrainDataLoader(train_dataset_file, batch_size,
+  train_loader = data_loader.TrainDataLoader(args.train_dataset, batch_size,
                                              raw_shape)
-  test_loader = data_loader.TestDataLoader(test_dataset_file, batch_size,
+  test_loader = data_loader.TestDataLoader(args.test_dataset, batch_size,
                                            raw_shape)
 
   train_pipelines = add_train_stages(train_loader)
@@ -457,11 +259,17 @@ def build_pipeline():
   return fuse_loaders(train_loader, train_pipelines,
                       test_loader, test_pipelines)
 
-def build_valid_pipeline():
+def build_valid_pipeline(args):
   """ Builds the preprocessing pipeline for the validation split.
+  Args:
+    The parsed command line arguments.
   Returns:
     The leye, reye, face, grid, and dots nodes for the validation loader. """
-  valid_loader = data_loader.ValidDataLoader(valid_dataset_file, batch_size,
+  if not args.valid_dataset:
+    # User did not specify location of validation dataset.
+    raise ValueError("--valid_dataset is required.")
+
+  valid_loader = data_loader.ValidDataLoader(args.valid_dataset, batch_size,
                                              raw_shape)
 
   valid_pipelines = add_test_stages(valid_loader)
@@ -476,7 +284,6 @@ def build_valid_pipeline():
   return nodes
 
 def train_section(model, learning_rate, iters, labels):
->>>>>>> origin/feature/exp_architectures
   """ Trains for a number of iterations at one learning rate.
   Args:
     model: The model to train.
@@ -512,12 +319,30 @@ def train_section(model, learning_rate, iters, labels):
 
   return (training_loss, testing_acc)
 
-def main(load_model=None):
+def parse_args():
+  parser = argparse.ArgumentParser()
+
+  parser.add_argument("train_dataset",
+                      help="The location of the training dataset.")
+  parser.add_argument("test_dataset",
+                      help="The location of the testing dataset.")
+
+  parser.add_argument("-v", "--valid_dataset",
+                      help="The location of the validation dataset.")
+  parser.add_argument("-m", "--model",
+                      help="Existing model to load. Necessary if validating.")
+
+  args = parser.parse_args()
+
+  return args
+
+def train(args):
   """
+  Runs the training procedure.
   Args:
-    load_model: A pretrained model to load, if specified. """
+    args: The parsed CLI arguments. """
   # Create the training and testing pipelines.
-  input_tensors = build_pipeline()
+  input_tensors = build_pipeline(args)
   data_tensors = input_tensors[:4]
   label_tensor = input_tensors[4]
 
@@ -526,6 +351,7 @@ def main(load_model=None):
   net = config.NET_ARCH(input_shape, eye_shape=eye_shape,
                         data_tensors=data_tensors)
   model = net.build()
+  load_model = args.model
   if load_model:
     logging.info("Loading pretrained model '%s'." % (load_model))
     model.load_weights(load_model)
@@ -553,13 +379,12 @@ def main(load_model=None):
   json.dump((training_loss, testing_acc, training_acc), results_file)
   results_file.close()
 
-def validate(load_model, iters):
+def validate(args):
   """ Validates an existing model.
   Args:
-    load_model: The model to load.
-    iters: How many iterations to validate for. """
+    args: Parsed CLI arguments. """
   # Create the validation pipeline.
-  input_tensors = build_valid_pipeline()
+  input_tensors = build_valid_pipeline(args)
   data_tensors = input_tensors[:4]
   label_tensor = input_tensors[4]
 
@@ -568,6 +393,10 @@ def validate(load_model, iters):
   net = config.NET_ARCH(input_shape, eye_shape=eye_shape,
                         data_tensors=data_tensors)
   model = net.build()
+  load_model = args.model
+  if not load_model:
+    # User did not tell us which model to validate.
+    raise ValueError("--model must be specified.")
   logging.info("Loading pretrained model '%s'." % (load_model))
   model.load_weights(load_model)
 
@@ -584,44 +413,24 @@ def validate(load_model, iters):
   testing_acc = []
 
   # Validate.
-  for _ in range(0, iters):
+  for _ in range(0, valid_iters):
     loss, accuracy = model.evaluate(steps=test_interval)
 
     logging.info("Loss: %f, Accuracy: %f" % (loss, accuracy))
     testing_acc.append(accuracy)
 
-<<<<<<< HEAD
-  print "Mean accuracy: %f" % (np.mean(testing_acc))
-
-  data.exit_gracefully()
-
-def fine_tune(load_model, ft_lrs):
-  """ Fine-tunes the model.
-  Args:
-    load_model: The model to load for fine-tuning.
-    ft_lrs: List of tuples of learning rates and iteration counts for
-            fine-tuning. """
-  model = build_network()
-  logging.info("Loading pretrained model '%s'." % (load_model))
-  model.load_weights(load_model)
-
-  data = data_loader.DataManagerLoader(batch_size, load_batches, image_shape,
-                                       ft_cache_dir, ft_dataset_files,
-                                       patch_shape=patch_shape,
-                                       pca_stddev=50,
-                                       patch_flip=False,
-                                       raw_labels=True)
-
-  if os.path.exists(synsets_save_file):
-    logging.info("Loading existing synsets...")
-    data.load(synsets_save_file)
-=======
   print "Total accuracy: %f" % (np.mean(testing_acc))
->>>>>>> origin/feature/exp_architectures
 
   coord.request_stop()
   coord.join(threads)
 
+def main():
+  args = parse_args()
+
+  if args.valid_dataset:
+    validate(args)
+  else:
+    train(args)
 
 if __name__ == "__main__":
-  main(load_model="eye_model_finetuned.hd5")
+  main()
