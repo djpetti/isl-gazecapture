@@ -9,7 +9,11 @@ SERVER_PORT = 6219
 MIN_CONFIDENCE = 0.20
 
 # Specifies the network architecture we will use.
-NET_ARCH = network.LargeVggNetwork
+NET_ARCH = network.LargeNetwork
+# The shape of the input face images to the network.
+FACE_SHAPE = (224, 224, 3)
+# The shape of the input eye images to the network.
+EYE_SHAPE = (224, 224, 1)
 # Time in seconds that an image gets to live in the pipeline before we consider
 # it stale.
 STALE_THRESHOLD = 0.1

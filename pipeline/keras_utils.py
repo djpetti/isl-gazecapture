@@ -1,6 +1,5 @@
 import keras.backend as K
-
-import tensorflow as tf
+import keras.layers as layers
 
 
 def fuse_loaders(train_outputs, test_outputs):
@@ -12,5 +11,26 @@ def fuse_loaders(train_outputs, test_outputs):
     test_outputs: The output tensors from the testing data loader.
   Returnes:
     The output tensors. """
-  is_train = K.learning_phase()
-  return tf.cond(is_train, lambda: train_outputs, lambda: test_outputs)
+  fused_outputs = []
+  # We have to combine them on a tensor-by-tensor basis.
+  for train_output, test_output in zip(train_outputs, test_outputs):
+    fused_output = K.in_train_phase(train_output, test_output)
+    fused_outputs.append(fused_output)
+
+  return fused_outputs
+
+
+def pipeline_input(*args, **kwargs):
+  """ Input layer specialization for use with Pipeline outputs. """
+  if kwargs.get("tensor") is None:
+    # Tensor is a required argument for this subclass.
+    raise ValueError("'tensor' argument is required.")
+
+  # Create the base layer.
+  input_tensor = layers.Input(*args, **kwargs)
+
+  # Hack for ensuring that Keras recognizes that the pipeline system depends
+  # on the learning_phase placeholder.
+  input_tensor._uses_learning_phase = True
+
+  return input_tensor

@@ -4,7 +4,11 @@ import time
 
 import cv2
 
+import keras.layers as layers
+
 import numpy as np
+
+import tensorflow as tf
 
 from ..common import config
 from ..common.eye_cropper import EyeCropper
@@ -28,7 +32,7 @@ def _is_stale(timestamp):
 
 
 class GazePredictor(object):
-  """ Handles capturing eye images, and uses the model to predict gaze. """
+  """ Takes in eye images, and uses the model to predict gaze. """
 
   def __init__(self, model_file, phone, display=False):
     """
@@ -37,16 +41,16 @@ class GazePredictor(object):
       phone: The configuration data for the phone we are using.
       display: If true, it will enable a debug display that shows the image
                crops. """
-    # Initialize capture and prediction processes.
-    self.__prediction_process = _CnnProcess(model_file)
-    self.__landmark_process = _LandmarkProcess(self.__prediction_process,
-                                               phone,
-                                               display=display)
+    # Initialize landmark and prediction processes.
+    self._prediction_process = _CnnProcess(model_file)
+    self._landmark_process = _LandmarkProcess(self._prediction_process,
+                                              phone,
+                                              display=display)
 
   def __del__(self):
     # Make sure internal processes have terminated.
-    self.__landmark_process.release()
-    self.__prediction_process.release()
+    self._landmark_process.release()
+    self._prediction_process.release()
 
   def predict_gaze(self):
     """ Predicts the user's gaze based on current frames.
@@ -54,7 +58,7 @@ class GazePredictor(object):
       The predicted gaze point, in cm, the sequence number of the
       corresponding frame, and the timestamp. """
     # Wait for new output from the predictor.
-    return self.__prediction_process.get_output()
+    return self._prediction_process.get_output()
 
   def process_image(self, image, seq_num):
     """ Adds a new image to the prediction pipeline.
@@ -65,7 +69,23 @@ class GazePredictor(object):
     # stale.
     timestamp = time.time()
 
-    self.__landmark_process.add_new_input(image, seq_num, timestamp)
+    self._landmark_process.add_new_input(image, seq_num, timestamp)
+
+class GazePredictorWithCapture(GazePredictor):
+  """ Same as a GazePredictor, except it also handles capturing images from the
+  camera. """
+
+  def __init__(self, *args, **kwargs):
+    super(GazePredictorWithCapture, self).__init__(*args, **kwargs)
+
+    # Initialize capture process.
+    self._capture_process = _CaptureProcess(self._landmark_process)
+
+  def __del__(self):
+    super(GazePredictorWithCapture, self).__del__()
+
+    self._capture_process.release()
+
 
 class _CnnProcess(object):
   """ Runs the CNN prediction in a separate process on the GPU, so that it can
@@ -85,14 +105,62 @@ class _CnnProcess(object):
     self.__process = Process(target=_CnnProcess.predict_forever, args=(self,))
     self.__process.start()
 
+  @staticmethod
+  def _make_eye_pathway(eye_input):
+    """ Generates the preprocessing pathway for a single eye.
+    Args:
+      eye_input: The raw eye input to be preprocessed.
+    Returns:
+      The input placeholder, and the output node. """
+    # Convert to grayscale.
+    eye_gray = tf.image.rgb_to_grayscale(eye_input)
+    # Crop it properly.
+    eye_cropped = tf.image.crop_to_bounding_box(eye_gray, 3, 3, 218, 218)
+    # Resize it properly.
+    resize_to = config.EYE_SHAPE[:2]
+    eye_resized = tf.image.resize_images(eye_cropped, resize_to,
+                                         align_corners=True)
+    # Normalize it.
+    eye_norm = tf.map_fn(lambda frame: \
+                         tf.image.per_image_standardization(frame), eye_resized)
+
+    return eye_norm
+
+  @staticmethod
+  def _make_face_pathway(face_input):
+    """ Generates the preprocessing pathway for the face image.
+    Args:
+      face_input: The raw face input to be processed.
+    Returns:
+      The input placeholder, and the output node. """
+    # Crop it properly.
+    face_cropped = tf.image.crop_to_bounding_box(face_input, 11, 11, 202, 202)
+    # Resize it properly.
+    resize_to = config.FACE_SHAPE[:2]
+    face_resized = tf.image.resize_images(face_cropped, resize_to,
+                                          align_corners=True)
+
+    # Normalize it.
+    face_norm = tf.map_fn(lambda frame: \
+                          tf.image.per_image_standardization(frame),
+                          face_resized)
+
+    return face_norm
+
   def release(self):
     """ Cleans up and terminates internal process. """
     self.__process.terminate()
 
   def predict_forever(self):
     """ Generates predictions indefinitely. """
+    # Create preprocessing layers.
+    eye_preproc_layer = layers.Lambda(_CnnProcess._make_eye_pathway)
+    face_preproc_layer = layers.Lambda(_CnnProcess._make_face_pathway)
+
     # Load the model we trained.
-    model = config.NET_ARCH()
+    model = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
+                            eye_preproc=eye_preproc_layer,
+                            face_preproc=face_preproc_layer)
     self.__predictor = model.build()
     self.__predictor.load_weights(self.__model_file)
 

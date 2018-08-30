@@ -46,13 +46,11 @@ import cv2
 
 import numpy as np
 
-from itracker.common import config
+from itracker.common import config, custom_data_loader
 from pipeline import data_loader, preprocess, keras_utils
 
 
 batch_size = 64
-# Shape of the input to the network.
-input_shape = (224, 224, 3)
 # Shape of the raw images from the dataset.
 raw_shape = (400, 400, 3)
 
@@ -180,15 +178,18 @@ def add_train_stages(loader):
 
   # Normalization and final sizing.
   norm_stage = preprocess.NormalizationStage()
-  output_size = input_shape[:2]
-  resize_stage = preprocess.ResizeStage(output_size)
+  face_output_size = config.FACE_SHAPE[:2]
+  eye_output_size = config.EYE_SHAPE[:2]
+  face_resize_stage = preprocess.ResizeStage(face_output_size)
+  eye_resize_stage = preprocess.ResizeStage(eye_output_size)
+
   leye.add(norm_stage)
   reye.add(norm_stage)
   face.add(norm_stage)
 
-  leye.add(resize_stage)
-  reye.add(resize_stage)
-  face.add(resize_stage)
+  leye.add(eye_resize_stage)
+  reye.add(eye_resize_stage)
+  face.add(face_resize_stage)
 
   # Build the loader graph.
   loader.build()
@@ -225,15 +226,17 @@ def add_test_stages(loader):
 
   # Normalization and final sizing.
   norm_stage = preprocess.NormalizationStage()
-  output_size = input_shape[:2]
-  resize_stage = preprocess.ResizeStage(output_size)
+  face_output_size = config.FACE_SHAPE[:2]
+  eye_output_size = config.EYE_SHAPE[:2]
+  face_resize_stage = preprocess.ResizeStage(face_output_size)
+  eye_resize_stage = preprocess.ResizeStage(eye_output_size)
   leye.add(norm_stage)
   reye.add(norm_stage)
   face.add(norm_stage)
 
-  leye.add(resize_stage)
-  reye.add(resize_stage)
-  face.add(resize_stage)
+  leye.add(eye_resize_stage)
+  reye.add(eye_resize_stage)
+  face.add(face_resize_stage)
 
   # Build the loader graph.
   loader.build()
@@ -248,10 +251,10 @@ def build_pipeline(args):
   Returns:
     The fused output nodes from the loaders, in order: leye, reye, face, grid,
     dots. """
-  train_loader = data_loader.TrainDataLoader(args.train_dataset, batch_size,
-                                             raw_shape)
-  test_loader = data_loader.TestDataLoader(args.test_dataset, batch_size,
-                                           raw_shape)
+  train_loader_class = custom_data_loader.TrainDataLoader
+  test_loader_class = custom_data_loader.TestDataLoader
+  train_loader = train_loader_class(args.train_dataset, batch_size, raw_shape)
+  test_loader = test_loader_class(args.test_dataset, batch_size, raw_shape)
 
   train_pipelines = add_train_stages(train_loader)
   test_pipelines = add_test_stages(test_loader)
@@ -269,8 +272,8 @@ def build_valid_pipeline(args):
     # User did not specify location of validation dataset.
     raise ValueError("--valid_dataset is required.")
 
-  valid_loader = data_loader.ValidDataLoader(args.valid_dataset, batch_size,
-                                             raw_shape)
+  valid_loader_class = custom_data_loader.ValidDataLoader
+  valid_loader = valid_loader_class(args.valid_dataset, batch_size, raw_shape)
 
   valid_pipelines = add_test_stages(valid_loader)
 
@@ -347,8 +350,7 @@ def train(args):
   label_tensor = input_tensors[4]
 
   # Create the model.
-  eye_shape = (input_shape[0], input_shape[1], 1)
-  net = config.NET_ARCH(input_shape, eye_shape=eye_shape,
+  net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
                         data_tensors=data_tensors)
   model = net.build()
   load_model = args.model
@@ -389,8 +391,7 @@ def validate(args):
   label_tensor = input_tensors[4]
 
   # Create the model.
-  eye_shape = (input_shape[0], input_shape[1], 1)
-  net = config.NET_ARCH(input_shape, eye_shape=eye_shape,
+  net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
                         data_tensors=data_tensors)
   model = net.build()
   load_model = args.model
