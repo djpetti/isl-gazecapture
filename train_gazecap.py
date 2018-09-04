@@ -70,7 +70,7 @@ valid_iters = 350
 momentum = 0.9
 
 # Where to save the network.
-save_file = "eye_model_finetuned.hd5"
+save_file = "eye_model.hd5"
 synsets_save_file = "synsets.pkl"
 # Location of the dataset files.
 dataset_base = \
