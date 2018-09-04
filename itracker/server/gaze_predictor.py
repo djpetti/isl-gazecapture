@@ -71,22 +71,6 @@ class GazePredictor(object):
 
     self._landmark_process.add_new_input(image, seq_num, timestamp)
 
-class GazePredictorWithCapture(GazePredictor):
-  """ Same as a GazePredictor, except it also handles capturing images from the
-  camera. """
-
-  def __init__(self, *args, **kwargs):
-    super(GazePredictorWithCapture, self).__init__(*args, **kwargs)
-
-    # Initialize capture process.
-    self._capture_process = _CaptureProcess(self._landmark_process)
-
-  def __del__(self):
-    super(GazePredictorWithCapture, self).__del__()
-
-    self._capture_process.release()
-
-
 class _CnnProcess(object):
   """ Runs the CNN prediction in a separate process on the GPU, so that it can
   be handled concurrently. """
@@ -157,8 +141,10 @@ class _CnnProcess(object):
     eye_preproc_layer = layers.Lambda(_CnnProcess._make_eye_pathway)
     face_preproc_layer = layers.Lambda(_CnnProcess._make_face_pathway)
 
+    # We expect color image inputs.
+    color_eye_shape = config.EYE_SHAPE[:2] + (3,)
     # Load the model we trained.
-    model = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
+    model = config.NET_ARCH(config.FACE_SHAPE, eye_shape=color_eye_shape,
                             eye_preproc=eye_preproc_layer,
                             face_preproc=face_preproc_layer)
     self.__predictor = model.build()
