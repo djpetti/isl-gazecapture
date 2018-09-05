@@ -64,7 +64,7 @@ learning_rates = [0.001, 0.0001, 0.00001]
 # How many iterations to train for at each learning rate.
 iterations = [100000, 100000, 100000]
 # How many iterations to validate for.
-valid_iters = 350
+valid_iters = 62
 
 # Learning rate hyperparameters.
 momentum = 0.9
