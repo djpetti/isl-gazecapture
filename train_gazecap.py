@@ -47,24 +47,24 @@ import cv2
 import numpy as np
 
 from itracker.common import config, custom_data_loader
-from pipeline import data_loader, preprocess, keras_utils
+from itracker.training import pipelines
 
 
-batch_size = 64
+batch_size = 32
 # Shape of the raw images from the dataset.
 raw_shape = (400, 400, 3)
 
 # How many batches to run between testing intervals.
-train_interval = 80
+train_interval = 160
 # How many batches to run during testing.
-test_interval = 12
+test_interval = 24
 
 # Learning rates to set.
 learning_rates = [0.001, 0.0001, 0.00001]
 # How many iterations to train for at each learning rate.
 iterations = [100000, 100000, 100000]
 # How many iterations to validate for.
-valid_iters = 62
+valid_iters = 124
 
 # Learning rate hyperparameters.
 momentum = 0.9
@@ -102,189 +102,6 @@ def distance_metric(y_true, y_pred):
   sqr = K.square(diff)
   total = K.sum(sqr, axis=1)
   return K.sqrt(total)
-
-def fuse_loaders(train_loader, train_pipelines, test_loader, test_pipelines):
-  """ Fuses the outputs from the training and testing loaders.
-  Args:
-    train_loader: The training loader.
-    train_pipelines: The pipelines associated with the train loader.
-    test_loader: The testing loader.
-    test_pipelines: The pipelines associated with the test loader.
-  Returns:
-    The fused outputs, in the same order as the pipeline inputs, with the labels
-    at the end. """
-  train_data = train_loader.get_data()
-  train_labels = train_loader.get_labels()
-  test_data = test_loader.get_data()
-  test_labels = test_loader.get_labels()
-
-  # Extract the corresponding outputs for the pipelines.
-  train_outputs = []
-  for pipeline in train_pipelines:
-    train_outputs.append(train_data[pipeline])
-  # Add the labels too.
-  train_outputs.append(train_labels)
-
-  test_outputs = []
-  for pipeline in test_pipelines:
-    test_outputs.append(test_data[pipeline])
-  test_outputs.append(test_labels)
-
-  # Fuse the outputs.
-  return keras_utils.fuse_loaders(train_outputs, test_outputs)
-
-def add_train_stages(loader):
-  """ Convenience function to configure train loader.
-  Args:
-    loader: The DataLoader to configure.
-  Returns:
-    A tuple of the pipelines created for the loader. """
-  pipeline = loader.get_pipeline()
-
-  # Extract eye crops.
-  extract_stage = preprocess.EyeExtractionStage()
-  leye, reye, face = pipeline.add(extract_stage)
-
-  # Extract face mask.
-  mask_stage = preprocess.FaceMaskStage()
-  mask, face = face.add(mask_stage)
-
-  # Random cropping.
-  crop_stage = preprocess.RandomCropStage((390, 390))
-  face_crop_stage = preprocess.RandomCropStage((360, 360))
-  leye.add(crop_stage)
-  reye.add(crop_stage)
-  face.add(face_crop_stage)
-
-  # Random adjustments.
-  brightness_stage = preprocess.RandomBrightnessStage(50)
-  contrast_stage = preprocess.RandomContrastStage(0.9, 1.4)
-  hue_stage = preprocess.RandomHueStage(0.1)
-  saturation_stage = preprocess.RandomSaturationStage(0.9, 1.1)
-  grayscale_stage = preprocess.GrayscaleStage()
-
-  leye.add(brightness_stage)
-  leye.add(contrast_stage)
-  leye.add(grayscale_stage)
-
-  reye.add(brightness_stage)
-  reye.add(contrast_stage)
-  reye.add(grayscale_stage)
-
-  face.add(brightness_stage)
-  face.add(contrast_stage)
-  face.add(hue_stage)
-  face.add(saturation_stage)
-
-  # Normalization and final sizing.
-  norm_stage = preprocess.NormalizationStage()
-  face_output_size = config.FACE_SHAPE[:2]
-  eye_output_size = config.EYE_SHAPE[:2]
-  face_resize_stage = preprocess.ResizeStage(face_output_size)
-  eye_resize_stage = preprocess.ResizeStage(eye_output_size)
-
-  leye.add(norm_stage)
-  reye.add(norm_stage)
-  face.add(norm_stage)
-
-  leye.add(eye_resize_stage)
-  reye.add(eye_resize_stage)
-  face.add(face_resize_stage)
-
-  # Build the loader graph.
-  loader.build()
-
-  return (leye, reye, face, mask)
-
-def add_test_stages(loader):
-  """ Convenience function to configure test and validation loaders.
-  Args:
-    loader: The DataLoader to configure.
-  Returns:
-    A tuple of the pipelines created for the loader. """
-  pipeline = loader.get_pipeline()
-
-  # Extract eye crops.
-  extract_stage = preprocess.EyeExtractionStage()
-  leye, reye, face = pipeline.add(extract_stage)
-
-  # Extract face mask.
-  mask_stage = preprocess.FaceMaskStage()
-  mask, face = face.add(mask_stage)
-
-  # Take the central crops.
-  crop_stage = preprocess.CenterCropStage(0.975)
-  face_crop_stage = preprocess.CenterCropStage(0.9)
-  leye.add(crop_stage)
-  reye.add(crop_stage)
-  face.add(face_crop_stage)
-
-  # Grayscale.
-  grayscale_stage = preprocess.GrayscaleStage()
-  leye.add(grayscale_stage)
-  reye.add(grayscale_stage)
-
-  # Normalization and final sizing.
-  norm_stage = preprocess.NormalizationStage()
-  face_output_size = config.FACE_SHAPE[:2]
-  eye_output_size = config.EYE_SHAPE[:2]
-  face_resize_stage = preprocess.ResizeStage(face_output_size)
-  eye_resize_stage = preprocess.ResizeStage(eye_output_size)
-  leye.add(norm_stage)
-  reye.add(norm_stage)
-  face.add(norm_stage)
-
-  leye.add(eye_resize_stage)
-  reye.add(eye_resize_stage)
-  face.add(face_resize_stage)
-
-  # Build the loader graph.
-  loader.build()
-
-  return (leye, reye, face, mask)
-
-
-def build_pipeline(args):
-  """ Builds the preprocessing pipeline.
-  Args:
-    args: The parsed command line arguments.
-  Returns:
-    The fused output nodes from the loaders, in order: leye, reye, face, grid,
-    dots. """
-  train_loader_class = custom_data_loader.TrainDataLoader
-  test_loader_class = custom_data_loader.TestDataLoader
-  train_loader = train_loader_class(args.train_dataset, batch_size, raw_shape)
-  test_loader = test_loader_class(args.test_dataset, batch_size, raw_shape)
-
-  train_pipelines = add_train_stages(train_loader)
-  test_pipelines = add_test_stages(test_loader)
-
-  return fuse_loaders(train_loader, train_pipelines,
-                      test_loader, test_pipelines)
-
-def build_valid_pipeline(args):
-  """ Builds the preprocessing pipeline for the validation split.
-  Args:
-    The parsed command line arguments.
-  Returns:
-    The leye, reye, face, grid, and dots nodes for the validation loader. """
-  if not args.valid_dataset:
-    # User did not specify location of validation dataset.
-    raise ValueError("--valid_dataset is required.")
-
-  valid_loader_class = custom_data_loader.ValidDataLoader
-  valid_loader = valid_loader_class(args.valid_dataset, batch_size, raw_shape)
-
-  valid_pipelines = add_test_stages(valid_loader)
-
-  # Extract the associated output nodes.
-  data = valid_loader.get_data()
-  nodes = []
-  for pipeline in valid_pipelines:
-    nodes.append(data[pipeline])
-  nodes.append(valid_loader.get_labels())
-
-  return nodes
 
 def train_section(model, learning_rate, iters, labels):
   """ Trains for a number of iterations at one learning rate.
@@ -345,7 +162,12 @@ def train(args):
   Args:
     args: The parsed CLI arguments. """
   # Create the training and testing pipelines.
-  input_tensors = build_pipeline(args)
+  face_size = config.FACE_SHAPE[:2]
+  eye_size = config.EYE_SHAPE[:2]
+  builder = pipelines.PipelineBuilder(raw_shape, face_size, batch_size,
+                                      eye_size=eye_size)
+
+  input_tensors = builder.build_pipeline(args.train_dataset, args.test_dataset)
   data_tensors = input_tensors[:4]
   label_tensor = input_tensors[4]
 
@@ -385,7 +207,19 @@ def validate(args):
   """ Validates an existing model.
   Args:
     args: Parsed CLI arguments. """
+  if not args.valid_dataset:
+    raise ValueError("--valid_dataset must be specified.")
+
   # Create the validation pipeline.
+  face_size = config.FACE_SHAPE[:2]
+  eye_size = config.EYE_SHAPE[:2]
+  builder = pipelines.PipelineBuilder(raw_shape, face_size, batch_size,
+                                      eye_size=eye_size)
+
+  input_tensors = builder.build_valid_pipeline(args.valid_dataset)
+  data_tensors = input_tensors[:4]
+  label_tensor = input_tensors[4]
+
   input_tensors = build_valid_pipeline(args)
   data_tensors = input_tensors[:4]
   label_tensor = input_tensors[4]
