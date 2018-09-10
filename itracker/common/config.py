@@ -10,6 +10,8 @@ MIN_CONFIDENCE = 0.20
 
 # Specifies the network architecture we will use.
 NET_ARCH = network.ResidualNetwork
+# The shape of raw images from the dataset.
+RAW_SHAPE = (400, 400, 3)
 # The shape of the input face images to the network.
 FACE_SHAPE = (224, 224, 3)
 # The shape of the input eye images to the network.
