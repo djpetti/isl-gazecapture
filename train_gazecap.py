@@ -2,32 +2,10 @@
 
 
 import argparse
-import logging
-
-
-def _configure_logging():
-  """ Configure logging handlers. """
-  # Cofigure root logger.
-  root = logging.getLogger()
-  root.setLevel(logging.DEBUG)
-  file_handler = logging.FileHandler("itracker_train.log")
-  file_handler.setLevel(logging.DEBUG)
-  stream_handler = logging.StreamHandler()
-  stream_handler.setLevel(logging.WARNING)
-  formatter = logging.Formatter("%(name)s@%(asctime)s: " + \
-      "[%(levelname)s] %(message)s")
-
-  file_handler.setFormatter(formatter)
-  stream_handler.setFormatter(formatter)
-
-  root.addHandler(file_handler)
-  root.addHandler(stream_handler)
-
-# Some modules need a logger to be configured immediately.
-_configure_logging()
-
 
 from itracker.training import experiment
+
+import logging_config
 
 
 # How many iterations to validate for.
@@ -124,6 +102,7 @@ def validate(args):
   coord.join(threads)
 
 def main():
+  logging_config.configure_logging()
   parser = parse_args()
 
   # Create and start the experiment.
