@@ -21,7 +21,8 @@ simple demo which we intend to make available in the future.
 
 ## Training the Model
 
-Training the model requires TensorFlow and Keras. Practically, it also requires
+Training the model requires TensorFlow, Keras, and
+[Rhodopsin](https://github.com/djpetti/rhodopsin). Practically, it also requires
 a GPU, preferably one with at least 8 Gb of VRAM.
 
 ### Building the Dataset
