@@ -3,6 +3,8 @@ import logging
 import keras.backend as K
 import keras.optimizers as optimizers
 
+import numpy as np
+
 from rhodopsin import experiment, params
 
 import tensorflow as tf
@@ -37,6 +39,13 @@ class Experiment(experiment.Experiment):
     my_params = self.__create_hyperparameters()
     # Create status parameters.
     my_status = self.__create_status()
+
+    # Create pipeline builder.
+    face_size = config.FACE_SHAPE[:2]
+    eye_size = config.EYE_SHAPE[:2]
+    batch_size = self.__args.batch_size
+    self.__builder = pipelines.PipelineBuilder(config.RAW_SHAPE, face_size,
+                                               batch_size, eye_size=eye_size)
 
     super(Experiment, self).__init__(self.__args.testing_interval,
                                      hyperparams=my_params,
@@ -101,6 +110,20 @@ class Experiment(experiment.Experiment):
       # We only need to compile a maximum of one time.
       break
 
+  def __build_model(self, data_tensors):
+    """ Builds the model, and loads existing weights if necessary.
+    Args:
+      data_tensors: The input tensors for the model. """
+    # Create the model.
+    net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
+                          data_tensors=data_tensors)
+    self.__model = net.build()
+
+    load_model = self.__args.model
+    if load_model:
+      logging.info("Loading pretrained model '%s'." % (load_model))
+      self.__model.load_weights(load_model)
+
   def _run_training_iteration(self):
     """ Runs a single training iteration. """
     my_params = self.get_params()
@@ -145,26 +168,13 @@ class Experiment(experiment.Experiment):
   def train(self):
     """ Initializes and performs the entire training procedure. """
     # Build input pipelines.
-    face_size = config.FACE_SHAPE[:2]
-    eye_size = config.EYE_SHAPE[:2]
-    batch_size = self.__args.batch_size
-    builder = pipelines.PipelineBuilder(config.RAW_SHAPE, face_size, batch_size,
-                                        eye_size=eye_size)
-
-    input_tensors = builder.build_pipeline(self.__args.train_dataset,
-                                           self.__args.test_dataset)
+    input_tensors = self.__builder.build_pipeline(self.__args.train_dataset,
+                                                  self.__args.test_dataset)
     data_tensors = input_tensors[:4]
     self.__labels = input_tensors[4]
 
     # Create the model.
-    net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
-                          data_tensors=data_tensors)
-    self.__model = net.build()
-
-    load_model = self.__args.model
-    if load_model:
-      logging.info("Loading pretrained model '%s'." % (load_model))
-      self.__model.load_weights(load_model)
+    self.__build_model(data_tensors)
 
     # Create a coordinator and run queues.
     coord = tf.train.Coordinator()
@@ -175,3 +185,48 @@ class Experiment(experiment.Experiment):
 
     coord.request_stop()
     coord.join(threads)
+
+  def validate(self):
+    """ Validates an existing model. """
+    # Create the validation pipeline.
+    input_tensors = \
+        self.__builder.build_valid_pipeline(self.__args.valid_dataset)
+    data_tensors = input_tensors[:4]
+    self.__labels = input_tensors[4]
+
+    if not self.__args.model:
+      # User did not tell us which model to validate.
+      raise ValueError("--model must be specified.")
+    # Create the model.
+    self.__build_model(data_tensors)
+
+    # Compile the model. The learning settings don't really matter, since we're
+    # not training.
+    self.__recompile_if_needed()
+
+    # Create a coordinator and run queues.
+    coord = tf.train.Coordinator()
+    threads = tf.train.start_queue_runners(coord=coord, sess=g_session)
+
+    testing_acc = []
+
+    # Validate.
+    for _ in range(0, self.__args.valid_iters):
+      loss, accuracy = self.__model.evaluate(steps=self.__args.testing_steps)
+
+      logging.info("Loss: %f, Accuracy: %f" % (loss, accuracy))
+      testing_acc.append(accuracy)
+
+    print "Total accuracy: %f" % (np.mean(testing_acc))
+
+    coord.request_stop()
+    coord.join(threads)
+
+  def run(self):
+    """ Runs the experiment. Performs the action selected by the user. """
+    if self.__args.valid_dataset:
+      # Perform validation.
+      self.validate()
+    else:
+      # Otherwise, train.
+      self.train()
