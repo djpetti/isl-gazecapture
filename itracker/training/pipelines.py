@@ -101,6 +101,10 @@ class PipelineBuilder(object):
     face_resize_stage = preprocess.ResizeStage(self.__image_size)
     eye_resize_stage = preprocess.ResizeStage(self.__eye_size)
 
+    leye.add(norm_stage)
+    reye.add(norm_stage)
+    face.add(norm_stage)
+
     leye.add(eye_resize_stage)
     reye.add(eye_resize_stage)
     face.add(face_resize_stage)
@@ -152,6 +156,7 @@ class PipelineBuilder(object):
     norm_stage = preprocess.NormalizationStage()
     face_resize_stage = preprocess.ResizeStage(self.__image_size)
     eye_resize_stage = preprocess.ResizeStage(self.__eye_size)
+
     leye.add(norm_stage)
     reye.add(norm_stage)
     face.add(norm_stage)

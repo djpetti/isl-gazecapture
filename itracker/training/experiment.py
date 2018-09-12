@@ -164,7 +164,7 @@ class Experiment(experiment.Experiment):
     load_model = self.__args.model
     if load_model:
       logging.info("Loading pretrained model '%s'." % (load_model))
-      model.load_weights(load_model)
+      self.__model.load_weights(load_model)
 
     # Create a coordinator and run queues.
     coord = tf.train.Coordinator()
