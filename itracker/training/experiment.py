@@ -156,6 +156,18 @@ class Experiment(experiment.Experiment):
       # Can't fine-tune without a loaded model.
       raise RuntimeError("Please specify a model with --model to fine-tune.")
 
+  def _init_experiment(self):
+    """ Initialization code for the experiment. """
+    # Build input pipelines.
+    input_tensors = self.__builder.build_pipeline(self.__args.train_dataset,
+                                                  self.__args.test_dataset)
+    # We don't need the session number for training.
+    data_tensors = input_tensors[:4]
+    self.__labels = {"dots": input_tensors[-1]}
+
+    # Create the model.
+    self.__build_model(data_tensors)
+
   def _run_training_iteration(self):
     """ Runs a single training iteration. """
     my_params = self.get_params()
@@ -193,24 +205,15 @@ class Experiment(experiment.Experiment):
     status.update("testing_loss", loss)
     status.update("testing_acc", accuracy)
 
-    # Save the trained models.
-    logger.info("Saving models.")
-    self.__model.save_weights(self.__args.output)
+  def _save_model(self, save_file):
+    """ Save the trained model. """
+    logger.info("Saving model.")
+    self.__model.save_weights(save_file)
 
-  def train(self):
-    """ Initializes and performs the entire training procedure. """
-    # Build input pipelines.
-    input_tensors = self.__builder.build_pipeline(self.__args.train_dataset,
-                                                  self.__args.test_dataset)
-    # We don't need the session number for training.
-    data_tensors = input_tensors[:4]
-    self.__labels = {"dots": input_tensors[-1]}
-
-    # Create the model.
-    self.__build_model(data_tensors)
-
-    # Train the model.
-    super(Experiment, self).train()
+  def _load_model(self, save_file):
+    """ Load a saved model. """
+    logging.info("Loading pretrained model '%s'." % (save_file))
+    self.__model.load_weights(save_file)
 
   def validate(self):
     """ Validates an existing model. """
