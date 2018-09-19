@@ -13,6 +13,7 @@ from ..common import config, custom_data_loader
 
 import metrics
 import pipelines
+import validator
 
 
 # Configure GPU VRAM usage.
@@ -190,37 +191,19 @@ class Experiment(experiment.Experiment):
     """ Validates an existing model. """
     # Create the validation pipeline.
     input_tensors = \
-        self.__builder.build_valid_pipeline(self.__args.valid_dataset)
-    data_tensors = input_tensors[:4]
-    self.__labels = input_tensors[4]
+        self.__builder.build_valid_pipeline(self.__args.valid_dataset,
+                                            has_pose=True)
+    data_tensors = input_tensors[:5]
+    self.__labels = input_tensors[5]
 
     if not self.__args.model:
       # User did not tell us which model to validate.
       raise ValueError("--model must be specified.")
-    # Create the model.
-    self.__build_model(data_tensors)
 
-    # Compile the model. The learning settings don't really matter, since we're
-    # not training.
-    self.__recompile_if_needed()
-
-    # Create a coordinator and run queues.
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(coord=coord, sess=g_session)
-
-    testing_acc = []
-
-    # Validate.
-    for _ in range(0, self.__args.valid_iters):
-      loss, accuracy = self.__model.evaluate(steps=self.__args.testing_steps)
-
-      logging.info("Loss: %f, Accuracy: %f" % (loss, accuracy))
-      testing_acc.append(accuracy)
-
-    print "Total accuracy: %f" % (np.mean(testing_acc))
-
-    coord.request_stop()
-    coord.join(threads)
+    # Create and run the validator.
+    my_validator = validator.Validator(data_tensors, self.__labels,
+                                       self.__args.model)
+    my_validator.validate(self.__args.valid_iters)
 
   def run(self):
     """ Runs the experiment. Performs the action selected by the user. """
