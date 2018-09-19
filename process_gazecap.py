@@ -494,13 +494,15 @@ def process_session(session_dir, randomizer):
 
   return True
 
-def process_dataset(dataset_dir, output_dir, start_at=None, use_pose=False):
+def process_dataset(dataset_dir, output_dir, start_at=None, use_pose=False,
+                    val_only=False):
   """ Processes an entire dataset, one session at a time.
   Args:
     dataset_dir: The root dataset directory.
     output_dir: Where to write the output data.
     start_at: Session to start at.
-    use_pose: If true, will include the estimated head pose as a feature. """
+    use_pose: If true, will include the estimated head pose as a feature.
+    val_only: If true, will only generate the validation dataset. """
   # Create output directory.
   if not start_at:
     if os.path.exists(output_dir):
@@ -526,6 +528,9 @@ def process_dataset(dataset_dir, output_dir, start_at=None, use_pose=False):
   val_randomizer = FrameRandomizer(use_pose=use_pose)
 
   sessions = os.listdir(dataset_dir)
+  if val_only:
+    # Only process as many sessions as we need for the validation dataset.
+    sessions = sessions[:NUM_VAL_SESSIONS]
 
   # Process each session one by one.
   process = False
@@ -539,10 +544,10 @@ def process_dataset(dataset_dir, output_dir, start_at=None, use_pose=False):
       # We can start here.
       process = True
     if (start_at and not process):
-      if num_test < NUM_TEST_SESSIONS:
-        num_test += 1
-      elif num_val < NUM_VAL_SESSIONS:
+      if num_val < NUM_VAL_SESSIONS:
         num_val += 1
+      elif (not val_only and num_test < NUM_TEST_SESSIONS):
+        num_test += 1
 
       continue
 
@@ -555,14 +560,14 @@ def process_dataset(dataset_dir, output_dir, start_at=None, use_pose=False):
     randomizer = None
     used_test = False
     used_val = False
-    if num_test < NUM_TEST_SESSIONS:
-      writer = test_writer
-      randomizer = test_randomizer
-      used_test = True
-    elif num_val < NUM_VAL_SESSIONS:
+    if num_val < NUM_VAL_SESSIONS:
       writer = val_writer
       randomizer = val_randomizer
       used_val = True
+    elif num_test < NUM_TEST_SESSIONS:
+      writer = test_writer
+      randomizer = test_randomizer
+      used_test = True
     else:
       writer = train_writer
       randomizer = train_randomizer
@@ -575,8 +580,9 @@ def process_dataset(dataset_dir, output_dir, start_at=None, use_pose=False):
 
   # Write out everything.
   save_images(val_randomizer, "val", val_writer)
-  save_images(test_randomizer, "test", test_writer)
-  save_images(train_randomizer, "train", train_writer)
+  if not val_only:
+    save_images(test_randomizer, "test", test_writer)
+    save_images(train_randomizer, "train", train_writer)
 
   train_writer.close()
   test_writer.close()
@@ -591,10 +597,12 @@ def main():
                       help="Specify a session to start processing at.")
   parser.add_argument("-p", "--pose", action="store_true",
                       help="Estimate and include the head pose.")
+  parser.add_argument("-v", "--val_only", action="store_true",
+                      help="Only generate the validation dataset.")
   args = parser.parse_args()
 
   process_dataset(args.dataset_dir, args.output_dir, args.start_at,
-                  args.pose)
+                  args.pose, args.val_only)
 
 if __name__ == "__main__":
   main()
