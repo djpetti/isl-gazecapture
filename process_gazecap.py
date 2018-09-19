@@ -13,6 +13,8 @@ import numpy as np
 
 import tensorflow as tf
 
+from itracker.common.eye_cropper import EyeCropper
+
 
 # Number of testing and validation sessions.
 NUM_TEST_SESSIONS = 150
@@ -25,7 +27,11 @@ class FrameRandomizer(object):
   class Session(object):
     """ Represents a training session. """
 
-    def __init__(self, **kwargs):
+    def __init__(self, include_pose=False, **kwargs):
+      """
+      Args:
+        include_pose: If true, it will estimate the pose and include it in the
+                      output. """
       # The combined metadata features for the session.
       self.label_features = kwargs.get("label_features")
       # The loaded frame information for the session.
@@ -37,6 +43,13 @@ class FrameRandomizer(object):
 
       # The frame directory for the session.
       self.frame_dir = kwargs.get("frame_dir")
+
+      self.__include_pose = include_pose
+      self.__ld_estimator = None
+      if self.__include_pose:
+        # If we need to estimate the pose, create an eye cropper instance to do
+        # that.
+        self.__ld_estimator = EyeCropper()
 
     def __shuffle_list(self, to_shuffle, indices):
       """ Shuffles a list in-place.
@@ -63,8 +76,47 @@ class FrameRandomizer(object):
       # Extract the crop.
       return extract_face_crop(image, face_bbox)
 
+    def __precompute_pose(self):
+      """ Precomputes the pose estimation for all images in the session before
+      shuffling. The idea here is that the landmark estimation is much faster
+      when it can "track" frames from a sequence, so it's worth the extra
+      overhead incurred by loading images twice. """
+      print "Precomputing head poses for %s..." % (self.frame_dir)
+
+      percent_complete = 0.0
+
+      for i, frame in enumerate(self.frame_info):
+        if not self.valid[i]:
+          # Add placeholder for invalid frame.
+          self.label_features[i] += (None,)
+          continue
+
+        # Load the face crop.
+        bbox = self.face_bboxes[i]
+        crop = self.__load_crop(frame, bbox)
+
+        # Run pose estimation.
+        self.__ld_estimator.detect(crop)
+        head_pose = self.__ld_estimator.estimate_pose()
+
+        # Generate a head pose feature.
+        pose_feature = _float_feature(head_pose)
+        # Save it to the corresponding feature vector.
+        self.label_features[i] += (pose_feature,)
+
+        # Calculate percent complete.
+        new_percent = float(i) / len(self.frame_info) * 100
+        if new_percent - percent_complete > 0.01:
+          print "Precomputing head pose. (%.2f%% done)" % (new_percent)
+          percent_complete = new_percent
+
     def shuffle(self):
       """ Shuffles all examples in the session. """
+      # Precompute head pose before shuffling if necessary.
+      if self.__include_pose:
+        self.__precompute_pose()
+
+
       indices = range(0, len(self.valid))
       random.shuffle(indices)
 
@@ -111,7 +163,13 @@ class FrameRandomizer(object):
 
       return num_valid
 
-  def __init__(self):
+  def __init__(self, use_pose=False):
+    """
+    Args:
+      use_pose: If true, will estimate the head pose and include that as a
+                feature. """
+    self.__use_pose = use_pose
+
     # Create dictionary of sessions.
     self.__sessions = []
     self.__total_examples = 0
@@ -139,7 +197,7 @@ class FrameRandomizer(object):
       label_features: The features created for the image metadata.
       frame_info: The frame filename information.
       valid: Whether the corresponding images are valid or not. """
-    session = self.Session()
+    session = self.Session(include_pose=self.__use_pose)
     session.frame_dir = frame_dir
     face_bboxes = extract_crop_data(crop_info)
     face_bboxes = np.stack(face_bboxes, axis=1)
@@ -182,6 +240,13 @@ class FrameRandomizer(object):
     Returns:
       The total number of examples. """
     return self.__total_examples
+
+  def uses_pose(self):
+    """
+    Returns:
+      True if the Randomizer includes head pose as a feature, false otherwise.
+    """
+    return self.__use_pose
 
 def _int64_feature(value):
 	""" Converts a list to an int64 feature.
@@ -257,17 +322,19 @@ def extract_face_crop(image, face_data):
   return crop
 
 def generate_label_features(dot_info, grid_info, face_info, left_eye_info,
-                            right_eye_info):
+                            right_eye_info, session_num):
   """ Generates label features for a set of data.
   Args:
     dot_info: The loaded dot information.
     grid_info: The loaded face grid information.
+    face_info: The loaded face crop information.
     left_eye_info: The loaded left eye crop information.
     right_eye_info: The loaded right eye crop information.
-    face_grid: The loaded face grid information.
+    session_num: The session number that this data comes from.
   Returns:
-    Generated list of features, in this order: dots, face size, left eye, right eye,
-    grid. It also returns a list indicating which items are valid. """
+    Generated list of features, in this order: dots, face size, left eye,
+    right eye, grid, session number. It also returns a list indicating which
+    items are valid. """
   # Location of the dot.
   x_cam = np.asarray(dot_info["XCam"], dtype=np.float32)
   y_cam = np.asarray(dot_info["YCam"], dtype=np.float32)
@@ -315,9 +382,10 @@ def generate_label_features(dot_info, grid_info, face_info, left_eye_info,
     leye_box_feature = _float_feature(list(leye_boxes[i]))
     reye_box_feature = _float_feature(list(reye_boxes[i]))
     grid_box_feature = _float_feature(list(grid_boxes[i]))
+    session_num_feature = _int64_feature([session_num])
 
     features.append((dots_feature, face_size_feature, leye_box_feature,
-                     reye_box_feature, grid_box_feature))
+                     reye_box_feature, grid_box_feature, session_num_feature))
 
   # Generate valid array.
   valid = np.logical_and(np.logical_and(face_valid, grid_valid),
@@ -355,13 +423,16 @@ def save_images(randomizer, split, writer):
     image_feature = _bytes_feature([tf.compat.as_bytes(encoded.tostring())])
 
     # Create the combined feature.
-    dots, face_size, leye_box, reye_box, grid_box = features
-    combined_feature = {"%s/dots" % (split): dots,
-                        "%s/face_size" % (split): face_size,
-                        "%s/leye_box" % (split): leye_box,
-                        "%s/reye_box" % (split): reye_box,
-                        "%s/grid_box" % (split): grid_box,
+    combined_feature = {"%s/dots" % (split): features[0],
+                        "%s/face_size" % (split): features[1],
+                        "%s/leye_box" % (split): features[2],
+                        "%s/reye_box" % (split): features[3],
+                        "%s/grid_box" % (split): features[4],
+                        "%s/session_num" % (split): features[5],
                         "%s/image" % (split): image_feature}
+    if randomizer.uses_pose():
+      # Include head pose.
+      combined_feature["%s/pose" % (split)] = features[6]
     example = \
         tf.train.Example(features=tf.train.Features(feature=combined_feature))
 
@@ -377,8 +448,6 @@ def process_session(session_dir, randomizer):
     writer: The FrameRandomizer to randomize data with.
   Returns:
     True if it saved some valid data, false if there was no valid data. """
-  session_name = session_dir.split("/")[-1]
-
   # Load all the relevant metadata.
   leye_file = file(os.path.join(session_dir, "appleLeftEye.json"))
   leye_info = json.load(leye_file)
@@ -405,9 +474,10 @@ def process_session(session_dir, randomizer):
   frame_file.close()
 
   # Generate label features.
+  session_num = int(session_dir.split("/")[-1])
   label_features, valid = generate_label_features(dot_info, grid_info,
                                                   face_info, leye_info,
-                                                  reye_info)
+                                                  reye_info, session_num)
 
   # Check if we have any valid data from this session.
   for image in valid:
@@ -424,12 +494,13 @@ def process_session(session_dir, randomizer):
 
   return True
 
-def process_dataset(dataset_dir, output_dir, start_at=None):
+def process_dataset(dataset_dir, output_dir, start_at=None, use_pose=False):
   """ Processes an entire dataset, one session at a time.
   Args:
     dataset_dir: The root dataset directory.
     output_dir: Where to write the output data.
-    start_at: Session to start at. """
+    start_at: Session to start at.
+    use_pose: If true, will include the estimated head pose as a feature. """
   # Create output directory.
   if not start_at:
     if os.path.exists(output_dir):
@@ -450,9 +521,9 @@ def process_dataset(dataset_dir, output_dir, start_at=None):
   val_writer = tf.python_io.TFRecordWriter(val_record)
 
   # Create randomizers for each split.
-  train_randomizer = FrameRandomizer()
-  test_randomizer = FrameRandomizer()
-  val_randomizer = FrameRandomizer()
+  train_randomizer = FrameRandomizer(use_pose=use_pose)
+  test_randomizer = FrameRandomizer(use_pose=use_pose)
+  val_randomizer = FrameRandomizer(use_pose=use_pose)
 
   sessions = os.listdir(dataset_dir)
 
@@ -518,9 +589,12 @@ def main():
                       help="The directory to write output images.")
   parser.add_argument("-s", "--start_at", default=None,
                       help="Specify a session to start processing at.")
+  parser.add_argument("-p", "--pose", action="store_true",
+                      help="Estimate and include the head pose.")
   args = parser.parse_args()
 
-  process_dataset(args.dataset_dir, args.output_dir, args.start_at)
+  process_dataset(args.dataset_dir, args.output_dir, args.start_at,
+                  args.pose)
 
 if __name__ == "__main__":
   main()

@@ -21,10 +21,11 @@ FOV_NORM_SHORT = 28.0
 class EyeCropper:
   """ Handles croping the eye from a series of images. """
 
-  def __init__(self, phone):
+  def __init__(self, phone=None):
     """
     Args:
-      phone: The configuration of the phone that produced the data. """
+      phone: The configuration of the phone that produced the data. If we're not
+             computing the face grid, this needn't be provided. """
     self.__phone = phone
 
     # Landmark detector to use henceforth.
@@ -141,15 +142,12 @@ class EyeCropper:
 
     return crop
 
-  def get_bboxes(self, image):
-    """ Takes an image, and gets the bounding boxes of the eyes and face.
+  def detect(self, image):
+    """ Performs landmark detection on an image and nothing else.
     Args:
-      image: The image to get bouncing boxes for.
+      image: The image to perform landmark detection on.
     Returns:
-      The left eye, right eye, and face bounding boxes, or None if the detection
-      failed. """
-    self.__image_shape = image.shape
-
+      The confidence for the detection. """
     confidence = 0
     if self.__detect_flag > 0:
       # We have to perform the base detection.
@@ -159,6 +157,19 @@ class EyeCropper:
       # We can continue tracking.
       self.__points, self.__detect_flag, confidence = \
           self.__detector.ffp_track(image, self.__points)
+
+    return confidence
+
+  def get_bboxes(self, image):
+    """ Takes an image, and gets the bounding boxes of the eyes and face.
+    Args:
+      image: The image to get bouncing boxes for.
+    Returns:
+      The left eye, right eye, and face bounding boxes, or None if the detection
+      failed. """
+    self.__image_shape = image.shape
+
+    confidence = self.detect(image)
 
     if (confidence < config.MIN_CONFIDENCE or self.__detect_flag == 2):
       # Not a good detection.
@@ -213,6 +224,10 @@ class EyeCropper:
     Returns:
       The face grid x and y positions, as well as the width and height, all as
       one tuple. """
+    if self.__phone is None:
+      # We need the phone specified for this functionality.
+      raise ValueError("Must specify 'phone' argument to constructor.")
+
     image_h, image_w, _ = self.__image_shape
 
     # Normalize image dimensions and face box for the camera FOV.
