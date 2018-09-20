@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from pipeline import data_loader
+from ..pipeline import data_loader
 
 
 class _GazeLoader(data_loader.DataLoader):
@@ -15,6 +15,7 @@ class _GazeLoader(data_loader.DataLoader):
     features.add_feature("leye_box", tf.FixedLenFeature([4], tf.float32))
     features.add_feature("reye_box", tf.FixedLenFeature([4], tf.float32))
     features.add_feature("grid_box", tf.FixedLenFeature([4], tf.float32))
+    features.add_feature("session_num", tf.FixedLenFeature([1], tf.int64))
     features.add_feature("image", tf.FixedLenFeature([1], tf.string))
 
     return features

@@ -81,7 +81,7 @@ class Validator(object):
   def __build_analysis_graph(self):
     """ Builds a portion of the graph for statistical analysis. """
     # Separate data tensors.
-    leye, reye, face, mask, pose = self.__data_tensors
+    leye, reye, face, mask, session_num, pose = self.__data_tensors
     # Keras wants the mask input to have a defined static shape.
     mask = tf.reshape(mask, [-1, 25, 25])
 
@@ -93,6 +93,8 @@ class Validator(object):
 
     # Save the head pose so we can correlate this with the error.
     self.__pose = pose
+    # Save the session num so we can analyze performance across subjects.
+    self.__session_num = session_num
     # Also save some attributes from the bitmask for this purpose.
     self.__face_area = tf.count_nonzero(mask, axis=[1, 2])
     self.__face_pos = self.__compute_face_pos(mask)
@@ -112,20 +114,22 @@ class Validator(object):
     total_pose = []
     total_face_area = []
     total_face_pos = []
+    total_session_num = []
 
     percentage = 0.0
     for i in range(0, num_batches):
       # Run the session to extract the values we need. Make sure we put Keras in
       # testing mode.
-      error, pose, face_area, face_pos = \
+      error, pose, face_area, face_pos, session_num = \
           session.run([self.__error, self.__pose, self.__face_area,
-                       self.__face_pos],
+                       self.__face_pos, self.__session_num],
                       feed_dict={K.learning_phase(): 0})
 
       total_error.extend(error)
       total_pose.extend(pose)
       total_face_area.extend(face_area)
       total_face_pos.extend(face_pos)
+      total_session_num.extend(session_num)
 
       new_percentage = float(i) / num_batches * 100
       if new_percentage - percentage > 0.01:
@@ -148,8 +152,11 @@ class Validator(object):
     face_area_row = np.expand_dims(face_area_row, 0)
     # Stack the face position.
     face_pos_stack = np.stack(total_face_pos, axis=1)
+    # Add a row for the session number.
+    session_num_row = np.asarray(total_session_num)
+    session_num_row = session_num_row.T
     data_matrix = np.concatenate((error_row, pose_stack, face_area_row,
-                                  face_pos_stack), axis=0)
+                                  face_pos_stack, session_num_row), axis=0)
 
     # Make the variables columns.
     data_matrix = data_matrix.T

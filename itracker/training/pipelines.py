@@ -109,14 +109,20 @@ class PipelineBuilder(object):
     reye.add(eye_resize_stage)
     face.add(face_resize_stage)
 
-    ret = (leye, reye, face, mask)
+    # Session number stage.
+    session_num_stage = preprocess.SessionNumStage()
+    session_num, face = face.add(session_num_stage)
+
+    ret = (leye, reye, face, mask, session_num)
 
     if has_pose:
       # Pose extraction.
       pose_stage = preprocess.HeadPoseStage()
       pose, face = face.add(pose_stage)
 
-      ret += (pose,)
+      # Have to redo the whole tuple because the face pipeline changes.
+      ret = (leye, reye, face, mask, session_num, pose)
+
 
     # Build the loader graph.
     loader.build()
@@ -165,14 +171,19 @@ class PipelineBuilder(object):
     reye.add(eye_resize_stage)
     face.add(face_resize_stage)
 
-    ret = (leye, reye, face, mask)
+    # Session number stage.
+    session_num_stage = preprocess.SessionNumStage()
+    session_num, face = face.add(session_num_stage)
+
+    ret = (leye, reye, face, mask, session_num)
 
     if has_pose:
       # Pose extraction.
       pose_stage = preprocess.HeadPoseStage()
       pose, face = face.add(pose_stage)
 
-      ret = (leye, reye, face, mask, pose)
+      # Have to redo the whole tuple because the face pipeline changes.
+      ret = (leye, reye, face, mask, session_num, pose)
 
     # Build the loader graph.
     loader.build()

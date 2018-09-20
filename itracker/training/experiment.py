@@ -193,8 +193,8 @@ class Experiment(experiment.Experiment):
     input_tensors = \
         self.__builder.build_valid_pipeline(self.__args.valid_dataset,
                                             has_pose=True)
-    data_tensors = input_tensors[:5]
-    self.__labels = input_tensors[5]
+    data_tensors = input_tensors[:6]
+    self.__labels = input_tensors[6]
 
     if not self.__args.model:
       # User did not tell us which model to validate.

@@ -447,3 +447,16 @@ class HeadPoseStage(PipelineStage):
 
   def get_num_outputs(self):
     return 2
+
+class SessionNumStage(PipelineStage):
+  """ Extracts the session number so that it can be used as an input. It passes
+  through the image input unchanged, and outputs two tensors, in order: The
+  session number, and the original face crop. """
+
+  def build(self, data_point):
+    # Cast to float so the pipeline code likes it.
+    float_session_num = tf.cast(data_point.session_num, tf.float32)
+    return (float_session_num, data_point.image)
+
+  def get_num_outputs(self):
+    return 2
