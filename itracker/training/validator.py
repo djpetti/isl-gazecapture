@@ -88,7 +88,8 @@ class Validator(object):
     # Run the model.
     predicted_gaze = self.__model([leye, reye, face, mask])
 
-    # Compute the error.
+    # Compute the error, both as the distance, and as the raw coordinate error.
+    self.__coord_error = self.__labels - predicted_gaze
     self.__error = metrics.distance_metric(self.__labels, predicted_gaze)
 
     # Save the head pose so we can correlate this with the error.
@@ -111,6 +112,7 @@ class Validator(object):
     threads = tf.train.start_queue_runners(coord=coord, sess=session)
 
     total_error = []
+    total_coord_error = []
     total_pose = []
     total_face_area = []
     total_face_pos = []
@@ -120,12 +122,13 @@ class Validator(object):
     for i in range(0, num_batches):
       # Run the session to extract the values we need. Make sure we put Keras in
       # testing mode.
-      error, pose, face_area, face_pos, session_num = \
-          session.run([self.__error, self.__pose, self.__face_area,
-                       self.__face_pos, self.__session_num],
+      error, coord_error, pose, face_area, face_pos, session_num = \
+          session.run([self.__error, self.__coord_error, self.__pose,
+                       self.__face_area, self.__face_pos, self.__session_num],
                       feed_dict={K.learning_phase(): 0})
 
       total_error.extend(error)
+      total_coord_error.extend(coord_error)
       total_pose.extend(pose)
       total_face_area.extend(face_area)
       total_face_pos.extend(face_pos)
@@ -144,7 +147,8 @@ class Validator(object):
     # Create data matrix. First, we need to stack pose, since that contains
     # three rows.
     pose_stack = np.stack(total_pose, axis=1)
-    # Add a row for the error.
+    # Stack the error.
+    coord_error_stack = np.stack(total_coord_error, axis=1)
     error_row = np.asarray(total_error)
     error_row = np.expand_dims(error_row, 0)
     # Add a row for the face area.
@@ -155,8 +159,9 @@ class Validator(object):
     # Add a row for the session number.
     session_num_row = np.asarray(total_session_num)
     session_num_row = session_num_row.T
-    data_matrix = np.concatenate((error_row, pose_stack, face_area_row,
-                                  face_pos_stack, session_num_row), axis=0)
+    data_matrix = np.concatenate((error_row, coord_error_stack, pose_stack,
+                                  face_area_row, face_pos_stack,
+                                  session_num_row), axis=0)
 
     # Make the variables columns.
     data_matrix = data_matrix.T

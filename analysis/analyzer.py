@@ -8,13 +8,15 @@ class Analyzer:
 
   # Constants defining the indices of the variable columns in the data matrix.
   _ERROR_COL = 0
-  _HEAD_PITCH_COL = 1
-  _HEAD_YAW_COL = 2
-  _HEAD_ROLL_COL = 3
-  _FACE_AREA_COL = 4
-  _FACE_POS_Y_COL = 5
-  _FACE_POS_X_COL = 6
-  _SESSION_NUM_COL = 7
+  _ERROR_X_COL = 1
+  _ERROR_Y_COL = 2
+  _HEAD_PITCH_COL = 3
+  _HEAD_YAW_COL = 4
+  _HEAD_ROLL_COL = 5
+  _FACE_AREA_COL = 6
+  _FACE_POS_Y_COL = 7
+  _FACE_POS_X_COL = 8
+  _SESSION_NUM_COL = 9
 
   def __init__(self, data_file):
     """
@@ -46,7 +48,10 @@ class Analyzer:
     Returns:
       The computed correlation matrix. """
     if self.__correlation is None:
-      self.__correlation = np.corrcoef(self.__data, rowvar=False)
+      # We take the absolute value when calculating correlation because for the
+      # attributes we're interested in, we expect the error to be smallest when
+      # they're around zero, and larger the farther away they get.
+      self.__correlation = np.corrcoef(np.abs(self.__data), rowvar=False)
 
     return self.__correlation
 
@@ -129,6 +134,23 @@ class Analyzer:
 
     return (pitch, yaw, roll)
 
+  def __stddev_accuracy_per_subject(self):
+    """ Computes the standard deviation of per-subject mean accuracies.
+    Returns:
+      The standard deviation of per-subject accuracies. """
+    # Get a list of all the subjects.
+    subject_col = self.__data[:, self._SESSION_NUM_COL]
+    subjects = np.unique(subject_col)
+
+    # Compute accuracies for each subject.
+    subject_errors = []
+    all_error = self.__data[:, self._ERROR_COL]
+    for subject in subjects:
+      error_data = all_error[subject_col == subject]
+      subject_errors.append(np.mean(error_data))
+
+    return np.std(subject_errors)
+
   def __corr_area_accuracy(self):
     """ Computes the correlation between face area and accuracy.
     Returns:
@@ -203,6 +225,8 @@ class Analyzer:
     face_area_corr = self.__corr_area_accuracy()
     face_pos_y_corr, face_pos_x_corr = self.__corr_pos_accuracy()
 
+    subject_sigma = self.__stddev_accuracy_per_subject()
+
     # Write out the report.
     report = [ \
       {"name": "mean error", "action": "print", "value": acc_mu,
@@ -243,5 +267,9 @@ class Analyzer:
        "value": face_pos_x_corr},
       {"name": "correlation of face y pos and error", "action": "print",
        "value": face_pos_y_corr},
+
+      {"name": "per-subject analysis", "action": "section"},
+      {"name": "subject mean accuracy standard dev", "action": "print",
+       "value": subject_sigma, "unit": "cm"},
     ]
     self.__write_report(report)
