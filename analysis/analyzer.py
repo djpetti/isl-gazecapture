@@ -1,5 +1,7 @@
 import cPickle as pickle
 
+import matplotlib.pyplot as plt
+
 import numpy as np
 
 
@@ -26,7 +28,10 @@ class Analyzer:
 
     # Covariance matrix.
     self.__sigma = None
+    # Correlation matrix.
     self.__correlation = None
+    # Per-subject error sequence.
+    self.__subject_errors = []
 
   def __load_data(self, data_file):
     """ Loads the data from a file. """
@@ -54,6 +59,28 @@ class Analyzer:
       self.__correlation = np.corrcoef(np.abs(self.__data), rowvar=False)
 
     return self.__correlation
+
+  def __per_subject_error(self):
+    """ Separates the error out on a per-subject basis.
+    Returns:
+      A list of vectors, where each vector contains error data for a single
+      subject. """
+    if self.__subject_errors:
+      # We've already generated this.
+      return self.__subject_errors
+
+    # Generate it.
+    subject_col = self.__data[:, self._SESSION_NUM_COL]
+    subjects = np.unique(subject_col)
+
+    # Compute accuracies for each subject.
+    subject_errors = []
+    all_error = self.__data[:, self._ERROR_COL]
+    for subject in subjects:
+      error_data = all_error[subject_col == subject]
+      self.__subject_errors.append(error_data)
+
+    return self.__subject_errors
 
   def __mean_accuracy(self):
     """ Computes the mean accuracy.
@@ -138,18 +165,13 @@ class Analyzer:
     """ Computes the standard deviation of per-subject mean accuracies.
     Returns:
       The standard deviation of per-subject accuracies. """
-    # Get a list of all the subjects.
-    subject_col = self.__data[:, self._SESSION_NUM_COL]
-    subjects = np.unique(subject_col)
+    subject_error = self.__per_subject_error()
 
-    # Compute accuracies for each subject.
-    subject_errors = []
-    all_error = self.__data[:, self._ERROR_COL]
-    for subject in subjects:
-      error_data = all_error[subject_col == subject]
-      subject_errors.append(np.mean(error_data))
+    mean_errors = []
+    for error_data in subject_error:
+      mean_errors.append(np.mean(error_data))
 
-    return np.std(subject_errors)
+    return np.std(mean_errors)
 
   def __corr_area_accuracy(self):
     """ Computes the correlation between face area and accuracy.
@@ -168,6 +190,23 @@ class Analyzer:
     pos_x = corr[self._FACE_POS_X_COL, self._ERROR_COL]
 
     return (pos_y, pos_x)
+
+  def __plot_per_subject(self):
+    """ Generates a box plot of the accuracy on a per-subject level. The plot is
+    entered into matplotlib but not shown. """
+    subject_error = self.__per_subject_error()
+
+    # Extract session numbers as labels.
+    labels = np.unique(self.__data[:, self._SESSION_NUM_COL])
+    labels = labels.astype(np.int32)
+
+    plt.boxplot(subject_error, sym="x", labels=labels)
+    # Rotate the x labels so they don't get smooshed.
+    plt.xticks(rotation=90)
+
+    # Label the axes.
+    plt.xlabel("Session Number")
+    plt.ylabel("Accuracy (cm)")
 
   def __write_report(self, report):
     """ Writes a report to the command line. The report is a list, where each
@@ -191,6 +230,11 @@ class Analyzer:
       if action == "section":
         # Create a new section.
         print "===== %s =====" % (name.title())
+
+      elif action == "graph":
+        # Show the graph.
+        plt.title(name.title())
+        plt.show()
 
       elif action == "print":
         # Simply print to command line.
@@ -226,6 +270,7 @@ class Analyzer:
     face_pos_y_corr, face_pos_x_corr = self.__corr_pos_accuracy()
 
     subject_sigma = self.__stddev_accuracy_per_subject()
+    self.__plot_per_subject()
 
     # Write out the report.
     report = [ \
@@ -271,5 +316,6 @@ class Analyzer:
       {"name": "per-subject analysis", "action": "section"},
       {"name": "subject mean accuracy standard dev", "action": "print",
        "value": subject_sigma, "unit": "cm"},
+      {"name": "per subject accuracy", "action": "graph"},
     ]
     self.__write_report(report)
