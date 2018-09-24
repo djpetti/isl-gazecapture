@@ -56,7 +56,8 @@ class Analyzer:
       # We take the absolute value when calculating correlation because for the
       # attributes we're interested in, we expect the error to be smallest when
       # they're around zero, and larger the farther away they get.
-      self.__correlation = np.corrcoef(np.abs(self.__data), rowvar=False)
+      centered = self.__data - np.mean(self.__data, axis=0)
+      self.__correlation = np.corrcoef(centered, rowvar=False)
 
     return self.__correlation
 
@@ -87,6 +88,13 @@ class Analyzer:
     Returns:
       The mean accuracy. """
     return np.mean(self.__data[:, self._ERROR_COL])
+
+  def __mean_pose(self):
+    pitch = np.mean(self.__data[:, self._HEAD_PITCH_COL])
+    yaw = np.mean(self.__data[:, self._HEAD_YAW_COL])
+    roll = np.mean(self.__data[:, self._HEAD_ROLL_COL])
+
+    return (pitch, yaw, roll)
 
   def __mean_face_area(self):
     """ Computes the mean face area.
@@ -259,6 +267,7 @@ class Analyzer:
 
     acc_mu = self.__mean_accuracy()
     acc_sigma = self.__stddev_accuracy()
+    pitch_mu, yaw_mu, roll_mu = self.__mean_pose()
     pitch_sigma, yaw_sigma, roll_sigma = self.__stddev_pose()
     pitch_corr, yaw_corr, roll_corr = self.__corr_pose_accuracy()
 
@@ -280,6 +289,12 @@ class Analyzer:
        "unit": "cm"},
 
       {"name": "head pose", "action": "section"},
+      {"name": "head pitch mean", "action": "print", "value": pitch_mu,
+       "unit": "rad"},
+      {"name": "head roll mean", "action": "print", "value": roll_mu,
+       "unit": "rad"},
+      {"name": "head yaw mean", "action": "print", "value": yaw_mu,
+       "unit": "rad"},
       {"name": "head pitch standard dev", "action": "print",
        "value": pitch_sigma, "unit": "rad"},
       {"name": "head roll standard dev", "action": "print",
