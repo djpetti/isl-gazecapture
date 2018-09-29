@@ -119,6 +119,8 @@ class DataLoader(object):
       # If we don't check this, TensorFlow gives us a really confusing and
       # hard-to-debug error later on.
       raise ValueError("File '%s' does not exist." % (records_file))
+    if len(image_shape) != 3:
+      raise ValueError("Image shape must be of length 3.")
 
     self._image_shape = image_shape
     self._records_file = records_file

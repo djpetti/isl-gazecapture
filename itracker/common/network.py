@@ -9,7 +9,7 @@ import keras.regularizers as regularizers
 
 import tensorflow as tf
 
-from pipeline import keras_utils
+from ..pipeline import keras_utils
 
 
 logger = logging.getLogger(__name__)

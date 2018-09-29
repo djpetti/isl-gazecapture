@@ -26,13 +26,13 @@ class Session(object):
 
     # List of data that should be converted to bytes features. Each item
     # should be a numpy array containing the data for a feature.
-    self.bytes_features = kwargs.get("bytes_features")
+    self.bytes_features = kwargs.get("bytes_features", [])
     # List of data that should be converted to float features. Each item
     # should be a numpy array containing the data for a feature.
-    self.float_features = kwargs.get("float_features")
+    self.float_features = kwargs.get("float_features", [])
     # List of data that should be converted to int features. Each item
     # should be a numpy array containing the data for a feature.
-    self.int_features = kwargs.get("int_features")
+    self.int_features = kwargs.get("int_features", [])
 
   def __shuffle_list(self, to_shuffle, indices):
     """ Shuffles a list in-place.
@@ -53,7 +53,7 @@ class Session(object):
     Returns:
       A cropped version of the image. A None value in this
       list indicates a face crop that was not valid. """
-    face_x, face_y, face_w, face_h, _ = face_data
+    face_x, face_y, face_w, face_h = face_data[:4]
 
     start_x = int(face_x)
     end_x = start_x + int(face_w)
