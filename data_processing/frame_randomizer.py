@@ -39,13 +39,13 @@ class FrameRandomizer(object):
       The next random example, including the features and extracted face crop,
       in the following order: crop, bytes features, float features, int
       features. """
-    if len(self.__sessions) == 0:
-      # No more data.
-      raise ValueError("Session pool has no more data.")
-
-    if not self.__random_sessions:
+    if self.__random_sessions is None:
       # Build the session pick list.
       self.__build_random_sessions()
+
+    if (len(self.__sessions) == 0 or len(self.__random_sessions) == 0):
+      # No more data.
+      raise ValueError("Session pool has no more data.")
 
     # First, pick a random session.
     session_key = self.__random_sessions.pop()
