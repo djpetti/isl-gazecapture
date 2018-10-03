@@ -10,5 +10,5 @@ CameraData:
   CameraShortOffset: 0.8
 
   # Camera FOV, in cm.
-  CameraFOVLong: 44.5
-  CameraFOVShort: 35.5
+  CameraFOVLong: 60.5
+  CameraFOVShort: 46.0
