@@ -17,11 +17,6 @@ from data_processing import frame_randomizer, records_output, session
 from itracker.common.eye_cropper import EyeCropper
 
 
-# Number of testing and validation sessions.
-NUM_TEST_SESSIONS = 150
-NUM_VAL_SESSIONS = 50
-
-
 class GazecapSaver(records_output.Saver):
   """ Saver specialization for Gazecapture. """
 
@@ -190,12 +185,15 @@ def generate_label_features(dot_info, grid_info, face_info, left_eye_info,
 
   return (bytes_features, float_features, int_features, valid)
 
-def process_session(session_dir, randomizer, use_pose=False):
+def process_session(session_dir, randomizers, use_pose=False,
+                    val_only=False):
   """ Process a session worth of data.
   Args:
     session_dir: The directory of the session.
-    randomizer: The FrameRandomizer to randomize data with.
+    randomizers: A dictionary mapping set names to the corresponding
+                 FrameRandomizer.
     use_pose: Whether to include head pose data or not.
+    val_only: Whether to ignore sessions that are not marked as validation.
   Returns:
     True if it saved some valid data, false if there was no valid data. """
   # Load all the relevant metadata.
@@ -223,6 +221,10 @@ def process_session(session_dir, randomizer, use_pose=False):
   frame_info = json.load(frame_file)
   frame_file.close()
 
+  info_file = file(os.path.join(session_dir, "info.json"))
+  general_info = json.load(info_file)
+  info_file.close()
+
   # Generate label features.
   session_num = int(session_dir.split("/")[-1])
   bytes_f, float_f, int_f, valid = generate_label_features(dot_info, grid_info,
@@ -238,6 +240,13 @@ def process_session(session_dir, randomizer, use_pose=False):
   else:
     # No valid data, no point in continuing.
     return False
+
+  # Find the correct randomizer.
+  split = general_info["Dataset"]
+  if (val_only and split != "val"):
+    # Not a validation session.
+    return False
+  randomizer = randomizers[split]
 
   # Calculate face bounding boxes.
   face_bboxes = extract_crop_data(face_info)
@@ -286,15 +295,16 @@ def process_dataset(dataset_dir, output_dir, start_at=None, use_pose=False,
   test_randomizer = frame_randomizer.FrameRandomizer()
   val_randomizer = frame_randomizer.FrameRandomizer()
 
+  # Group them by dataset name.
+  randomizers = {"train": train_randomizer, "test": test_randomizer,
+                 "val": val_randomizer}
+
   # Create savers for managing output writing.
   train_saver = GazecapSaver(train_randomizer, "train", train_writer)
   test_saver = GazecapSaver(test_randomizer, "test", test_writer)
   val_saver = GazecapSaver(val_randomizer, "val", val_writer)
 
   sessions = os.listdir(dataset_dir)
-  if val_only:
-    # Only process as many sessions as we need for the validation dataset.
-    sessions = sessions[:NUM_VAL_SESSIONS]
 
   # Process each session one by one.
   process = False
@@ -307,36 +317,13 @@ def process_dataset(dataset_dir, output_dir, start_at=None, use_pose=False,
     if (start_at and item == start_at):
       # We can start here.
       process = True
-    if (start_at and not process):
-      if num_val < NUM_VAL_SESSIONS:
-        num_val += 1
-      elif (not val_only and num_test < NUM_TEST_SESSIONS):
-        num_test += 1
-
-      continue
 
     # Print percentage complete.
     percent = float(i) / len(sessions) * 100
     print "Analyzing dataset. (%.2f%% done)" % (percent)
 
-    # Determine which split this belongs in.
-    randomizer = None
-    used_test = False
-    used_val = False
-    if num_val < NUM_VAL_SESSIONS:
-      randomizer = val_randomizer
-      used_val = True
-    elif num_test < NUM_TEST_SESSIONS:
-      randomizer = test_randomizer
-      used_test = True
-    else:
-      randomizer = train_randomizer
-
-    if process_session(item_path, randomizer, use_pose=use_pose):
-      if used_test:
-        num_test += 1
-      elif used_val:
-        num_val += 1
+    process_session(item_path, randomizers, use_pose=use_pose,
+                    val_only=val_only)
 
   # Write out everything.
   val_saver.save_all()
