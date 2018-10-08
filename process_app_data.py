@@ -62,8 +62,7 @@ class VideoSession(session.Session):
     super(VideoSession, self).__init__(**kwargs)
 
     # Set the frame directory.
-    video_dir = os.path.dirname(self.video_file)
-    self.frame_dir = os.path.join(video_dir, "frames")
+    self.frame_dir = self.__generate_frame_dir()
 
     # Precompute needed information.
     self.__prepare_data()
@@ -80,6 +79,15 @@ class VideoSession(session.Session):
       print "WARNING: Have extraneous frames in %s." % (self.video_file)
 
     return self.frames_per_dot * self.dot_data.shape[0]
+
+  def __generate_frame_dir(self):
+    """ Generates a unique frame directory name for this session. """
+    # We can base this on the video file name, since we know this is unique.
+    video_name = os.path.basename(self.video_file)
+    video_dir = os.path.dirname(self.video_file)
+    frame_dir = os.path.join(video_dir, "%s_frames" % (video_name))
+
+    return frame_dir
 
   def __should_extract(self):
     """
