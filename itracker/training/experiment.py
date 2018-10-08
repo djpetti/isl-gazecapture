@@ -112,13 +112,17 @@ class Experiment(experiment.Experiment):
       break
 
   def __build_model(self, data_tensors):
-    """ Builds the model, and loads existing weights if necessary.
+    """ Builds the model, and loads existing weights if necessary. It also
+    modifies self.__labels according to the model.
     Args:
       data_tensors: The input tensors for the model. """
     # Create the model.
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
                           data_tensors=data_tensors)
     self.__model = net.build()
+
+    # Prepare label data.
+    self.__labels = net.prepare_labels(self.__labels)
 
     load_model = self.__args.model
     if load_model:
@@ -172,7 +176,7 @@ class Experiment(experiment.Experiment):
     input_tensors = self.__builder.build_pipeline(self.__args.train_dataset,
                                                   self.__args.test_dataset)
     data_tensors = input_tensors[:4]
-    self.__labels = input_tensors[4]
+    self.__labels = input_tensors[-1]
 
     # Create the model.
     self.__build_model(data_tensors)
@@ -194,7 +198,7 @@ class Experiment(experiment.Experiment):
         self.__builder.build_valid_pipeline(self.__args.valid_dataset,
                                             has_pose=True)
     data_tensors = input_tensors[:6]
-    self.__labels = input_tensors[6]
+    self.__labels = input_tensors[-1]
 
     if not self.__args.model:
       # User did not tell us which model to validate.

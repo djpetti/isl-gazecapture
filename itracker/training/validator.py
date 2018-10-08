@@ -36,10 +36,15 @@ class Validator(object):
     self.__build_analysis_graph()
 
   def __build_model(self):
-    """ Builds the model and loads the model weights. """
+    """ Builds the model and loads the model weights. It also modifies
+    self.__labels according to the model. """
     # Create the model.
-    net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE)
+    net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
+                          data_tensors=self.__data_tensors[:4])
     self.__model = net.build()
+
+    # Prepare the label data.
+    self.__labels = net.prepare_labels(self.__labels)
 
     logger.info("Loading pretrained model '%s'." % (self.__save_path))
     self.__model.load_weights(self.__save_path)
