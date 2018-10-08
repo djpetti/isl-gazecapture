@@ -39,7 +39,8 @@ class Validator(object):
     """ Builds the model and loads the model weights. It also modifies
     self.__labels according to the model. """
     # Create the model.
-    net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE)
+    net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
+                          data_tensors=self.__data_tensors[:4])
     self.__model = net.build()
 
     # Prepare the label data.
