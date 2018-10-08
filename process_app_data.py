@@ -70,15 +70,22 @@ class VideoSession(session.Session):
   def __num_usable_frames(self):
     """ Gets the total number of usable frames in the video.
     Returns:
-      The number of total frames in the video. """
+      The number of total frames that we should process from the video. """
     # Get the total number of frames in the video.
     cap = cv2.VideoCapture(self.video_file)
     num_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
 
-    if num_frames / self.frames_per_dot > self.dot_data.shape[0]:
-      print "WARNING: Have extraneous frames in %s." % (self.video_file)
+    num_dots = self.dot_data.shape[0]
+    expected_frames = self.frames_per_dot * num_dots
 
-    return self.frames_per_dot * self.dot_data.shape[0]
+    if num_frames > expected_frames:
+      print "WARNING: Have extraneous frames in %s." % (self.video_file)
+    elif num_frames < expected_frames:
+      print "WARNING: Missing frames. Final dots will be ignored."
+      # Don't process dots that we don't have the full number of frames for.
+      num_dots = num_frames / self.frames_per_dot
+
+    return self.frames_per_dot * num_dots
 
   def __generate_frame_dir(self):
     """ Generates a unique frame directory name for this session. """
