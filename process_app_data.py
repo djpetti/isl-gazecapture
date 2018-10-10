@@ -2,6 +2,7 @@
 
 
 import argparse
+import json
 import os
 import random
 import shutil
@@ -21,7 +22,7 @@ class VideoSession(session.Session):
 
   # Name of the final file that we write to a frame directory to indicate that
   # extraction completed.
-  _FINAL_FILE = "frames.dat"
+  _INDEX_FILE = "frames.json"
   # Single eye cropper to use for all sessions.
   _eye_cropper = None
 
@@ -101,7 +102,7 @@ class VideoSession(session.Session):
     Returns:
       True if we need to extract the frames. """
     # We write this file after successfully completing extraction.
-    last_file = os.path.join(self.frame_dir, VideoSession._FINAL_FILE)
+    last_file = os.path.join(self.frame_dir, VideoSession._INDEX_FILE)
 
     if (os.path.exists(last_file)):
        # We've extracted the frames.
@@ -119,6 +120,7 @@ class VideoSession(session.Session):
 
     # Open the video file.
     video_frames = cv2.VideoCapture(self.video_file)
+    frame_names = []
 
     for i in range(0, self.__total_frames):
       # Get the next frame.
@@ -131,13 +133,16 @@ class VideoSession(session.Session):
         continue
 
       # Write the frame.
-      frame_path = os.path.join(self.frame_dir, "frame%d.jpg" % (i,))
+      frame_name = "frame%d.jpg" % i
+      frame_path = os.path.join(self.frame_dir, frame_name)
       if not cv2.imwrite(frame_path, frame):
         raise ValueError("Failed to save image %d." % (i,))
+      frame_names.append(frame_name)
 
-    # Write the last file to indicate that extraction completed.
-    final_path = os.path.join(self.frame_dir, VideoSession._FINAL_FILE)
+    # Write the index file containing all frames in order.
+    final_path = os.path.join(self.frame_dir, VideoSession._INDEX_FILE)
     final_file = open(final_path, "w")
+    json.dump(frame_names, final_file)
     final_file.close()
 
   def __get_face_grid(self):
@@ -283,8 +288,10 @@ class VideoSession(session.Session):
     self.__add_dot_data()
 
     # Add all the frame files.
-    self.frame_files = \
-        [f for f in os.listdir(self.frame_dir) if f.endswith(".jpg")]
+    frame_index_file = file(os.path.join(self.frame_dir, self._INDEX_FILE))
+    self.frame_files = json.load(frame_index_file)
+    frame_index_file.close()
+
     # Indicate that everything is valid initially.
     self.valid = [1] * len(self.frame_files)
     # Compute the bounding boxes with the landmark detector.
