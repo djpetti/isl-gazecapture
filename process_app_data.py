@@ -34,6 +34,7 @@ class VideoSession(session.Session):
       frames_per_dot: The number of captured frames for each dot.
       phone_config: The phone configuration to use.
       skip_frames: Number of frames to skip from the beginning of each video.
+      session_num: The session number. Defaults to 0.
       int_freatures, float_features, byte_features: Additional feature
                                                     lists. """
     # Number of frames to skip from the beginning of each video.
@@ -44,6 +45,8 @@ class VideoSession(session.Session):
     if kwargs.get("frame_files"):
       # User shouldn't specify this.
       raise ValueError("frame_files will be set automatically.")
+
+    self.session_num = kwargs.get("session_num", 0)
 
     # Get the dot data. It should be included here, instead of with the
     # features.
@@ -85,6 +88,7 @@ class VideoSession(session.Session):
       print "WARNING: Missing frames. Final dots will be ignored."
       # Don't process dots that we don't have the full number of frames for.
       num_dots = num_frames / self.frames_per_dot
+      self.dot_data = self.dot_data[:num_dots]
 
     return self.frames_per_dot * num_dots
 
@@ -271,10 +275,11 @@ class VideoSession(session.Session):
     # frame.
     dots_expanded = []
     for dot in self.dot_data:
-      for _ in range(0, self.frames_per_dot):
+      for _ in range(0, self.frames_per_dot - self.skip_frames):
         dots_expanded.append(dot)
 
     # Add the feature.
+    print "Dot length: %d" % (len(dots_expanded))
     dots_expanded = np.stack(dots_expanded)
     self.float_features.append(dots_expanded)
 
@@ -290,7 +295,12 @@ class VideoSession(session.Session):
     # Add all the frame files.
     frame_index_file = file(os.path.join(self.frame_dir, self._INDEX_FILE))
     self.frame_files = json.load(frame_index_file)
+    print "Frame files: %d" % (len(self.frame_files))
     frame_index_file.close()
+
+    # Create the session number feature.
+    session_num = np.array([[self.session_num]] * len(self.frame_files))
+    self.int_features.append(session_num)
 
     # Indicate that everything is valid initially.
     self.valid = [1] * len(self.frame_files)
@@ -416,14 +426,10 @@ def process_session(index, video_file, data_file, randomizer, phone, skip=0):
   # Load dot data.
   frames_per_dot, dot_data = read_dot_data(data_file, phone)
 
-  # Create the session number feature.
-  session_num = np.array([[index]] * dot_data.shape[0] * frames_per_dot)
-  int_features = [session_num]
-
   # Create a new session.
   my_session = VideoSession(video_file=video_file, dot_data=dot_data,
                             frames_per_dot=frames_per_dot, phone_config=phone,
-                            int_features=int_features, skip_frames=skip)
+                            session_num=index, skip_frames=skip)
   # Add the session to the randomizer.
   randomizer.add_session(my_session)
 

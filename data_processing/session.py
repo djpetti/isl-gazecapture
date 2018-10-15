@@ -39,6 +39,10 @@ class Session(object):
     Args:
       to_shuffle: The list to shuffle.
       indices: The list of which indices go where. """
+    if len(to_shuffle) != len(indices):
+      raise RuntimeError("Cannot shuffle list of len %d with %d indices." % \
+                         (len(to_shuffle), len(indices)))
+
     old = to_shuffle[:]
     if type(to_shuffle) == np.ndarray:
       old = np.array(to_shuffle, copy=True)
