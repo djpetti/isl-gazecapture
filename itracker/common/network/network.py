@@ -136,4 +136,4 @@ class Network(object):
       labels: The labels to prepare.
     Returns:
       The modified labels. """
-    return labels
+    return {"dots": labels}

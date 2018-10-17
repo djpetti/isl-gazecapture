@@ -94,8 +94,8 @@ class Validator(object):
     predicted_gaze = self.__model([leye, reye, face, mask])
 
     # Compute the error, both as the distance, and as the raw coordinate error.
-    self.__coord_error = self.__labels - predicted_gaze
-    self.__error = metrics.distance_metric(self.__labels, predicted_gaze)
+    self.__coord_error = self.__labels[0] - predicted_gaze
+    self.__error = metrics.distance_metric(self.__labels[0], predicted_gaze)
 
     # Save the head pose so we can correlate this with the error.
     self.__pose = pose

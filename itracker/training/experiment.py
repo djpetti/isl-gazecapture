@@ -104,9 +104,12 @@ class Experiment(experiment.Experiment):
 
       # Set the optimizers.
       opt = optimizers.SGD(lr=learning_rate, momentum=momentum)
-      self.__model.compile(optimizer=opt, loss=metrics.distance_metric,
+      self.__model.compile(optimizer=opt,
+                           loss={"decode": "binary_crossentropy",
+                                 "dots": metrics.distance_metric},
                            metrics=[metrics.distance_metric],
-                           target_tensors=[self.__labels])
+                           target_tensors=self.__labels,
+                           loss_weights={"decode": 0.5, "dots": 0.5})
 
       # We only need to compile a maximum of one time.
       break
@@ -143,8 +146,8 @@ class Experiment(experiment.Experiment):
     history = self.__model.fit(epochs=1, steps_per_epoch=training_steps)
 
     # Update the status parameters.
-    loss = history.history["loss"][0]
-    accuracy = history.history["distance_metric"][0]
+    loss = history.history["decode_loss"][0]
+    accuracy = history.history["decode_distance_metric"][0]
     logger.debug("Training loss: %f, acc: %f" % (loss, accuracy))
     status.update("loss", loss)
     status.update("acc", accuracy)
@@ -159,7 +162,7 @@ class Experiment(experiment.Experiment):
     status = self.get_status()
 
     # Test the model.
-    loss, accuracy = self.__model.evaluate(steps=testing_steps)
+    loss, _, accuracy, _, _ = self.__model.evaluate(steps=testing_steps)
 
     # Update the status parameters.
     logger.info("Testing loss: %f, acc: %f" % (loss, accuracy))
@@ -176,7 +179,7 @@ class Experiment(experiment.Experiment):
     input_tensors = self.__builder.build_pipeline(self.__args.train_dataset,
                                                   self.__args.test_dataset)
     data_tensors = input_tensors[:4]
-    self.__labels = input_tensors[-1]
+    self.__labels = {"dots": input_tensors[-1]}
 
     # Create the model.
     self.__build_model(data_tensors)
@@ -198,7 +201,7 @@ class Experiment(experiment.Experiment):
         self.__builder.build_valid_pipeline(self.__args.valid_dataset,
                                             has_pose=True)
     data_tensors = input_tensors[:6]
-    self.__labels = input_tensors[-1]
+    self.__labels = {"dots": input_tensors[-1]}
 
     if not self.__args.model:
       # User did not tell us which model to validate.
