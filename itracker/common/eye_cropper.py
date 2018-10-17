@@ -39,15 +39,7 @@ class EyeCropper:
 
     self.__image_shape = None
 
-  def __get_eye_bbox(self, eye_corner_l, eye_corner_r, image):
-    """ Gets the bounding box for an eye image.
-    Args:
-      eye_corner_l: The left corner point of the eye.
-      eye_corner_r: The right corner point of the eye.
-      image: The raw image to crop the eye from.
-    Returns:
-      The bounding box of the eye crop. """
-    def increase_margin(bbox, increase_fraction):
+  def __increase_margin(self, bbox, increase_fraction):
       """ Increases the margin around a bounding box.
       Args:
         bbox: The bbox to increase the margin of.
@@ -56,12 +48,22 @@ class EyeCropper:
         A new bounding box with a wider margin. """
       abs_change_x = int(bbox[2] * increase_fraction / 2.0)
       abs_change_y = int(bbox[3] * increase_fraction / 2.0)
+      print abs_change_x
+      print abs_change_y
 
       new_bbox = [bbox[0] - abs_change_x, bbox[1] - abs_change_y,
                   bbox[2] + abs_change_x * 2, bbox[3] + abs_change_y * 2]
 
       return new_bbox
 
+  def __get_eye_bbox(self, eye_corner_l, eye_corner_r, image):
+    """ Gets the bounding box for an eye image.
+    Args:
+      eye_corner_l: The left corner point of the eye.
+      eye_corner_r: The right corner point of the eye.
+      image: The raw image to crop the eye from.
+    Returns:
+      The bounding box of the eye crop. """
     eye_corner_l = [int(x) for x in eye_corner_l]
     eye_corner_r = [int(x) for x in eye_corner_r]
 
@@ -73,7 +75,7 @@ class EyeCropper:
     # Also, shift the y coordinate up, so it's centered vertically.
     eye_bbox = [eye_corner_r[0], eye_corner_r[1] - eye_h / 2, eye_w, eye_h]
     # Increase the margin around the eye a little.
-    eye_bbox = increase_margin(eye_bbox, 1.5)
+    eye_bbox = self.__increase_margin(eye_bbox, 1.5)
 
     eye_bbox[0] = max(0, eye_bbox[0])
     eye_bbox[1] = max(0, eye_bbox[1])
@@ -125,7 +127,11 @@ class EyeCropper:
       # This is just a bad detection.
       return (None, None, None, None)
 
-    return (low_x, low_y, high_x - low_x, high_y - low_y)
+    bbox = (low_x, low_y, high_x - low_x, high_y - low_y)
+    # Increase the margin slightly.
+    bbox = self.__increase_margin(bbox, 0.5)
+
+    return bbox
 
   def __extract_crop(self, image, bbox):
     """ Extracts a crop from the image defined by the bounding box.
