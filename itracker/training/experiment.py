@@ -117,8 +117,11 @@ class Experiment(experiment.Experiment):
     Args:
       data_tensors: The input tensors for the model. """
     # Create the model.
+    if self.__args.fine_tune:
+      logger.info("Will now fine-tune model.")
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
-                          data_tensors=data_tensors)
+                          data_tensors=data_tensors,
+                          fine_tune=self.__args.fine_tune)
     self.__model = net.build()
 
     # Prepare label data.
@@ -128,6 +131,9 @@ class Experiment(experiment.Experiment):
     if load_model:
       logging.info("Loading pretrained model '%s'." % (load_model))
       self.__model.load_weights(load_model)
+    elif self.__args.fine_tune:
+      # Can't fine-tune without a loaded model.
+      raise RuntimeError("Please specify a model with --model to fine-tune.")
 
   def _run_training_iteration(self):
     """ Runs a single training iteration. """

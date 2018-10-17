@@ -48,8 +48,6 @@ class EyeCropper:
         A new bounding box with a wider margin. """
       abs_change_x = int(bbox[2] * increase_fraction / 2.0)
       abs_change_y = int(bbox[3] * increase_fraction / 2.0)
-      print abs_change_x
-      print abs_change_y
 
       new_bbox = [bbox[0] - abs_change_x, bbox[1] - abs_change_y,
                   bbox[2] + abs_change_x * 2, bbox[3] + abs_change_y * 2]

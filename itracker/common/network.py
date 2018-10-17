@@ -879,8 +879,7 @@ class SmallNetwork(Network):
     # Concat everything and put through a final FF layer.
     all_concat = layers.Concatenate()([fc_e1, face_fc2, grid_fc2])
     all_fc1 = layers.Dense(128, activation="relu",
-                           kernel_regularizer=self._l2,
-                           trainable=trainable)(all_concat)
+                           kernel_regularizer=self._l2)(all_concat)
     all_fc2 = layers.Dense(2, kernel_regularizer=self._l2)(all_fc1)
 
     return all_fc2

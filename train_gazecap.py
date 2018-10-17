@@ -25,6 +25,8 @@ def parse_args():
                       help="Existing model to load. Necessary if validating.")
   parser.add_argument("-o", "--output", default="eye_model.hd5",
                       help="Where to save the trained model.")
+  parser.add_argument("-f", "--fine_tune", action="store_true",
+                      help="Fine-tune the model.")
 
   parser.add_argument("--batch_size", type=int, default=32,
                       help="Examples in each batch.")
