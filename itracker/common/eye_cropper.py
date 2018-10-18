@@ -125,9 +125,13 @@ class EyeCropper:
       # This is just a bad detection.
       return (None, None, None, None)
 
-    bbox = (low_x, low_y, high_x - low_x, high_y - low_y)
+    bbox = [low_x, low_y, high_x - low_x, high_y - low_y]
     # Increase the margin slightly.
     bbox = self.__increase_margin(bbox, 0.5)
+
+    # Bound everything to zero.
+    bbox[0] = max(0, bbox[0])
+    bbox[1] = max(0, bbox[1])
 
     return bbox
 
