@@ -105,7 +105,7 @@ class Experiment(experiment.Experiment):
       # Set the optimizers.
       opt = optimizers.SGD(lr=learning_rate, momentum=momentum)
       self.__model.compile(optimizer=opt,
-                           loss={"decode": "binary_crossentropy",
+                           loss={"decode": "mse",
                                  "dots": metrics.distance_metric},
                            metrics=[metrics.distance_metric],
                            target_tensors=self.__labels,

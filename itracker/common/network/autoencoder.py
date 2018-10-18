@@ -55,7 +55,7 @@ class Autoencoder(Network):
     upsample_d3 = layers.UpSampling2D(size=2)
     norm_d3 = layers.BatchNormalization(trainable=trainable)
 
-    conv_d4 = layers.Conv2D(1, (3, 3), activation="sigmoid", padding="same",
+    conv_d4 = layers.Conv2D(1, (3, 3), padding="same",
                             kernel_regularizer=self._l2, trainable=trainable,
                             name="decode")
 
@@ -115,7 +115,5 @@ class Autoencoder(Network):
       The decodings and gaze predictions. """
     # The expected decoding is just the input.
     labels = dots.copy()
-    # Scale to between 0 and 1 so the sigmoid output can capture the entire
-    # range.
-    labels["decode"] = self._small_eye / 2.0 + 0.5
+    labels["decode"] = self._small_eye
     return labels
