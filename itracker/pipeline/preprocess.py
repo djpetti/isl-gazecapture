@@ -455,9 +455,8 @@ class SessionNumStage(PipelineStage):
 
   def build(self, data_point):
     # Cast to float so the pipeline code likes it.
-    #float_session_num = tf.cast(data_point.session_num, tf.float32)
-    #return (float_session_num, data_point.image)
-    return (0.0, data_point.image)
+    float_session_num = tf.cast(data_point.session_num, tf.float32)
+    return (float_session_num, data_point.image)
 
   def get_num_outputs(self):
     return 2

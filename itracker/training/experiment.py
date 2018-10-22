@@ -11,6 +11,7 @@ import tensorflow as tf
 
 from ..common import config, custom_data_loader
 
+import autoencoder_validator
 import metrics
 import pipelines
 import validator
@@ -208,8 +209,13 @@ class Experiment(experiment.Experiment):
       raise ValueError("--model must be specified.")
 
     # Create and run the validator.
-    my_validator = validator.Validator(data_tensors, self.__labels,
-                                       self.__args.model)
+    valid_module = validator
+    if self.__args.autoencoder:
+      # Use autoencoder validator.
+      logger.info("Performing autoencoder validation.")
+      valid_module = autoencoder_validator
+    my_validator = valid_module.Validator(data_tensors, self.__labels,
+                                          self.__args.model)
     my_validator.validate(self.__args.valid_iters)
 
   def run(self):

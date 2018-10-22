@@ -1,4 +1,5 @@
 import cPickle as pickle
+
 import logging
 
 import keras.backend as K
@@ -28,26 +29,28 @@ class Validator(object):
     self.__data_tensors = data_tensors
     self.__labels = labels
     self.__save_path = model_save
-    self.__data_file = out_file
+    self._data_file = out_file
 
     # Build the model.
-    self.__build_model()
+    self._build_model()
     # Build the stuff we need to perform statistical analysis.
-    self.__build_analysis_graph()
+    self._build_analysis_graph()
 
-  def __build_model(self):
+  def _build_model(self):
     """ Builds the model and loads the model weights. It also modifies
     self.__labels according to the model. """
     # Create the model.
+    # TODO (danielp): Keras bug: It shouldn't require me to pass data_tensors
+    # here.
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
                           data_tensors=self.__data_tensors[:4])
-    self.__model = net.build()
+    self._model = net.build()
 
     # Prepare the label data.
     self.__labels = net.prepare_labels(self.__labels)
 
     logger.info("Loading pretrained model '%s'." % (self.__save_path))
-    self.__model.load_weights(self.__save_path)
+    self._model.load_weights(self.__save_path)
 
   def __compute_face_pos(self, masks):
     """ Computes the position of the face, given the bitmask.
@@ -83,7 +86,7 @@ class Validator(object):
     return tf.map_fn(face_pos, masks, back_prop=False,
                      dtype=(tf.int64))
 
-  def __build_analysis_graph(self):
+  def _build_analysis_graph(self):
     """ Builds a portion of the graph for statistical analysis. """
     # Separate data tensors.
     leye, reye, face, mask, session_num, pose = self.__data_tensors
@@ -91,11 +94,14 @@ class Validator(object):
     mask = tf.reshape(mask, [-1, 25, 25])
 
     # Run the model.
-    predicted_gaze = self.__model([leye, reye, face, mask])
+    predicted_gaze = self._model([leye, reye, face, mask])
 
     # Compute the error, both as the distance, and as the raw coordinate error.
-    self.__coord_error = self.__labels[0] - predicted_gaze
-    self.__error = metrics.distance_metric(self.__labels[0], predicted_gaze)
+    print self.__labels
+    print predicted_gaze
+    self.__coord_error = self.__labels["dots"] - predicted_gaze
+    self.__error = metrics.distance_metric(self.__labels["dots"],
+                                           predicted_gaze)
 
     # Save the head pose so we can correlate this with the error.
     self.__pose = pose
@@ -172,6 +178,6 @@ class Validator(object):
     data_matrix = data_matrix.T
 
     # Save it.
-    data_file = open(self.__data_file, "wb")
+    data_file = open(self._data_file, "wb")
     pickle.dump(data_matrix, data_file)
     data_file.close()
