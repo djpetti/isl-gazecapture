@@ -11,7 +11,7 @@ class Autoencoder(Network):
   def _build_custom(self):
     trainable = not self._fine_tune
 
-    pool_eye_in = layers.MaxPooling2D(pool_size=8, padding="same")
+    pool_eye_in = layers.MaxPooling2D(pool_size=2, padding="same")
 
     # Encoder layers.
     #conv_e1 = layers.Conv2D(48, (11, 11), strides=(2, 2), activation="relu",
@@ -51,6 +51,7 @@ class Autoencoder(Network):
     norm_d2 = layers.BatchNormalization(trainable=trainable)
 
     conv_d3 = layers.Conv2D(16, (3, 3), activation="relu",
+                            padding="same",
                             kernel_regularizer=self._l2, trainable=trainable)
     upsample_d3 = layers.UpSampling2D(size=2)
     norm_d3 = layers.BatchNormalization(trainable=trainable)
@@ -93,17 +94,19 @@ class Autoencoder(Network):
     dec10 = conv_d4(dec9)
 
     # Build the gaze prediction pathway.
-    encoded = layers.Flatten()(enc11)
+    self.__encoded = layers.Flatten(name="encode")(enc11)
     gaze_dense1 = layers.Dense(128, activation="relu",
                                kernel_regularizer=self._l2,
-                               trainable=trainable)(encoded)
-    gaze_pred = layers.Dense(2, activation="relu",
-                             kernel_regularizer=self._l2,
+                               trainable=trainable)(self.__encoded)
+    gaze_dense2 = layers.Dense(128, activation="relu",
+                               kernel_regularizer=self._l2,
+                               trainable=trainable)(gaze_dense1)
+    gaze_pred = layers.Dense(2, kernel_regularizer=self._l2,
                              trainable=trainable,
-                             name="dots")(gaze_dense1)
+                             name="dots")(gaze_dense2)
 
     # The outputs are the decoded input and the gaze prediction.
-    return dec10, gaze_pred
+    return dec10, gaze_pred, self.__encoded
 
   def prepare_labels(self, dots):
     """ We abuse the prepare_labels functionality a little so that we can get
@@ -116,4 +119,7 @@ class Autoencoder(Network):
     # The expected decoding is just the input.
     labels = dots.copy()
     labels["decode"] = self._small_eye
+    # We don't really care about the encoded representation, so we can just set
+    # the labels to what the output already is.
+    labels["encode"] = self.__encoded
     return labels

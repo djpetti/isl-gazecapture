@@ -34,18 +34,21 @@ def _is_stale(timestamp):
 class GazePredictor(object):
   """ Takes in eye images, and uses the model to predict gaze. """
 
-  def __init__(self, model_file, phone, display=False):
+  def __init__(self, model, model_file, phone, display=False, drop_stale=True):
     """
     Args:
+      model: The model class to use.
       model_file: The saved model to load for predictions.
       phone: The configuration data for the phone we are using.
       display: If true, it will enable a debug display that shows the image
-               crops. """
+               crops.
+      drop_stale: If true, we want to automatically drop stale images. """
     # Initialize landmark and prediction processes.
-    self._prediction_process = _CnnProcess(model_file)
+    self._prediction_process = _CnnProcess(model, model_file, drop_stale=drop_stale)
     self._landmark_process = _LandmarkProcess(self._prediction_process,
                                               phone,
-                                              display=display)
+                                              display=display,
+                                              drop_stale=drop_stale)
 
   def __del__(self):
     # Make sure internal processes have terminated.
@@ -75,11 +78,15 @@ class _CnnProcess(object):
   """ Runs the CNN prediction in a separate process on the GPU, so that it can
   be handled concurrently. """
 
-  def __init__(self, model_file):
+  def __init__(self, model, model_file, drop_stale=True):
     """
     Args:
-      model_file: The file to load the predictor model from. """
+      model: The model class to use.
+      model_file: The file to load the predictor model from.
+      drop_stale: Whether to automatically drop stale images. """
     self.__model_file = model_file
+    self.__model_class = model
+    self.__drop_stale = drop_stale
 
     # Create the queues.
     self.__input_queue = Queue()
@@ -144,9 +151,9 @@ class _CnnProcess(object):
     # We expect color image inputs.
     color_eye_shape = config.EYE_SHAPE[:2] + (3,)
     # Load the model we trained.
-    model = config.NET_ARCH(config.FACE_SHAPE, eye_shape=color_eye_shape,
-                            eye_preproc=eye_preproc_layer,
-                            face_preproc=face_preproc_layer)
+    model = self.__model_class(config.FACE_SHAPE, eye_shape=color_eye_shape,
+                               eye_preproc=eye_preproc_layer,
+                               face_preproc=face_preproc_layer)
     self.__predictor = model.build()
     self.__predictor.load_weights(self.__model_file)
 
@@ -167,7 +174,7 @@ class _CnnProcess(object):
       # If we have a sequence number but no images, we got a bad detection.
       self.__output_queue.put((None, seq_num, timestamp))
       return
-    if _is_stale(timestamp):
+    if (self.__drop_stale and _is_stale(timestamp)):
       # The image is stale, so indicate that it is invalid.
       self.__output_queue.put((None, seq_num, timestamp))
       return
@@ -186,8 +193,11 @@ class _CnnProcess(object):
     # Generate a prediction.
     pred = self.__predictor.predict([left_eye, right_eye, face, grid],
                                     batch_size=1)
-    # Remove the batch dimension, and convert to Python floats.
-    pred = [float(x) for x in pred[0]]
+    # Remove the batch dimension.
+    if type(pred) is list:
+      pred = [x[0] for x in pred]
+    else:
+      pred = pred[0]
 
     self.__output_queue.put((pred, seq_num, timestamp))
 
@@ -214,16 +224,18 @@ class _LandmarkProcess(object):
   """ Reads images from a queue, and runs landmark detection in a separate
   process. """
 
-  def __init__(self, cnn_process, phone, display=False):
+  def __init__(self, cnn_process, phone, display=False, drop_stale=True):
     """
     Args:
       phone: The configuration of the phone that we are capturing data on.
       cnn_process: The _CnnProcess to send captured images to.
       display: If true, it will enable a debugging display that shows the
-               detected crops on-screen. """
+               detected crops on-screen.
+      drop_stale: Whether to automatically drop stale frames. """
     self.__cnn_process = cnn_process
     self.__display = display
     self.__phone = phone
+    self.__drop_stale = drop_stale
 
     # Create the queues.
     self.__input_queue = Queue()
@@ -248,7 +260,7 @@ class _LandmarkProcess(object):
       # pipeline.
       self.__cnn_process.add_new_input(None, None, None, None, None, None)
       return
-    if _is_stale(timestamp):
+    if (self.__drop_stale and _is_stale(timestamp)):
       # Image is stale. Indicate that it is invalid.
       self.__cnn_process.add_new_input(None, None, None, None, seq_num,
                                        timestamp)

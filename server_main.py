@@ -48,7 +48,8 @@ def predict_forever(model_file, port, phone, display_crops=False):
     phone: The configuration for the phone we are using.
     display_crops: If true, it will display the crops for the images it
                    receives. Useful for debugging. """
-  predictor = GazePredictor(model_file, phone, display=display_crops)
+  predictor = GazePredictor(config.NET_ARCH, model_file, phone,
+                            display=display_crops)
   my_server = server.Server(port)
 
   while True:
