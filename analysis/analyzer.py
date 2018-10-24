@@ -48,9 +48,6 @@ class Analyzer(analyzer_base.AnalyzerBase):
     Returns:
       The computed correlation matrix. """
     if self.__correlation is None:
-      # We take the absolute value when calculating correlation because for the
-      # attributes we're interested in, we expect the error to be smallest when
-      # they're around zero, and larger the farther away they get.
       centered = self._data - np.mean(self._data, axis=0)
       self.__correlation = np.corrcoef(centered, rowvar=False)
 

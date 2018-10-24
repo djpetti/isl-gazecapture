@@ -95,7 +95,7 @@ class Validator(validator.Validator):
     session_num_row = session_num_row.T
 
     data_matrix = np.concatenate((gaze_error_row, decode_error_row,
-                                  encoding_stack, pose_stack, session_num_row),
+                                  pose_stack, session_num_row, encoding_stack),
                                  axis=0)
 
     # Make the variables columns.
