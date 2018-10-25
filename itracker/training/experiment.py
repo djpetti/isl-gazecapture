@@ -10,6 +10,7 @@ from rhodopsin import experiment, params
 import tensorflow as tf
 
 from ..common import config, custom_data_loader
+from ..common.network import branched_autoenc_network
 
 import autoencoder_validator
 import metrics
@@ -106,11 +107,9 @@ class Experiment(experiment.Experiment):
       # Set the optimizers.
       opt = optimizers.SGD(lr=learning_rate, momentum=momentum)
       self.__model.compile(optimizer=opt,
-                           loss={"decode": "mse",
-                                 "dots": metrics.distance_metric},
+                           loss={"dots": metrics.distance_metric},
                            metrics=[metrics.distance_metric],
-                           target_tensors=self.__labels,
-                           loss_weights={"decode": 0.5, "dots": 0.5})
+                           target_tensors=self.__labels)
 
       # We only need to compile a maximum of one time.
       break
@@ -120,9 +119,23 @@ class Experiment(experiment.Experiment):
     modifies self.__labels according to the model.
     Args:
       data_tensors: The input tensors for the model. """
+    autoenc_weights = None
+    clusters = None
+    if config.NET_ARCH == branched_autoenc_network.BranchedAutoencNetwork:
+      # The autoencoder network takes some special parameters.
+      if not self.__args.autoencoder_weights:
+        raise ValueError("--autoencoder_weights is required for this network.")
+      if not self.__args.clusters:
+        raise ValueError("--clusters is required for this network.")
+
+      autoenc_weights = self.__args.autoencoder_weights
+      clusters = self.__args.clusters
+
     # Create the model.
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
-                          data_tensors=data_tensors)
+                          data_tensors=data_tensors,
+                          autoenc_model_file=autoenc_weights,
+                          cluster_data=clusters)
     self.__model = net.build()
 
     # Prepare label data.
@@ -147,8 +160,8 @@ class Experiment(experiment.Experiment):
     history = self.__model.fit(epochs=1, steps_per_epoch=training_steps)
 
     # Update the status parameters.
-    loss = history.history["decode_loss"][0]
-    accuracy = history.history["decode_distance_metric"][0]
+    loss = history.history["loss"][0]
+    accuracy = history.history["distance_metric"][0]
     logger.debug("Training loss: %f, acc: %f" % (loss, accuracy))
     status.update("loss", loss)
     status.update("acc", accuracy)
@@ -163,7 +176,7 @@ class Experiment(experiment.Experiment):
     status = self.get_status()
 
     # Test the model.
-    loss, _, accuracy, _, _ = self.__model.evaluate(steps=testing_steps)
+    loss, accuracy = self.__model.evaluate(steps=testing_steps)
 
     # Update the status parameters.
     logger.info("Testing loss: %f, acc: %f" % (loss, accuracy))

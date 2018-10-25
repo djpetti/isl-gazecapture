@@ -15,7 +15,8 @@ class Network(object):
   """ Represents a network. """
 
   def __init__(self, input_shape, eye_shape=None, fine_tune=False,
-               data_tensors=None, eye_preproc=None, face_preproc=None):
+               data_tensors=None, eye_preproc=None, face_preproc=None,
+               **kwargs):
     """ Creates a new network.
     Args:
       input_shape: The input shape to the network.

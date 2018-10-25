@@ -25,8 +25,13 @@ def parse_args():
                       help="Existing model to load. Necessary if validating.")
   parser.add_argument("-o", "--output", default="eye_model.hd5",
                       help="Where to save the trained model.")
+
   parser.add_argument("--autoencoder", action="store_true",
       help="Specifies that we want to evaluate the autoencoder.")
+  parser.add_argument("--autoencoder_weights",
+      help="For branched autoencoder network, location of autoencoder weights.")
+  parser.add_argument("--clusters",
+      help="For branched autoencoder network, location of cluster data.")
 
   parser.add_argument("--batch_size", type=int, default=32,
                       help="Examples in each batch.")
