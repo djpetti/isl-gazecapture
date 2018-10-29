@@ -228,7 +228,7 @@ class Experiment(experiment.Experiment):
       logger.info("Performing autoencoder validation.")
       valid_module = autoencoder_validator
     my_validator = valid_module.Validator(data_tensors, self.__labels,
-                                          self.__args.model)
+                                          self.__args)
     my_validator.validate(self.__args.valid_iters)
 
   def run(self):

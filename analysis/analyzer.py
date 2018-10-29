@@ -79,7 +79,8 @@ class Analyzer(analyzer_base.AnalyzerBase):
     """ Computes the mean accuracy.
     Returns:
       The mean accuracy. """
-    return np.mean(self._data[:, self._ERROR_COL])
+    truncated = np.clip(self._data[:, self._ERROR_COL], 0, 10)
+    return np.mean(truncated)
 
   def __mean_pose(self):
     pitch = np.mean(self._data[:, self._HEAD_PITCH_COL])

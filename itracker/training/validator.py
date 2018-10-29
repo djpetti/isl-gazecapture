@@ -9,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 from ..common import config
+from ..common.network import branched_autoenc_network
 import metrics
 
 
@@ -18,17 +19,19 @@ logger = logging.getLogger(__name__)
 class Validator(object):
   """ Handles validation and statistical analysis of a model. """
 
-  def __init__(self, data_tensors, labels, model_save,
+  def __init__(self, data_tensors, labels, args,
                out_file="validation_data.pkl"):
     """
     Args:
       data_tensors: The input tensors for the model.
       labels: The label tensor for the model.
+      args: The CLI arguments passed to the script.
       model_save: The path to the saved model weights.
       out_file: The file in which to save the collected data. """
     self.__data_tensors = data_tensors
     self.__labels = labels
-    self.__save_path = model_save
+    self.__args = args
+    self.__save_path = self.__args.model
     self._data_file = out_file
 
     # Build the model.
@@ -39,11 +42,25 @@ class Validator(object):
   def _build_model(self):
     """ Builds the model and loads the model weights. It also modifies
     self.__labels according to the model. """
+    autoenc_weights = None
+    clusters = None
+    if config.NET_ARCH == branched_autoenc_network.BranchedAutoencNetwork:
+      # The autoencoder network takes some special parameters.
+      if not self.__args.autoencoder_weights:
+        raise ValueError("--autoencoder_weights is required for this network.")
+      if not self.__args.clusters:
+        raise ValueError("--clusters is required for this network.")
+
+      autoenc_weights = self.__args.autoencoder_weights
+      clusters = self.__args.clusters
+
     # Create the model.
     # TODO (danielp): Keras bug: It shouldn't require me to pass data_tensors
     # here.
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
-                          data_tensors=self.__data_tensors[:4])
+                          data_tensors=self.__data_tensors[:4],
+                          autoenc_model_file=autoenc_weights,
+                          cluster_data=clusters)
     self._model = net.build()
 
     # Prepare the label data.
