@@ -11,6 +11,7 @@ import tensorflow as tf
 
 from ..common import config, custom_data_loader
 from ..common.network import branched_autoenc_network
+from ..common.network import branched_autoenc_small_network
 
 import autoencoder_validator
 import metrics
@@ -121,7 +122,9 @@ class Experiment(experiment.Experiment):
       data_tensors: The input tensors for the model. """
     autoenc_weights = None
     clusters = None
-    if config.NET_ARCH == branched_autoenc_network.BranchedAutoencNetwork:
+    if (config.NET_ARCH == branched_autoenc_network.BranchedAutoencNetwork or \
+        config.NET_ARCH == \
+            branched_autoenc_small_network.BranchedAutoencSmallNetwork):
       # The autoencoder network takes some special parameters.
       if not self.__args.autoencoder_weights:
         raise ValueError("--autoencoder_weights is required for this network.")

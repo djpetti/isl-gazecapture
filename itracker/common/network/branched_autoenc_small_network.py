@@ -14,8 +14,8 @@ import autoencoder
 logger = logging.getLogger(__name__)
 
 
-class BranchedAutoencNetwork(Network):
-  """ Extension of LargeVggNetwork that uses a branched architecture based on
+class BranchedAutoencSmallNetwork(Network):
+  """ Extension of SmallNetwork that uses a branched architecture based on
   the appearance of a subject's eye. """
 
   def __init__(self, *args, **kwargs):
@@ -116,32 +116,23 @@ class BranchedAutoencNetwork(Network):
   def _build_custom(self):
     trainable = not self._fine_tune
 
-    # Get pretrained VGG model for use as a base.
-    vgg = applications.vgg19.VGG19(include_top=False,
-                                   input_shape=self._input_shape)
-    vgg_out = vgg(self._face_node)
-
-    # Freeze all layers in VGG.
-    for layer in vgg.layers:
-      layer.trainable = False
-
     # Shared eye layers.
-    conv_e1 = layers.Conv2D(144, (11, 11), strides=(4, 4), activation="relu",
+    conv_e1 = layers.Conv2D(48, (11, 11), strides=(4, 4), activation="relu",
                             kernel_regularizer=self._l2, trainable=trainable)
     pool_e1 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
     norm_e1 = layers.BatchNormalization(trainable=trainable)
 
     pad_e2 = layers.ZeroPadding2D(padding=(2, 2))
-    conv_e2 = layers.Conv2D(384, (5, 5), activation="relu",
+    conv_e2 = layers.Conv2D(128, (5, 5), activation="relu",
                             kernel_regularizer=self._l2, trainable=trainable)
     pool_e2 = layers.MaxPooling2D(pool_size=(3, 3), strides=(2, 2))
     norm_e2 = layers.BatchNormalization(trainable=trainable)
 
     pad_e3 = layers.ZeroPadding2D(padding=(1, 1))
-    conv_e3 = layers.Conv2D(576, (3, 3), activation="relu",
+    conv_e3 = layers.Conv2D(192, (3, 3), activation="relu",
                             kernel_regularizer=self._l2, trainable=trainable)
 
-    conv_e4 = layers.Conv2D(64, (1, 1), activation="relu",
+    conv_e4 = layers.Conv2D(32, (1, 1), activation="relu",
                             kernel_regularizer=self._l2, trainable=trainable)
     flatten_e4 = layers.Flatten()
 
@@ -179,19 +170,43 @@ class BranchedAutoencNetwork(Network):
 
     # Concatenate eyes and put through a shared FC layer.
     eye_combined = layers.Concatenate()([reye_flatten_e4, leye_flatten_e4])
-    eye_drop = layers.Dropout(0.5)(eye_combined)
     fc_e1 = layers.Dense(128, activation="relu",
-                        kernel_regularizer=self._l2)(eye_drop)
+                        kernel_regularizer=self._l2,
+                        trainable=trainable)(eye_combined)
 
     # Face layers.
-    face_flatten_f4 = layers.Flatten()(vgg_out)
+    face_conv_f1 = layers.Conv2D(48, (11, 11), strides=(4, 4),
+                                activation="relu",
+                                kernel_regularizer=self._l2,
+                                trainable=trainable)(self._face_node)
+    face_pool_f1 = layers.MaxPooling2D(pool_size=(3, 3),
+                                      strides=(2, 2))(face_conv_f1)
+    face_norm_f1 = layers.BatchNormalization(trainable=trainable)(face_pool_f1)
 
-    face_drop = layers.Dropout(0.5)(face_flatten_f4)
+    face_pad_f2 = layers.ZeroPadding2D(padding=(2, 2))(face_norm_f1)
+    face_conv_f2 = layers.Conv2D(128, (5, 5), activation="relu",
+                                kernel_regularizer=self._l2,
+                                trainable=trainable)(face_pad_f2)
+    face_pool_f2 = layers.MaxPooling2D(pool_size=(3, 3),
+                                      strides=(2, 2))(face_conv_f2)
+    face_norm_f2 = layers.BatchNormalization(trainable=trainable)(face_pool_f2)
+
+    face_pad_f3 = layers.ZeroPadding2D(padding=(1, 1))(face_norm_f2)
+    face_conv_f3 = layers.Conv2D(192, (3, 3), activation="relu",
+                                kernel_regularizer=self._l2,
+                                trainable=trainable)(face_pad_f3)
+
+    face_conv_f4 = layers.Conv2D(32, (1, 1), activation="relu",
+                                kernel_regularizer=self._l2,
+                                trainable=trainable)(face_conv_f3)
+    face_flatten_f4 = layers.Flatten()(face_conv_f4)
+
     face_fc1 = layers.Dense(128, activation="relu",
                             kernel_regularizer=self._l2,
-                            trainable=trainable)(face_drop)
+                            trainable=trainable)(face_flatten_f4)
     face_fc2 = layers.Dense(64, activation="relu",
-                            kernel_regularizer=self._l2)(face_fc1)
+                            kernel_regularizer=self._l2,
+                            trainable=trainable)(face_fc1)
 
     # Face grid.
     grid_flat = layers.Flatten()(self._grid_input)
