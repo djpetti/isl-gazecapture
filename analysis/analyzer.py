@@ -1,11 +1,11 @@
-import cPickle as pickle
-
 import matplotlib.pyplot as plt
 
 import numpy as np
 
+import analyzer_base
 
-class Analyzer:
+
+class Analyzer(analyzer_base.AnalyzerBase):
   """ Handles analysis for the validation data. """
 
   # Constants defining the indices of the variable columns in the data matrix.
@@ -24,7 +24,7 @@ class Analyzer:
     """
     Args:
       data_file: The file to load the validation data from. """
-    self.__load_data(data_file)
+    super(Analyzer, self).__init__(data_file)
 
     # Covariance matrix.
     self.__sigma = None
@@ -33,18 +33,13 @@ class Analyzer:
     # Per-subject error sequence.
     self.__subject_errors = []
 
-  def __load_data(self, data_file):
-    """ Loads the data from a file. """
-    print "Loading validation data..."
-    self.__data = pickle.load(file(data_file, "rb"))
-
   def __cov(self):
     """ Computes the covariance matrix, if it hasn't been already.
     Returns:
       The computed covariance matrix. """
     if self.__sigma is None:
       # We need to specify that are variables are columns.
-      self.__sigma = np.cov(self.__data, rowvar=False)
+      self.__sigma = np.cov(self._data, rowvar=False)
 
     return self.__sigma
 
@@ -53,10 +48,7 @@ class Analyzer:
     Returns:
       The computed correlation matrix. """
     if self.__correlation is None:
-      # We take the absolute value when calculating correlation because for the
-      # attributes we're interested in, we expect the error to be smallest when
-      # they're around zero, and larger the farther away they get.
-      centered = self.__data - np.mean(self.__data, axis=0)
+      centered = self._data - np.mean(self._data, axis=0)
       self.__correlation = np.corrcoef(centered, rowvar=False)
 
     return self.__correlation
@@ -71,12 +63,12 @@ class Analyzer:
       return self.__subject_errors
 
     # Generate it.
-    subject_col = self.__data[:, self._SESSION_NUM_COL]
+    subject_col = self._data[:, self._SESSION_NUM_COL]
     subjects = np.unique(subject_col)
 
     # Compute accuracies for each subject.
     subject_errors = []
-    all_error = self.__data[:, self._ERROR_COL]
+    all_error = self._data[:, self._ERROR_COL]
     for subject in subjects:
       error_data = all_error[subject_col == subject]
       self.__subject_errors.append(error_data)
@@ -87,12 +79,12 @@ class Analyzer:
     """ Computes the mean accuracy.
     Returns:
       The mean accuracy. """
-    return np.mean(self.__data[:, self._ERROR_COL])
+    return np.mean(self._data[:, self._ERROR_COL])
 
   def __mean_pose(self):
-    pitch = np.mean(self.__data[:, self._HEAD_PITCH_COL])
-    yaw = np.mean(self.__data[:, self._HEAD_YAW_COL])
-    roll = np.mean(self.__data[:, self._HEAD_ROLL_COL])
+    pitch = np.mean(self._data[:, self._HEAD_PITCH_COL])
+    yaw = np.mean(self._data[:, self._HEAD_YAW_COL])
+    roll = np.mean(self._data[:, self._HEAD_ROLL_COL])
 
     return (pitch, yaw, roll)
 
@@ -100,14 +92,14 @@ class Analyzer:
     """ Computes the mean face area.
     Returns:
       The mean face area. """
-    return np.mean(self.__data[:, self._FACE_AREA_COL])
+    return np.mean(self._data[:, self._FACE_AREA_COL])
 
   def __mean_face_pos(self):
     """ Computes the mean face position.
     Returns:
       The mean y and x values of the face position. """
-    pos_mu_y = np.mean(self.__data[:, self._FACE_POS_Y_COL])
-    pos_mu_x = np.mean(self.__data[:, self._FACE_POS_X_COL])
+    pos_mu_y = np.mean(self._data[:, self._FACE_POS_Y_COL])
+    pos_mu_x = np.mean(self._data[:, self._FACE_POS_X_COL])
 
     return (pos_mu_y, pos_mu_x)
 
@@ -205,7 +197,7 @@ class Analyzer:
     subject_error = self.__per_subject_error()
 
     # Extract session numbers as labels.
-    labels = np.unique(self.__data[:, self._SESSION_NUM_COL])
+    labels = np.unique(self._data[:, self._SESSION_NUM_COL])
     labels = labels.astype(np.int32)
 
     plt.boxplot(subject_error, sym="x", labels=labels)
@@ -215,51 +207,6 @@ class Analyzer:
     # Label the axes.
     plt.xlabel("Session Number")
     plt.ylabel("Accuracy (cm)")
-
-  def __write_report(self, report):
-    """ Writes a report to the command line. The report is a list, where each
-    item is a dictionary. The dictionary should have the following attributes:
-      name: The name of the parameter.
-      action: 'print' or 'graph', depending on how we want to display it. This
-              can also be 'section', in which case just the name is used to
-              define a new section in the report.
-      value: The value of the parameter.
-      unit: Defines a unit for the value.
-    Args:
-      report: The report to write. """
-    print "===== Start of Analysis Report ====="
-
-    for param in report:
-      name = param.get("name")
-      action = param.get("action")
-      value = param.get("value")
-      unit = param.get("unit")
-
-      if action == "section":
-        # Create a new section.
-        print "===== %s =====" % (name.title())
-
-      elif action == "graph":
-        # Show the graph.
-        plt.title(name.title())
-        plt.show()
-
-      elif action == "print":
-        # Simply print to command line.
-        value_str = str(value)
-        separator = " "
-        if len(value_str) + len(name) > 80:
-          # Split into two lines.
-          separator = "\n\t"
-
-        unit_str = ""
-        if unit is not None:
-          # We have a unit.
-          unit_str = " (%s)" % (unit)
-
-        print "%s:%s%s%s" % (name.title(), separator, value_str, unit_str)
-
-    print "===== End of Analysis Report ====="
 
   def analyze(self):
     """ Performs the full analysis. """
@@ -333,4 +280,4 @@ class Analyzer:
        "value": subject_sigma, "unit": "cm"},
       {"name": "per subject accuracy", "action": "graph"},
     ]
-    self.__write_report(report)
+    self._write_report(report)

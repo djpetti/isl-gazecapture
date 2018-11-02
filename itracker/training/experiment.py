@@ -10,7 +10,10 @@ from rhodopsin import experiment, params
 import tensorflow as tf
 
 from ..common import config, custom_data_loader
+from ..common.network import branched_autoenc_network
+from ..common.network import branched_autoenc_small_network
 
+import autoencoder_validator
 import metrics
 import pipelines
 import validator
@@ -104,9 +107,10 @@ class Experiment(experiment.Experiment):
 
       # Set the optimizers.
       opt = optimizers.SGD(lr=learning_rate, momentum=momentum)
-      self.__model.compile(optimizer=opt, loss=metrics.distance_metric,
+      self.__model.compile(optimizer=opt,
+                           loss={"dots": metrics.distance_metric},
                            metrics=[metrics.distance_metric],
-                           target_tensors=[self.__labels])
+                           target_tensors=self.__labels)
 
       # We only need to compile a maximum of one time.
       break
@@ -116,12 +120,28 @@ class Experiment(experiment.Experiment):
     modifies self.__labels according to the model.
     Args:
       data_tensors: The input tensors for the model. """
+    autoenc_weights = None
+    clusters = None
+    if (config.NET_ARCH == branched_autoenc_network.BranchedAutoencNetwork or \
+        config.NET_ARCH == \
+            branched_autoenc_small_network.BranchedAutoencSmallNetwork):
+      # The autoencoder network takes some special parameters.
+      if not self.__args.autoencoder_weights:
+        raise ValueError("--autoencoder_weights is required for this network.")
+      if not self.__args.clusters:
+        raise ValueError("--clusters is required for this network.")
+
+      autoenc_weights = self.__args.autoencoder_weights
+      clusters = self.__args.clusters
+
     # Create the model.
     if self.__args.fine_tune:
       logger.info("Will now fine-tune model.")
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
                           data_tensors=data_tensors,
                           fine_tune=self.__args.fine_tune)
+                          autoenc_model_file=autoenc_weights,
+                          cluster_data=clusters)
     self.__model = net.build()
 
     # Prepare label data.
@@ -182,7 +202,7 @@ class Experiment(experiment.Experiment):
     input_tensors = self.__builder.build_pipeline(self.__args.train_dataset,
                                                   self.__args.test_dataset)
     data_tensors = input_tensors[:4]
-    self.__labels = input_tensors[-1]
+    self.__labels = {"dots": input_tensors[-1]}
 
     # Create the model.
     self.__build_model(data_tensors)
@@ -204,15 +224,20 @@ class Experiment(experiment.Experiment):
         self.__builder.build_valid_pipeline(self.__args.valid_dataset,
                                             has_pose=True)
     data_tensors = input_tensors[:6]
-    self.__labels = input_tensors[-1]
+    self.__labels = {"dots": input_tensors[-1]}
 
     if not self.__args.model:
       # User did not tell us which model to validate.
       raise ValueError("--model must be specified.")
 
     # Create and run the validator.
-    my_validator = validator.Validator(data_tensors, self.__labels,
-                                       self.__args.model)
+    valid_module = validator
+    if self.__args.autoencoder:
+      # Use autoencoder validator.
+      logger.info("Performing autoencoder validation.")
+      valid_module = autoencoder_validator
+    my_validator = valid_module.Validator(data_tensors, self.__labels,
+                                          self.__args)
     my_validator.validate(self.__args.valid_iters)
 
   def run(self):

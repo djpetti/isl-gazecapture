@@ -28,6 +28,13 @@ def parse_args():
   parser.add_argument("-f", "--fine_tune", action="store_true",
                       help="Fine-tune the model.")
 
+  parser.add_argument("--autoencoder", action="store_true",
+      help="Specifies that we want to evaluate the autoencoder.")
+  parser.add_argument("--autoencoder_weights",
+      help="For branched autoencoder network, location of autoencoder weights.")
+  parser.add_argument("--clusters",
+      help="For branched autoencoder network, location of cluster data.")
+
   parser.add_argument("--batch_size", type=int, default=32,
                       help="Examples in each batch.")
   parser.add_argument("--testing_interval", type=int, default=4,

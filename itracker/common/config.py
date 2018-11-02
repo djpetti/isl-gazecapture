@@ -1,4 +1,4 @@
-import network
+from network import *
 
 # Model to use for prediction.
 MODEL_FILE = "models/eye_model_face_branch.hd5"
@@ -9,7 +9,7 @@ SERVER_PORT = 6219
 MIN_CONFIDENCE = 0.20
 
 # Specifies the network architecture we will use.
-NET_ARCH = network.BranchedNetwork
+NET_ARCH = branched_autoenc_network.BranchedAutoencNetwork
 # The shape of raw images from the dataset.
 RAW_SHAPE = (400, 400, 3)
 # The shape of the input face images to the network.

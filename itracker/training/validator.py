@@ -1,4 +1,5 @@
 import cPickle as pickle
+
 import logging
 
 import keras.backend as K
@@ -8,6 +9,7 @@ import numpy as np
 import tensorflow as tf
 
 from ..common import config
+from ..common.network import branched_autoenc_network
 import metrics
 
 
@@ -17,37 +19,55 @@ logger = logging.getLogger(__name__)
 class Validator(object):
   """ Handles validation and statistical analysis of a model. """
 
-  def __init__(self, data_tensors, labels, model_save,
+  def __init__(self, data_tensors, labels, args,
                out_file="validation_data.pkl"):
     """
     Args:
       data_tensors: The input tensors for the model.
       labels: The label tensor for the model.
+      args: The CLI arguments passed to the script.
       model_save: The path to the saved model weights.
       out_file: The file in which to save the collected data. """
     self.__data_tensors = data_tensors
     self.__labels = labels
-    self.__save_path = model_save
-    self.__data_file = out_file
+    self.__args = args
+    self.__save_path = self.__args.model
+    self._data_file = out_file
 
     # Build the model.
-    self.__build_model()
+    self._build_model()
     # Build the stuff we need to perform statistical analysis.
-    self.__build_analysis_graph()
+    self._build_analysis_graph()
 
-  def __build_model(self):
+  def _build_model(self):
     """ Builds the model and loads the model weights. It also modifies
     self.__labels according to the model. """
+    autoenc_weights = None
+    clusters = None
+    if config.NET_ARCH == branched_autoenc_network.BranchedAutoencNetwork:
+      # The autoencoder network takes some special parameters.
+      if not self.__args.autoencoder_weights:
+        raise ValueError("--autoencoder_weights is required for this network.")
+      if not self.__args.clusters:
+        raise ValueError("--clusters is required for this network.")
+
+      autoenc_weights = self.__args.autoencoder_weights
+      clusters = self.__args.clusters
+
     # Create the model.
+    # TODO (danielp): Keras bug: It shouldn't require me to pass data_tensors
+    # here.
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
-                          data_tensors=self.__data_tensors[:4])
-    self.__model = net.build()
+                          data_tensors=self.__data_tensors[:4],
+                          autoenc_model_file=autoenc_weights,
+                          cluster_data=clusters)
+    self._model = net.build()
 
     # Prepare the label data.
     self.__labels = net.prepare_labels(self.__labels)
 
     logger.info("Loading pretrained model '%s'." % (self.__save_path))
-    self.__model.load_weights(self.__save_path)
+    self._model.load_weights(self.__save_path)
 
   def __compute_face_pos(self, masks):
     """ Computes the position of the face, given the bitmask.
@@ -83,7 +103,7 @@ class Validator(object):
     return tf.map_fn(face_pos, masks, back_prop=False,
                      dtype=(tf.int64))
 
-  def __build_analysis_graph(self):
+  def _build_analysis_graph(self):
     """ Builds a portion of the graph for statistical analysis. """
     # Separate data tensors.
     leye, reye, face, mask, session_num, pose = self.__data_tensors
@@ -91,11 +111,14 @@ class Validator(object):
     mask = tf.reshape(mask, [-1, 25, 25])
 
     # Run the model.
-    predicted_gaze = self.__model([leye, reye, face, mask])
+    predicted_gaze = self._model([leye, reye, face, mask])
 
     # Compute the error, both as the distance, and as the raw coordinate error.
-    self.__coord_error = self.__labels - predicted_gaze
-    self.__error = metrics.distance_metric(self.__labels, predicted_gaze)
+    print self.__labels
+    print predicted_gaze
+    self.__coord_error = self.__labels["dots"] - predicted_gaze
+    self.__error = metrics.distance_metric(self.__labels["dots"],
+                                           predicted_gaze)
 
     # Save the head pose so we can correlate this with the error.
     self.__pose = pose
@@ -172,6 +195,6 @@ class Validator(object):
     data_matrix = data_matrix.T
 
     # Save it.
-    data_file = open(self.__data_file, "wb")
+    data_file = open(self._data_file, "wb")
     pickle.dump(data_matrix, data_file)
     data_file.close()
