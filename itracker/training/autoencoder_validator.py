@@ -55,7 +55,7 @@ class Validator(validator.Validator):
 
     percentage = 0.0
     for i in range(0, num_batches):
-      # Run the session to extract the values we need. make sure we put Keras in
+      # Run the session to extract the values we need. Make sure we put Keras in
       # testing mode.
       gaze_error, decode_error, encoding, pose, session_num = \
           session.run([self.__gaze_error, self.__decode_error, self.__encoding,
@@ -63,6 +63,8 @@ class Validator(validator.Validator):
                       feed_dict={K.learning_phase(): 0})
 
       total_gaze_error.extend(gaze_error)
+      # Reduce across pixels so we have a single number for each image.
+      decode_error = np.mean(decode_error, axis=(1, 2))
       total_decode_error.extend(decode_error)
       total_encoding.extend(encoding)
       total_pose.extend(pose)
@@ -85,8 +87,6 @@ class Validator(validator.Validator):
     gaze_error_row = np.asarray(total_gaze_error)
     gaze_error_row = np.expand_dims(gaze_error_row, 0)
     decode_error_row = np.asarray(total_decode_error)
-    # Reduce across pixels so we have a single number for each image.
-    decode_error_row = np.mean(decode_error_row, axis=(1, 2))
     decode_error_row = np.expand_dims(decode_error_row, 0)
     # Stack the encodings and add them.
     encoding_stack = np.stack(total_encoding, axis=1)
