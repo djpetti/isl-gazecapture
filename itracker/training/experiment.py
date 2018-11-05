@@ -139,7 +139,7 @@ class Experiment(experiment.Experiment):
       logger.info("Will now fine-tune model.")
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
                           data_tensors=data_tensors,
-                          fine_tune=self.__args.fine_tune)
+                          fine_tune=self.__args.fine_tune,
                           autoenc_model_file=autoenc_weights,
                           cluster_data=clusters)
     self.__model = net.build()
