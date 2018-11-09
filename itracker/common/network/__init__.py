@@ -6,4 +6,5 @@ __all__ = ["network",
            "large_vgg_network",
            "mit_network",
            "residual_network",
+           "res_network",
            "small_network"]
