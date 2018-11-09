@@ -44,6 +44,21 @@ class Network(object):
     if eye_shape is not None:
       self._eye_shape = eye_shape
 
+  def _apply_all(self, inputs, layers):
+    """ Creates a stack of layers, where each layer is applied to the output of
+    the previous one.
+    Args:
+      inputs: The initial inputs to apply the stack on.
+      layers: The layers to apply.
+    Returns:
+      The output from the last layer. """
+    next_input = inputs
+
+    for layer in layers:
+      next_input = layer(next_input)
+
+    return next_input
+
   def _build_common(self):
     """ Build the network components that are common to all. """
     def input_creator(tensor):
