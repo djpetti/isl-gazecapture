@@ -336,8 +336,9 @@ class SendProcess(object):
     Returns:
       True if it sent new data, false if the sequence end was reached. """
     gaze_point, seq_num, _ = self.__predictor.predict_gaze()
-    # Convert to python floats.
-    gaze_point = [float(x) for x in gaze_point]
+    if gaze_point is not None:
+      # Convert to python floats.
+      gaze_point = [float(x) for x in gaze_point]
     if seq_num is None:
       # A None tuple means the end of the sequence, so we'll want to join this
       # process.
