@@ -490,6 +490,16 @@ def process_dataset(dataset_dir, output_dir, phone, args):
   train_saver = AppSaver(train_randomizer, "train", train_writer)
   test_saver = AppSaver(test_randomizer, "test", test_writer)
 
+  val_randomizer = None
+  val_saver = None
+  if args.valid_days:
+    # We want to create a validation dataset.
+    val_record = os.path.join(output_dir, "app_data_val.tfrecord")
+    val_writer = tf.python_io.TFRecordWriter(val_record)
+
+    val_randomizer = frame_randomizer.FrameRandomizer()
+    val_saver = AppSaver(val_randomizer, "val", val_writer)
+
   days = os.listdir(dataset_dir)
   # Shuffle the directories so we get a unique test split, but do it
   # deterministically so we can get the same test split every time.
@@ -508,6 +518,8 @@ def process_dataset(dataset_dir, output_dir, phone, args):
     randomizer = train_randomizer
     if i < args.test_days:
       randomizer = test_randomizer
+    elif i - args.test_days < args.valid_days:
+      randomizer = val_randomizer
 
     # Calculate percentage complete.
     percent = float(i) / len(days) * 100
@@ -522,6 +534,10 @@ def process_dataset(dataset_dir, output_dir, phone, args):
   train_saver.close()
   test_saver.close()
 
+  if val_saver:
+    val_saver.save_all()
+    val_saver.close()
+
 def main():
   parser = argparse.ArgumentParser("Convert data collected through the app.")
   parser.add_argument("dataset_dir", help="The root dataset directory.")
@@ -532,6 +548,8 @@ def main():
 
   parser.add_argument("-t", "--test_days", type=int, default=1,
                       help="Number of days to use in the test set.")
+  parser.add_argument("-v", "--valid_days", type=int, default=0,
+                      help="Number of days to use in the validation set.")
   parser.add_argument("-s", "--skip_frames", type=int, default=15,
       help="Number of frames to skip at the beginning of each video.")
   args = parser.parse_args()
