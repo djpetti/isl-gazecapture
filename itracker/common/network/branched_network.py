@@ -154,9 +154,15 @@ class BranchedNetwork(Network):
     return all_fc2
 
   def prepare_labels(self, labels):
+    dots = labels["dots"]
+
     # Since we reorder the output from our model relative to the input, we need
     # our labels to be organized similarly.
     labels_group1, labels_group2 = \
-        self.__get_face_groups((self._grid_input, labels))
-    return tf.concat([labels_group1, labels_group2], axis=0)
+        self.__get_face_groups((self._grid_input, dots))
+    dots = tf.concat([labels_group1, labels_group2], axis=0)
+
+    new_labels = labels.copy()
+    new_labels["dots"] = dots
+    return new_labels
 

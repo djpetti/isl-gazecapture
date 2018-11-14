@@ -26,7 +26,6 @@ class Validator(object):
       data_tensors: The input tensors for the model.
       labels: The label tensor for the model.
       args: The CLI arguments passed to the script.
-      model_save: The path to the saved model weights.
       out_file: The file in which to save the collected data. """
     self.__data_tensors = data_tensors
     self.__labels = labels
@@ -106,7 +105,12 @@ class Validator(object):
   def _build_analysis_graph(self):
     """ Builds a portion of the graph for statistical analysis. """
     # Separate data tensors.
-    leye, reye, face, mask, session_num, pose = self.__data_tensors
+    leye, reye, face, mask, session_num = self.__data_tensors[:5]
+    pose = tf.zeros((leye.shape[0], 3))
+    if len(self.__data_tensors) > 5:
+      # We have pose as well.
+      logger.info("Using pose data.")
+      pose = self.__data_tensors[5]
     # Keras wants the mask input to have a defined static shape.
     mask = tf.reshape(mask, [-1, 25, 25])
 
@@ -114,8 +118,6 @@ class Validator(object):
     predicted_gaze = self._model([leye, reye, face, mask])
 
     # Compute the error, both as the distance, and as the raw coordinate error.
-    print self.__labels
-    print predicted_gaze
     self.__coord_error = self.__labels["dots"] - predicted_gaze
     self.__error = metrics.distance_metric(self.__labels["dots"],
                                            predicted_gaze)

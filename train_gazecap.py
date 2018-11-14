@@ -49,6 +49,8 @@ def parse_args():
                       help="Num. of batches to run for each testing iter.")
   parser.add_argument("--valid_iters", type=int, default=124,
                       help="How many iterations to validate for.")
+  parser.add_argument("--pose", action="store_true",
+                      help="Whether the dataset supports head pose.")
 
   return parser
 

@@ -201,6 +201,7 @@ class Experiment(experiment.Experiment):
     # Build input pipelines.
     input_tensors = self.__builder.build_pipeline(self.__args.train_dataset,
                                                   self.__args.test_dataset)
+    # We don't need the session number for training.
     data_tensors = input_tensors[:4]
     self.__labels = {"dots": input_tensors[-1]}
 
@@ -222,8 +223,11 @@ class Experiment(experiment.Experiment):
     # Create the validation pipeline.
     input_tensors = \
         self.__builder.build_valid_pipeline(self.__args.valid_dataset,
-                                            has_pose=True)
-    data_tensors = input_tensors[:6]
+                                            has_pose=self.__args.pose)
+    data_tensors = input_tensors[:5]
+    if self.__args.pose:
+      # Include the pose data.
+      data_tensors += [input_tensors[5]]
     self.__labels = {"dots": input_tensors[-1]}
 
     if not self.__args.model:
