@@ -156,20 +156,16 @@ class DataLoader(object):
 
   def __build_loader_stage(self):
     """ Builds the pipeline stages that actually loads data from the disk. """
-    # Create queue for filenames, which is a little silly since we only have one
-    # file.
-    filename_queue = tf.train.string_input_producer([self._records_file])
-
     # Define a reader and read the next record.
-    reader = tf.TFRecordReader()
-    _, serialized_examples = reader.read(filename_queue)
+    reader = tf.data.TFRecordDataset(self._records_file) \
+                                    .shuffle(self._batch_size * 15) \
+                                    .repeat() \
+                                    .batch(self._batch_size,
+                                           drop_remainder=True)
 
-    # Prepare random batches.
-    batch = tf.train.shuffle_batch([serialized_examples],
-                                   batch_size=self._batch_size,
-                                   capacity=self._batch_size * 30,
-                                   min_after_dequeue=self._batch_size * 15,
-                                   num_threads=16)
+    # Create the iterator for producing actual examples.
+    batch_iter = reader.make_one_shot_iterator()
+    batch = batch_iter.get_next()
 
     # Deserialize the example.
     self._features.parse_from(batch)
