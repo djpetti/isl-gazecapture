@@ -7,7 +7,6 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.ActivityInfo;
 import android.graphics.Color;
-import android.graphics.Matrix;
 import android.graphics.drawable.ColorDrawable;
 import android.media.Image;
 import android.media.ImageReader;
@@ -47,6 +46,7 @@ import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
+import org.opencv.core.Mat;
 import org.opencv.core.Point;
 
 import java.util.ArrayList;
@@ -65,6 +65,7 @@ public class GameMainActivity extends Activity {
     public static final int     VALUE_MODE_TIMER = 1;
     public static final String  KEY_MAX_SCORE = "game_max_score";
     public static final String  KEY_TRIGGER_MODE = "trigger_mode";
+    public static final String  KEY_ADDITIONAL_VISUAL = "additional_visual_effect_circle";
     private static final int    GAME_DURATION = 1000 * 60;
 
     private SharedPreferences settings;
@@ -73,6 +74,7 @@ public class GameMainActivity extends Activity {
     private int GAME_MODE;
     private int GAME_MAX_SCORE;
     private boolean GAME_GAZE_AUTO_TRIGGER;
+    private boolean GAME_ADDITIONAL_VISUAL;
 
 
     private ImageView       imgServerConnect;
@@ -139,6 +141,7 @@ public class GameMainActivity extends Activity {
                         textureView.setLayoutParams(params);
                     } else {
                         table.bringToFront();
+                        classifiedCircleHolder.bringToFront();
                         takeImageHandler.removeCallbacks(takeImageRunnable);
                     }
                 }
@@ -149,6 +152,12 @@ public class GameMainActivity extends Activity {
         btnController.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if( isPreviewMode ){
+                    table.bringToFront();
+                    classifiedCircleHolder.bringToFront();
+                    takeImageHandler.removeCallbacks(takeImageRunnable);
+                    isPreviewMode = !isPreviewMode;
+                }
                 if(isGameStarted){
                     stopGame();
                 } else {
@@ -186,6 +195,9 @@ public class GameMainActivity extends Activity {
         textureView = findViewById(R.id.activity_game_main_textureview);
         textureView.setRotation((float) 270.0);
 
+        // circle holder
+        classifiedCircleHolder = findViewById(R.id.activity_game_main_layout_circle_holder);
+        classifiedCircleHolder.bringToFront();
 
 
         // prepare to start
@@ -240,6 +252,7 @@ public class GameMainActivity extends Activity {
         GAME_SPEED = settings.getInt(this.KEY_SPEED, 5);
         GAME_MAX_SCORE = settings.getInt(this.KEY_MAX_SCORE, 0);
         GAME_GAZE_AUTO_TRIGGER = settings.getBoolean(this.KEY_TRIGGER_MODE, true);
+        GAME_ADDITIONAL_VISUAL = settings.getBoolean(this.KEY_ADDITIONAL_VISUAL, false);
     }
 
     private void initGameGrid(){
@@ -530,6 +543,9 @@ public class GameMainActivity extends Activity {
             if( isPreviewMode ) {
                 drawExactResult(new float[]{(float) avePX, (float) avePY}, true, R.color.desired_square_color);
             }
+            if( isGameStarted && GAME_ADDITIONAL_VISUAL ){
+                drawClassifiedResult(new float[]{(float) avePX, (float) avePY});
+            }
             double diff = 0;
             for(Pair<Float, Float> eachPoint : pointHistory){
                 diff += Math.sqrt((eachPoint.first - avePX)*(eachPoint.first - avePX)
@@ -544,7 +560,7 @@ public class GameMainActivity extends Activity {
         }
     }
 
-    private void    clickTriggle(double[] analRes){
+    private void clickTriggle(double[] analRes){
         if (analRes==null){
             return;
         }
@@ -568,8 +584,9 @@ public class GameMainActivity extends Activity {
         }
     }
 
-    /***** TEMP *****/
+    /***** Drawing *****/
     private FrameLayout frame_gaze_result;
+    private FrameLayout classifiedCircleHolder;
     private DrawHandler drawHandler;
 //    private int[]       SCREEN_SIZE = new int[]{1440, 2392};
     private void drawGaze(JSONObject object, boolean isHoldOn, int color){
@@ -592,6 +609,28 @@ public class GameMainActivity extends Activity {
         int portraitX = (int)(confHandler.getScreenResoPHeight() * estimateGaze[0]);
         int portraitY = (int)(confHandler.getScreenResoPWidth() * estimateGaze[1]);
         drawHandler.fillRect(portraitX, portraitY, 80,80, frame_gaze_result, color, isHoldOn);
+    }
+
+    private void drawClassifiedResult(float[] estimateGaze){
+        int holderWidth     = classifiedCircleHolder.getWidth();
+        int holderHeight    = classifiedCircleHolder.getHeight();
+        float gazeToLeft    = confHandler.getScreenResoPHeight() * estimateGaze[0];
+        float gazeToBottom  = confHandler.getScreenResoPWidth() * estimateGaze[1];
+        float[] relPos = new float[2];
+        relPos[0] = gazeToLeft / holderWidth;
+        relPos[1] = 1 - gazeToBottom / holderHeight;
+        if( estimateGaze!=null ){
+            switch (GRID_SIZE){
+                case 22:
+                    drawHandler.draw22ClassifiedResult(relPos, new int[]{holderWidth, holderHeight}, classifiedCircleHolder); break;
+                case 33:
+                    drawHandler.draw33ClassifiedResult(relPos, new int[]{holderWidth, holderHeight}, classifiedCircleHolder); break;
+                case 34:
+                    drawHandler.draw34ClassifiedResult(relPos, new int[]{holderWidth, holderHeight}, classifiedCircleHolder); break;
+            }
+        } else {
+            classifiedCircleHolder.removeAllViews();
+        }
     }
 
 

@@ -16,6 +16,7 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.Toast;
 
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.Handlers.CameraHandler;
 import com.iai.mdf.Handlers.DrawHandler;
 import com.iai.mdf.R;
@@ -98,6 +99,7 @@ public class FragmentDataCollectionByVideo extends Fragment {
     public void onResume() {
         super.onResume();
         cameraHandler = new CameraHandler(getActivity());
+        cameraHandler.setVideoCollectionFPS(DeviceConfiguration.getInstance(getContext()).getVideoCollectionFPS());
         cameraHandler.openFrontCameraForVideo();    // media recorder is inilized in this function
         SCREEN_SIZE = fetchScreenSize();
         Log.d(LOG_TAG, "Width: " + SCREEN_SIZE[0] + "    Height: " + SCREEN_SIZE[1]);

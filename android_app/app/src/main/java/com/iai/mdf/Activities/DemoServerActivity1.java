@@ -10,6 +10,7 @@ import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.TextureView;
 import android.view.View;
@@ -61,6 +62,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
     private TextureView textureView;
     private Spinner     spinnerView;
     private ToggleButton toggleButton;
+    private FrameLayout textureviewHolder;
     private FrameLayout frame_background_grid;
     private FrameLayout view_dot_container;
     private FrameLayout frame_gaze_result;
@@ -86,8 +88,8 @@ public class DemoServerActivity1 extends AppCompatActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_demo);
-        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT);
+        setContentView(R.layout.activity_demo_1);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getSupportActionBar().hide();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         Bundle extras = getIntent().getExtras();
@@ -99,22 +101,33 @@ public class DemoServerActivity1 extends AppCompatActivity {
 
         SCREEN_SIZE = fetchScreenSize();
         textureView = findViewById(R.id.activity_demo_preview_textureview);
+        textureView.setRotation((float) 270.0);
         // ensure texture fill the screen with a certain ratio
-        TEXTURE_SIZE = SCREEN_SIZE;
-        int expected_height = TEXTURE_SIZE[0]*DataCollectionActivity.Image_Size.getHeight()/DataCollectionActivity.Image_Size.getWidth();
-        if( expected_height< TEXTURE_SIZE[1] ){
-            TEXTURE_SIZE[1] = expected_height;
+        TEXTURE_SIZE = new int[] { SCREEN_SIZE[0], SCREEN_SIZE[1] };
+        int imageWidth = Math.max(DataCollectionActivity.Image_Size.getHeight(), DataCollectionActivity.Image_Size.getWidth());
+        int imageHeight = Math.min(DataCollectionActivity.Image_Size.getHeight(), DataCollectionActivity.Image_Size.getWidth());
+        int expected_width = TEXTURE_SIZE[1] * imageWidth / imageHeight;
+        if( expected_width < TEXTURE_SIZE[0] ){
+            TEXTURE_SIZE[0] = expected_width;
         } else {
-            TEXTURE_SIZE[0] = TEXTURE_SIZE[1]*DataCollectionActivity.Image_Size.getWidth()/DataCollectionActivity.Image_Size.getHeight();
+            TEXTURE_SIZE[1] = TEXTURE_SIZE[0] * imageHeight / imageWidth;
         }
-        textureView.setLayoutParams(new RelativeLayout.LayoutParams(TEXTURE_SIZE[0], TEXTURE_SIZE[1]));
+        textureviewHolder = findViewById(R.id.activity_demo_layout_textureview_holder);
+        textureviewHolder.setLayoutParams(new RelativeLayout.LayoutParams(TEXTURE_SIZE[0], TEXTURE_SIZE[1]));
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                TEXTURE_SIZE[1], TEXTURE_SIZE[0]
+        );
+        params.gravity = Gravity.CENTER;
+        textureView.setLayoutParams(params);
+//        textureView.setLayoutParams(new RelativeLayout.LayoutParams(TEXTURE_SIZE[0], TEXTURE_SIZE[1]));
 
 
         view_dot_container = findViewById(R.id.activity_demo_layout_dotHolder_background);
         frame_background_grid = findViewById(R.id.activity_demo_layout_background_grid);
-        frame_background_grid.setLayoutParams(new RelativeLayout.LayoutParams(TEXTURE_SIZE[0], TEXTURE_SIZE[1]));
+        frame_background_grid.setLayoutParams(new RelativeLayout.LayoutParams(SCREEN_SIZE[0], SCREEN_SIZE[1]));
 //        frame_background_grid.bringToFront();
         frame_gaze_result = findViewById(R.id.activity_demo_layout_dotHolder_result);
+        frame_gaze_result.setLayoutParams(new RelativeLayout.LayoutParams(SCREEN_SIZE[0], SCREEN_SIZE[1]));
         frame_gaze_result.bringToFront();
         drawHandler = new DrawHandler(this, fetchScreenSize());
         drawHandler.setDotHolderLayout(view_dot_container);
@@ -148,7 +161,7 @@ public class DemoServerActivity1 extends AppCompatActivity {
         });
 
 
-        spinnerView = (Spinner) findViewById(R.id.activity_demo_spinner_class_number);
+        spinnerView = findViewById(R.id.activity_demo_spinner_class_number);
         ArrayList<String> classNumOptions = new ArrayList<>();
         classNumOptions.add("2x2");
         classNumOptions.add("2x3");
@@ -204,6 +217,8 @@ public class DemoServerActivity1 extends AppCompatActivity {
 
         toggleButton = findViewById(R.id.activity_demo_toggle_show_dot);
         toggleButton.setChecked(false);
+        toggleButton.setTextOn("Gaze Dot");
+        toggleButton.setTextOff("Gaze Dot");
 
         result_board = findViewById(R.id.activity_demo_txtview_result);
         result_board.setText("Press Anywhere to Start");
@@ -353,16 +368,16 @@ public class DemoServerActivity1 extends AppCompatActivity {
 
     private void drawGaze(JSONObject object){
         try {
-//            int receivedIdx = object.getInt(SocketHandler.JSON_KEY_SEQ_NUMBER);
-//            if( receivedIdx > prevReceivedGazeIndex ){
-//                prevReceivedGazeIndex = receivedIdx;
-            double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
-            double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
+            double landscapeHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
+            double landscapeVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
             float[] loc = new float[2];
-            loc[0] = (float) (portraitHori + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePWidth();
-            loc[1] = (float) (portraitVert + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePHeight();
+            loc[0] = (float) (landscapeHori + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePWidth();
+            loc[1] = 1 - (float) (landscapeVert + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePHeight();
+            // linear calibration
+            float[] mat = confHandler.getCalibrationMatrix();
+            loc[0] = loc[0] * mat[0]  + loc[1] * mat[2] + mat[4];
+            loc[1] = loc[0] * mat[1]  + loc[1] * mat[3] + mat[5];
             drawClassifiedResult(loc, toggleButton.isChecked());
-//            }
         } catch (JSONException e) {
             e.printStackTrace();
         }
@@ -372,11 +387,11 @@ public class DemoServerActivity1 extends AppCompatActivity {
         if( estimateGaze!=null ){
             switch (currentClassNum){
                 case 4:
-                    drawHandler.draw4ClassRegrsResult(estimateGaze, TEXTURE_SIZE, frame_gaze_result, isShowDot); break;
+                    drawHandler.draw4ClassRegrsResult(estimateGaze, SCREEN_SIZE, frame_gaze_result, isShowDot); break;
                 case 6:
-                    drawHandler.draw6ClassRegrsResult(estimateGaze, TEXTURE_SIZE, frame_gaze_result, isShowDot); break;
+                    drawHandler.draw6ClassRegrsResult(estimateGaze, SCREEN_SIZE, frame_gaze_result, isShowDot); break;
                 case 9:
-                    drawHandler.draw9ClassRegrsResult(estimateGaze, TEXTURE_SIZE, frame_gaze_result,  isShowDot); break;
+                    drawHandler.draw9ClassRegrsResult(estimateGaze, SCREEN_SIZE, frame_gaze_result,  isShowDot); break;
             }
         }
     }

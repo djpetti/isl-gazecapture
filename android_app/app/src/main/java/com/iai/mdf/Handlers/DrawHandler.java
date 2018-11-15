@@ -17,6 +17,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.iai.mdf.DependenceClasses.CustomGraphics;
+import com.iai.mdf.DependenceClasses.DeviceConfiguration;
 import com.iai.mdf.R;
 
 import java.util.ArrayList;
@@ -34,8 +35,8 @@ public class DrawHandler {
     private final String LOG_TAG = "DrawHandler";
     private final int ROW_COL_POINT_NUM = 6;
     private Context ctxt;
-    private int SCREEN_WIDTH;
-    private int SCREEN_HEIGHT;
+    private int SCREEN_WIDTH_IN_PORTRAIT;
+    private int SCREEN_HEIGHT_IN_PORTRAIT;
     private ArrayList<Point> dotCandidates;
     private FrameLayout dotHolderLayout;
     private TextView dotTextView;
@@ -47,8 +48,8 @@ public class DrawHandler {
 
     public DrawHandler(Context context, int[] screenSize){
         ctxt = context;
-        SCREEN_WIDTH = screenSize[0];
-        SCREEN_HEIGHT = screenSize[1];
+        SCREEN_WIDTH_IN_PORTRAIT = screenSize[0];
+        SCREEN_HEIGHT_IN_PORTRAIT = screenSize[1];
         dotCandidates = new ArrayList<>();
         initDotCandidates();
         dotHolderLayout = null;
@@ -59,6 +60,11 @@ public class DrawHandler {
 
     public void showNextPoint(){
         generateDot();
+        showDot();
+    }
+
+    public void showNextPointInOrder(){
+        generateDotInOrder();
         showDot();
     }
 
@@ -82,20 +88,22 @@ public class DrawHandler {
      */
     private void initDotCandidates(){
         if( null!= dotCandidates) {
-//            int[] TEXTURE_SIZE = new int[]{SCREEN_WIDTH, SCREEN_HEIGHT};
+//            int[] TEXTURE_SIZE = new int[]{SCREEN_WIDTH_IN_PORTRAIT, SCREEN_HEIGHT_IN_PORTRAIT};
 //            int expected_height = TEXTURE_SIZE[0]* DataCollectionActivity.Image_Size.getHeight()/DataCollectionActivity.Image_Size.getWidth();
 //            if( expected_height < TEXTURE_SIZE[1] ){
 //                TEXTURE_SIZE[1] = expected_height;
 //            } else {
 //                TEXTURE_SIZE[0] = TEXTURE_SIZE[1]*DataCollectionActivity.Image_Size.getWidth()/DataCollectionActivity.Image_Size.getHeight();
 //            }
-            int width_interval = SCREEN_WIDTH / ROW_COL_POINT_NUM;
-            int height_interval = SCREEN_HEIGHT / ROW_COL_POINT_NUM;
+            DeviceConfiguration confHandler = DeviceConfiguration.getInstance(ctxt);
+            int width_interval = SCREEN_WIDTH_IN_PORTRAIT / confHandler.getDotCandidateCol();
+            int height_interval = SCREEN_HEIGHT_IN_PORTRAIT / confHandler.getDotCandidateRow();
             int offsetX = width_interval / 3;
             int offsetY = height_interval / 3;
-            for (int i = 0; i < ROW_COL_POINT_NUM; ++i) {
-                for (int j = 0; j < ROW_COL_POINT_NUM; ++j) {
-                    dotCandidates.add(new Point(i * width_interval + offsetX, j * height_interval + offsetY));
+            for (int i = 0; i < confHandler.getDotCandidateRow(); ++i) {
+                for (int j = 0; j < confHandler.getDotCandidateCol(); ++j) {
+                    dotCandidates.add(new Point(j * width_interval + offsetX, i * height_interval + offsetY));
+                    Log.d("DrawHandler", String.valueOf(j * width_interval + offsetX) + ',' + String.valueOf(i * height_interval + offsetY));
                 }
             }
         }
@@ -112,6 +120,17 @@ public class DrawHandler {
         } while( dotCandidates.get(randIndex).equals(currDot.x, currDot.y) );
         currDot = dotCandidates.get(randIndex);
         currDotType = new Random().nextInt(2);
+    }
+
+
+    /**
+     * generate a dot in a certain order
+     */
+    int indexForDotInOrder = -1;
+    private void generateDotInOrder(){
+        indexForDotInOrder++;
+        indexForDotInOrder = indexForDotInOrder % dotCandidates.size();
+        currDot = dotCandidates.get(indexForDotInOrder);
     }
 
 
@@ -190,8 +209,8 @@ public class DrawHandler {
         //setting image position
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT);
-        params.leftMargin = Math.round( width_ratio * SCREEN_WIDTH );
-        params.topMargin = Math.round( height_ratio * SCREEN_HEIGHT );
+        params.leftMargin = Math.round( width_ratio * SCREEN_WIDTH_IN_PORTRAIT);
+        params.topMargin = Math.round( height_ratio * SCREEN_HEIGHT_IN_PORTRAIT);
         dotTextView.setLayoutParams(params);
         //adding view to layout
         dotHolderLayout.addView(dotTextView);
@@ -469,26 +488,26 @@ public class DrawHandler {
 
     // draw estimation results
 
-    public void draw4ClassRegrsResult(float[] loc, int[] txtrueSize, FrameLayout panel, boolean isShowDot){
+    public void draw4ClassRegrsResult(float[] loc, int[] panelSize, FrameLayout panel, boolean isShowDot){
         int x;
         int y;
-        int width = txtrueSize[0] / 2;
-        int height = txtrueSize[1] / 2;
+        int width = panelSize[0] / 2;
+        int height = panelSize[1] / 2;
         if( loc[0] < 0.5 && loc[1] < 0.5 ){
             x = 0;
             y = 0;
         } else if (loc[0] >= 0.5 && loc[1] < 0.5){
-            x = txtrueSize[0] / 2;
+            x = width;
             y = 0;
         } else if (loc[0] < 0.5 && loc[1] >= 0.5){
             x = 0;
-            y =txtrueSize[1] / 2;
+            y = height;
         } else {
-            x = txtrueSize[0] / 2;
-            y = txtrueSize[1] / 2;
+            x = width;
+            y = height;
         }
         if( isShowDot ) {
-            showDot((int) (txtrueSize[0] * loc[0]), (int) (txtrueSize[1] * loc[1]), panel);
+            showDot((int) (panelSize[0] * loc[0]), (int) (panelSize[1] * loc[1]), panel);
         }
 //        fillRect(x, y, width, height, panel, true);
         int size = Math.min(width, height)/2;
@@ -497,32 +516,32 @@ public class DrawHandler {
         showCircle(cx, cy, size, size, R.drawable.ring_orange_10, panel,true);
     }
 
-    public void draw6ClassRegrsResult(float[] loc, int[] txtrueSize, FrameLayout panel, boolean isShowDot) {
+    public void draw6ClassRegrsResult(float[] loc, int[] panelSize, FrameLayout panel, boolean isShowDot) {
         int x;
         int y;
-        int width = txtrueSize[0] / 2;
-        int height = txtrueSize[1] / 3;
-        if (loc[0] < 0.5 && loc[1] < 0.3333) {
+        int width = panelSize[0] / 3;
+        int height = panelSize[1] / 2;
+        if (loc[1] < 0.5 && loc[0] < 0.3333) {
             x = 0;
             y = 0;
-        } else if (loc[0] < 0.5 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
-            x = 0;
-            y = height;
-        } else if (loc[0] < 0.5 && loc[1] >= 0.6666) {
-            x = 0;
-            y = 2 * height;
-        } else if (loc[0] >= 0.5 && loc[1] < 0.3333) {
+        } else if (loc[1] < 0.5 && loc[0] >= 0.3333 && loc[0] < 0.6666) {
             x = width;
             y = 0;
-        } else if (loc[0] >= 0.5 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
+        } else if (loc[1] < 0.5 && loc[0] >= 0.6666) {
+            x = 2 * width;
+            y = 0;
+        } else if (loc[1] >= 0.5 && loc[0] < 0.3333) {
+            x = 0;
+            y = height;
+        } else if (loc[1] >= 0.5 && loc[0] >= 0.3333 && loc[0] < 0.6666) {
             x = width;
             y = height;
         } else {
-            x = width;
-            y = 2 * height;
+            x = 2 * width;
+            y = height;
         }
         if( isShowDot ) {
-            showDot((int) (txtrueSize[0] * loc[0]), (int) (txtrueSize[1] * loc[1]), panel);
+            showDot((int) (panelSize[0] * loc[0]), (int) (panelSize[1] * loc[1]), panel);
         }
 //        fillRect(x, y, width, height, panel, true);
         int size = Math.min(width, height)/2;
@@ -531,11 +550,11 @@ public class DrawHandler {
         showCircle(cx, cy, size, size, R.drawable.ring_orange_8, panel,true);
     }
 
-    public void draw9ClassRegrsResult(float[] loc, int[] txtrueSize, FrameLayout panel, boolean isShowDot) {
+    public void draw9ClassRegrsResult(float[] loc, int[] panelSize, FrameLayout panel, boolean isShowDot) {
         int x;
         int y;
-        int width = txtrueSize[0] / 3;
-        int height = txtrueSize[1] / 3;
+        int width = panelSize[0] / 3;
+        int height = panelSize[1] / 3;
         if (loc[0] < 0.3333 && loc[1] < 0.3333) {
             x = 0;
             y = 0;
@@ -565,7 +584,7 @@ public class DrawHandler {
             y = 2 * height;
         }
         if( isShowDot ) {
-            showDot((int) (txtrueSize[0] * loc[0]), (int) (txtrueSize[1] * loc[1]), panel);
+            showDot((int) (panelSize[0] * loc[0]), (int) (panelSize[1] * loc[1]), panel);
         }
 //        fillRect(x, y, width, height, panel, true);
         int size = Math.min(width, height)/2;
@@ -696,6 +715,129 @@ public class DrawHandler {
         if( x*y>=0 ) {
             fillRect(x, y, width, height, panel,  R.color.translucent_green, false);
         }
+    }
+
+
+    // draw classified results for Game
+
+    public void draw22ClassifiedResult(float[] loc, int[] textureSize, FrameLayout panel){
+        int x;
+        int y;
+        int width = textureSize[0] / 2;
+        int height = textureSize[1] / 2;
+        if( 0 <= loc[0] && loc[0] < 0.5 && 0 <= loc[1] && loc[1] < 0.5 ){
+            x = 0;
+            y = 0;
+        } else if (1 >= loc[0] && loc[0] >= 0.5 && 0 <= loc[1] && loc[1] < 0.5){
+            x = width;
+            y = 0;
+        } else if (0 <= loc[0] && loc[0] < 0.5 && 1 >= loc[1] && loc[1] >= 0.5){
+            x = 0;
+            y = height;
+        } else if (1 >= loc[0] && loc[0] >= 0.5 && 1 >= loc[1] && loc[1] >= 0.5){
+            x = width;
+            y = height;
+        } else {
+            panel.removeAllViews();
+            return;
+        }
+        int size = (int)(Math.min(width, height) * 0.95);
+        int cx = x + width/2 - size/2;
+        int cy = y + height/2 - size/2;
+        showCircle(cx, cy, size, size, R.drawable.ring_orange_10, panel,false);
+    }
+
+    public void draw33ClassifiedResult(float[] loc, int[] textureSize, FrameLayout panel){
+        int x;
+        int y;
+        int width = textureSize[0] / 3;
+        int height = textureSize[1] / 3;
+        if (0 <= loc[0] && loc[0] < 0.3333 && 0 <= loc[1] && loc[1] < 0.3333) {
+            x = 0;
+            y = 0;
+        } else if (0 <= loc[0] && loc[0] < 0.3333 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
+            x = 0;
+            y = height;
+        } else if (0 <= loc[0] && loc[0] < 0.3333 && 1 >= loc[1] && loc[1] >= 0.6666) {
+            x = 0;
+            y = 2 * height;
+        } else if (loc[0] >= 0.3333 && loc[0] < 0.6666 && 0 <= loc[1] && loc[1] < 0.3333) {
+            x = width;
+            y = 0;
+        } else if (loc[0] >= 0.3333 && loc[0] < 0.6666 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
+            x = width;
+            y = height;
+        } else if (loc[0] >= 0.3333 && loc[0] < 0.6666 && 1 >= loc[1] && loc[1] >= 0.6666) {
+            x = width;
+            y = 2 * height;
+        } else if (1 >= loc[0] && loc[0] >= 0.6666 && 0 <= loc[1] && loc[1] < 0.3333) {
+            x = 2 * width;
+            y = 0;
+        } else if (1 >= loc[0] && loc[0] >= 0.6666 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
+            x = 2 * width;
+            y = height;
+        } else if (1 >= loc[0] && loc[0] >= 0.6666 && 1 >= loc[1] && loc[1] >= 0.6666){
+            x = 2 * width;
+            y = 2 * height;
+        } else {
+            panel.removeAllViews();
+            return;
+        }
+        int size = (int)(Math.min(width, height) * 0.95);
+        int cx = x + width/2 - size/2;
+        int cy = y + height/2 - size/2;
+        showCircle(cx, cy, size, size, R.drawable.ring_orange_10, panel,false);
+    }
+
+    public void draw34ClassifiedResult(float[] loc, int[] textureSize, FrameLayout panel){
+        int x;
+        int y;
+        int width = textureSize[0] / 4;
+        int height = textureSize[1] / 3;
+        if (0 <= loc[0] && loc[0] < 0.25 && 0 <= loc[1] && loc[1] < 0.3333) {
+            x = 0;
+            y = 0;
+        } else if (0 <= loc[0] && loc[0] < 0.25 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
+            x = 0;
+            y = height;
+        } else if (0 <= loc[0] && loc[0] < 0.25 && 1 >= loc[1] && loc[1] >= 0.6666) {
+            x = 0;
+            y = 2 * height;
+        } else if (loc[0] >= 0.25 && loc[0] < 0.5 && 0 <= loc[1] && loc[1] < 0.3333) {
+            x = width;
+            y = 0;
+        } else if (loc[0] >= 0.25 && loc[0] < 0.5 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
+            x = width;
+            y = height;
+        } else if (loc[0] >= 0.25 && loc[0] < 0.5 && 1 >= loc[1] && loc[1] >= 0.6666) {
+            x = width;
+            y = 2 * height;
+        } else if (loc[0] >= 0.5 && loc[0] < 0.75 && 0 <= loc[1] && loc[1] < 0.3333) {
+            x = 2 * width;
+            y = 0;
+        } else if (loc[0] >= 0.5 && loc[0] < 0.75 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
+            x = 2 * width;
+            y = height;
+        } else if (loc[0] >= 0.5 && loc[0] < 0.75 && 1 >= loc[1] && loc[1] >= 0.6666){
+            x = 2 * width;
+            y = 2 * height;
+        }  else if (1 >= loc[0] && loc[0] >= 0.75 && 0 <= loc[1] && loc[1] < 0.3333) {
+            x = 3 * width;
+            y = 0;
+        } else if (1 >= loc[0] && loc[0] >= 0.75 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
+            x = 3 * width;
+            y = height;
+        } else if (1 >= loc[0] && loc[0] >= 0.75 && 1 >= loc[1] && loc[1] >= 0.6666){
+            x = 3 * width;
+            y = 2 * height;
+        } else {
+            panel.removeAllViews();
+            return;
+        }
+        int size = (int)(Math.min(width, height) * 0.95);
+        int cx = x + width/2 - size/2;
+        int cy = y + height/2 - size/2;
+        showCircle(cx, cy, size, size, R.drawable.ring_orange_10, panel,false);
     }
 
 

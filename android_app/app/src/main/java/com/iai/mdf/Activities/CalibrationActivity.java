@@ -1,6 +1,7 @@
 package com.iai.mdf.Activities;
 
 import android.content.pm.ActivityInfo;
+import android.graphics.Point;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Build;
@@ -11,20 +12,27 @@ import android.support.v7.app.AppCompatActivity;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.LayoutInflater;
 import android.view.TextureView;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
 import android.widget.RelativeLayout;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
 import com.iai.mdf.DependenceClasses.DeviceConfiguration;
+import com.iai.mdf.DependenceClasses.Matrix;
 import com.iai.mdf.Handlers.CameraHandler;
 import com.iai.mdf.Handlers.DrawHandler;
 import com.iai.mdf.Handlers.SocketHandler;
 import com.iai.mdf.Handlers.TensorFlowHandler;
+import com.iai.mdf.Handlers.TextFileHanlder;
 import com.iai.mdf.R;
 
 import org.json.JSONException;
@@ -32,7 +40,6 @@ import org.json.JSONObject;
 import org.opencv.android.BaseLoaderCallback;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
-import org.opencv.core.Point;
 
 import java.util.ArrayList;
 
@@ -42,22 +49,19 @@ import java.util.ArrayList;
  * Created by Mou on 9/22/2017.
  */
 
-public class DemoServerActivity2 extends AppCompatActivity {
+public class CalibrationActivity extends AppCompatActivity {
 
     public static final String BUNDLE_KEY_IP = "ip";
     public static final String BUNDLE_KEY_PORT = "port";
-    private final String LOG_TAG = "DemoServerActivity2";
+    private final String LOG_TAG = "CalibrationActivity";
+    private final String JSON_STRING_START = "RESP_START";
 
 
     private CameraHandler cameraHandler;
     private DrawHandler drawHandler;
     private TextureView textureView;
-    private ToggleButton toggleButton;
     private FrameLayout textureviewHolder;
-    private FrameLayout frame_background_grid;
     private FrameLayout view_dot_container;
-    private FrameLayout frame_gaze_result;
-    private FrameLayout frame_bounding_box;
     private TextView    result_board;
     private int[]       SCREEN_SIZE;
     private int[]       TEXTURE_SIZE;
@@ -65,7 +69,10 @@ public class DemoServerActivity2 extends AppCompatActivity {
     private boolean     isRealTimeDetection = false;
     private Handler     autoDetectionHandler = new Handler();
     private Runnable    takePicRunnable;
-    private Runnable    autoDotGenerationRunnable;
+    private Handler     dotGeneratorHandler = new Handler();
+    private Runnable    dotGeneratorRunnable;
+    private Handler     matrixComputationHandler = new Handler();
+    private Runnable    matrixComputationRunnable;
     private TensorFlowHandler tensorFlowHandler;
     private int         mFrameIndex = 0;
     private int         currentClassNum = 4;
@@ -73,15 +80,18 @@ public class DemoServerActivity2 extends AppCompatActivity {
     private int         prevReceivedGazeIndex = 0;
     private String      socketIp = null;
     private int         socketPort;
-    private ArrayList<Point> estimationList = new ArrayList<>();
     private DeviceConfiguration confHandler = DeviceConfiguration.getInstance(this);
+    /** calibration **/
+    private int                     AmountPicForEachPoint = 2;
+    private ArrayList<float[]>      GroundTruthPoints = new ArrayList<>();
+    private ArrayList<float[]>      EstimatePoints = new ArrayList<>();
 
 
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_demo_2);
+        setContentView(R.layout.activity_calibration);
         setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getSupportActionBar().hide();
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
@@ -93,7 +103,7 @@ public class DemoServerActivity2 extends AppCompatActivity {
         initOpenCV();
 
         SCREEN_SIZE = fetchScreenSize();
-        textureView = findViewById(R.id.activity_demo_preview_textureview);
+        textureView = findViewById(R.id.activity_calibration_preview_textureview);
         textureView.setRotation((float) 270.0);
         // ensure texture fill the screen with a certain ratio
         TEXTURE_SIZE = new int[] { SCREEN_SIZE[0], SCREEN_SIZE[1] };
@@ -105,84 +115,96 @@ public class DemoServerActivity2 extends AppCompatActivity {
         } else {
             TEXTURE_SIZE[1] = TEXTURE_SIZE[0] * imageHeight / imageWidth;
         }
-        textureviewHolder = findViewById(R.id.activity_demo_layout_textureview_holder);
+        textureviewHolder = findViewById(R.id.activity_calibration_layout_textureview_holder);
         textureviewHolder.setLayoutParams(new RelativeLayout.LayoutParams(TEXTURE_SIZE[0], TEXTURE_SIZE[1]));
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 TEXTURE_SIZE[1], TEXTURE_SIZE[0]
         );
         params.gravity = Gravity.CENTER;
         textureView.setLayoutParams(params);
+//        textureView.setLayoutParams(new RelativeLayout.LayoutParams(TEXTURE_SIZE[0], TEXTURE_SIZE[1]));
 
+        result_board = findViewById(R.id.activity_calibration_txtview_result);
+        result_board.setText("Press Anywhere to Start");
 
-        view_dot_container = findViewById(R.id.activity_demo_layout_dotHolder_background);
-        frame_background_grid = findViewById(R.id.activity_demo_layout_background_grid);
-//        frame_background_grid.setLayoutParams(new RelativeLayout.LayoutParams(TEXTURE_SIZE[0], TEXTURE_SIZE[1]));
-//        frame_background_grid.bringToFront();
-        frame_gaze_result = findViewById(R.id.activity_demo_layout_dotHolder_result);
-        frame_gaze_result.setLayoutParams(new RelativeLayout.LayoutParams(SCREEN_SIZE[0], SCREEN_SIZE[1]));
-        frame_gaze_result.bringToFront();
-        drawHandler = new DrawHandler(this, fetchScreenSize());
-        drawHandler.setDotHolderLayout(view_dot_container);
-//        drawHandler.showAllCandidateDots();
-
-        frame_bounding_box = findViewById(R.id.activity_demo_layout_bounding_box);
-//        frame_bounding_box.bringToFront();
-        frame_bounding_box.setOnClickListener(new View.OnClickListener() {
+        view_dot_container = findViewById(R.id.activity_calibration_layout_dotHolder_background);
+        view_dot_container.bringToFront();
+        view_dot_container.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                drawHandler.clear(frame_bounding_box);
-                drawHandler.clear(frame_gaze_result);
                 drawHandler.clear(view_dot_container);
                 Log.d(LOG_TAG, "pressed");  //cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_STILL_CAPTURE);
                 if( !socketHandler.isConnected() && !isRealTimeDetection ){
-                    Toast.makeText(DemoServerActivity2.this, "Restart to connect to the server", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CalibrationActivity.this, "Restart to connect to the server", Toast.LENGTH_SHORT).show();
                     return;
                 }
                 isRealTimeDetection = !isRealTimeDetection;
                 if(isRealTimeDetection){
-                    frame_background_grid.setBackgroundColor(0xFFFFFFFF);   // cover texture with white
-                    autoDetectionHandler.post(takePicRunnable);
-                    autoDetectionHandler.post(autoDotGenerationRunnable);
+                    EstimatePoints.clear();
+                    GroundTruthPoints.clear();
+                    view_dot_container.setBackgroundColor(0xFFFFFFFF);   // cover texture with white
+                    dotGeneratorHandler.postDelayed(dotGeneratorRunnable, 500);
+                    autoDetectionHandler.postDelayed(takePicRunnable, 500-confHandler.getCalibrationSpeed()/AmountPicForEachPoint/2);
                     result_board.setText("");
                 } else {
-                    frame_background_grid.setBackgroundColor(0x00FFFFFF);   // uncover texture with translucent
+                    view_dot_container.setBackgroundColor(0x00FFFFFF);   // uncover texture with translucent
                     cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_PREVIEW);
+                    dotGeneratorHandler.removeCallbacks(dotGeneratorRunnable);
                     autoDetectionHandler.removeCallbacks(takePicRunnable);
-                    autoDetectionHandler.removeCallbacks(autoDotGenerationRunnable);
-                    result_board.setText("Press Anywhere to Start");
+                    while (GroundTruthPoints.size() != EstimatePoints.size()){
+                        GroundTruthPoints.remove(GroundTruthPoints.size()-1);
+                    }
+                    Toast.makeText(CalibrationActivity.this, "Sample Collected: " + String.valueOf(GroundTruthPoints.size()), Toast.LENGTH_LONG).show();
+                    if (GroundTruthPoints.size()<2){
+                        result_board.setText("Too few samples are collected\nPress Anywhere to Restart");
+                    } else {
+                        float[] mat = computeTransportationMaxtrix(EstimatePoints, GroundTruthPoints);
+                        confHandler.setCalibrationMatrix(mat);
+                        confHandler.saveConfiguration();
+                        Log.d(LOG_TAG, String.valueOf(mat[0]));
+                        Log.d(LOG_TAG, String.valueOf(mat[1]));
+                        Log.d(LOG_TAG, String.valueOf(mat[2]));
+                        Log.d(LOG_TAG, String.valueOf(mat[3]));
+                        Log.d(LOG_TAG, String.valueOf(mat[4]));
+                        Log.d(LOG_TAG, String.valueOf(mat[5]));
+                        result_board.setText("Calibration is done: \n" +
+                                            String.valueOf(mat[0]).substring(0, 6) + ", " + String.valueOf(mat[1]).substring(0, 6) + ";\n" +
+                                            String.valueOf(mat[2]).substring(0, 6) + ", " + String.valueOf(mat[3]).substring(0, 6) + ";\n" +
+                                            String.valueOf(mat[4]).substring(0, 6) + ", " + String.valueOf(mat[5]).substring(0, 6) + ";");
+                    }
                 }
             }
         });
 
-        toggleButton = (ToggleButton) findViewById(R.id.activity_demo_toggle_show_dot);
-        toggleButton.setChecked(false);
-        toggleButton.setTextOn("stabilize");
-        toggleButton.setTextOff("stabilize");
+        drawHandler = new DrawHandler(this, fetchScreenSize());
+        drawHandler.setDotHolderLayout(view_dot_container);
+        drawHandler.showAllCandidateDots();
 
-        result_board = (TextView) findViewById(R.id.activity_demo_txtview_result);
-        result_board.setText("Press Anywhere to Start");
+        dotGeneratorRunnable = new Runnable() {
+            @Override
+            public void run() {
+                drawHandler.clear(view_dot_container);
+                drawHandler.showNextPointInOrder();
+                Point curPoint = drawHandler.getCurrDot();
+                for(int i=0; i<AmountPicForEachPoint; i++) {
+                    GroundTruthPoints.add(new float[]{(float) curPoint.x / (float) SCREEN_SIZE[0], (float) curPoint.y / (float) SCREEN_SIZE[1]});
+                }
+//                delayCapture(confHandler.getCollectionCaptureDelayTime());
+                dotGeneratorHandler.postDelayed(this,confHandler.getCalibrationSpeed());
+            }
+        };
 
         takePicRunnable = new Runnable() {
             @Override
             public void run() {
                 cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_STILL_CAPTURE);
-                autoDetectionHandler.postDelayed(this, confHandler.getDemoCaptureDelayTime());
-            }
-        };
-        autoDotGenerationRunnable = new Runnable() {
-            @Override
-            public void run() {
-                drawHandler.clear(view_dot_container);
-                drawHandler.drawRandomBlockInCandidates(80,80, view_dot_container, true);
-                autoDetectionHandler.postDelayed(this, 2000);
-                if( toggleButton.isChecked() ) {
-                    estimationList.clear();
-                }
+                autoDetectionHandler.postDelayed(this, confHandler.getCalibrationSpeed()/AmountPicForEachPoint);
             }
         };
 
-        tensorFlowHandler = new TensorFlowHandler(this);
-        tensorFlowHandler.pickModel(TensorFlowHandler.MODEL_ISL_FILE_NAME);
+//        tensorFlowHandler = new TensorFlowHandler(this);
+//        tensorFlowHandler.pickModel(TensorFlowHandler.MODEL_ISL_FILE_NAME);
+
     }
 
 
@@ -197,8 +219,6 @@ public class DemoServerActivity2 extends AppCompatActivity {
                 if( cameraHandler.getCameraState()==CameraHandler.CAMERA_STATE_STILL_CAPTURE ) {
                     cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_PREVIEW);
                     Log.d(LOG_TAG, "Take a picture");
-//                    drawHandler.clear(frame_bounding_box);
-//                    drawHandler.clear(frame_gaze_result);
                     if( Build.MODEL.equalsIgnoreCase("BLU Studio Touch")) {
                         socketHandler.uploadImageOnBLU(image);
                     } else {
@@ -218,7 +238,6 @@ public class DemoServerActivity2 extends AppCompatActivity {
         super.onPause();
         cameraHandler.stopPreview();
         autoDetectionHandler.removeCallbacks(takePicRunnable);
-        autoDetectionHandler.removeCallbacks(autoDotGenerationRunnable);
         isRealTimeDetection = false;
         // stop socket communication
         socketHandler.socketDestroy();
@@ -266,10 +285,15 @@ public class DemoServerActivity2 extends AppCompatActivity {
                     JSONObject object = new JSONObject(str);
                     if (object != null) {
                         if( object.getBoolean(SocketHandler.JSON_KEY_VALID) && isRealTimeDetection ) {
-                            drawGaze(object);
+                            double landscapeHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
+                            double landscapeVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
+                            float[] loc = new float[2];
+                            loc[0] = (float) (landscapeHori + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePWidth();
+                            loc[1] = 1 - (float) (landscapeVert + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePHeight();
+                            EstimatePoints.add(new float[]{ loc[0], loc[1] } );
                             Log.d(LOG_TAG, object.toString());
                         } else {
-                            Log.d(LOG_TAG, "inValid");
+                            Log.d(LOG_TAG, "invalid");
                         }
                     }
                 } catch (JSONException e) {
@@ -281,12 +305,12 @@ public class DemoServerActivity2 extends AppCompatActivity {
             public void onError(String str) {
                 Log.e(LOG_TAG, str);
                 if( str.equalsIgnoreCase(SocketHandler.ERROR_DISCONNECTED) ){
-                    Toast.makeText(DemoServerActivity2.this, "Disconnect From Server\nRestart Please", Toast.LENGTH_SHORT).show();
-                    frame_bounding_box.performClick();
+                    Toast.makeText(CalibrationActivity.this, "Disconnect From Server\nRestart Please", Toast.LENGTH_SHORT).show();
+                    view_dot_container.performClick();
                 } else if (str.equalsIgnoreCase(SocketHandler.ERROR_TIMEOUT)) {
-                     Log.d(LOG_TAG, "Timeout");
+                    Log.d(LOG_TAG, "Timeout");
                 } else if (str.equalsIgnoreCase(SocketHandler.ERROR_SETTING)) {
-                    Toast.makeText(DemoServerActivity2.this, "Please set the address and the port correctly", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(CalibrationActivity.this, "Please set the address and the port correctly", Toast.LENGTH_SHORT).show();
                     result_board.setText("Wrong address or port");
                 }
             }
@@ -300,68 +324,83 @@ public class DemoServerActivity2 extends AppCompatActivity {
 
 
 
+
+
     private int[] fetchScreenSize(){
         DisplayMetrics displayMetrics = new DisplayMetrics();
         getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
         return new int[]{displayMetrics.widthPixels, displayMetrics.heightPixels};
     }
 
-    private void drawGaze(JSONObject object){
-        try {
-//            int receivedIdx = object.getInt(SocketHandler.JSON_KEY_SEQ_NUMBER);
-//            if( receivedIdx > prevReceivedGazeIndex ){
-//            prevReceivedGazeIndex = receivedIdx;
-            double landscapeHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
-            double landscapeVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
-            float[] loc = new float[2];
-            loc[0] = (float) (landscapeHori + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePWidth();
-            loc[1] = 1 - (float) (landscapeVert + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePHeight();
-            // linear calibration
-            float[] mat = confHandler.getCalibrationMatrix();
-            loc[0] = loc[0] * mat[0]  + loc[1] * mat[2] + mat[4];
-            loc[1] = loc[0] * mat[1]  + loc[1] * mat[3] + mat[5];
-            if (toggleButton.isChecked()){
-                loc = adjustEstimation(loc);
+    private void switchGridBackground(FrameLayout layoutHolder, int layoutId){
+        layoutHolder.removeAllViews();
+        LayoutInflater inflater = (LayoutInflater) this.getSystemService(LAYOUT_INFLATER_SERVICE);
+        View childLayout = inflater.inflate(layoutId, (ViewGroup) findViewById(R.id.grid_for_demo));
+        layoutHolder.addView(childLayout);
+    }
+
+
+    private void delayCapture(int delayLength){
+        Handler handler = new Handler();
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_STILL_CAPTURE);
             }
-            drawExactResult(loc);
-//                drawClassifiedResult(loc, toggleButton.isChecked());
-//            }
-        } catch (JSONException e) {
-            e.printStackTrace();
+        }, delayLength);
+    }
+
+
+    private float[] computeTransportationMaxtrix(ArrayList<float[]> leftMat, ArrayList<float[]> rightMat){
+        // leftMat * A = rightMat
+        // Estimated * A = Ground Truth
+        double[][] estArr = new double[leftMat.size()][3];
+        double[][] truArr = new double[rightMat.size()][2];
+        TextFileHanlder.WriteLogIntoFile(leftMat);
+        TextFileHanlder.WriteLogIntoFile(rightMat);
+        for ( int i=0; i < leftMat.size(); i++){
+            estArr[i][0] = leftMat.get(i)[0];
+            estArr[i][1] = leftMat.get(i)[1];
+            estArr[i][2] = 1;
+            truArr[i][0] = rightMat.get(i)[0];
+            truArr[i][1] = rightMat.get(i)[1];
         }
-    }
-
-    private void drawClassifiedResult(float[] estimateGaze, boolean isShowDot){
-        if( estimateGaze!=null ){
-            switch (currentClassNum){
-                case 4:
-                    drawHandler.draw4ClassRegrsResult(estimateGaze, TEXTURE_SIZE, frame_gaze_result, isShowDot); break;
-                case 6:
-                    drawHandler.draw6ClassRegrsResult(estimateGaze, TEXTURE_SIZE, frame_gaze_result, isShowDot); break;
-                case 9:
-                    drawHandler.draw9ClassRegrsResult(estimateGaze, TEXTURE_SIZE, frame_gaze_result,  isShowDot); break;
-            }
+        Log.d(LOG_TAG, "leftMat");
+        for ( int i=0; i < leftMat.size(); i++){
+            Log.d(LOG_TAG, "("+String.valueOf(leftMat.get(i)[0])+", "+String.valueOf(leftMat.get(i)[1])+")");
         }
-    }
-
-    private void drawExactResult(float[] estimateGaze){
-        int landscapeHori = (int)(SCREEN_SIZE[0] * estimateGaze[0]);
-        int landscapeVert = (int)(SCREEN_SIZE[1] * estimateGaze[1]);
-        drawHandler.fillRect(landscapeHori, landscapeVert, 80,80, frame_gaze_result, R.color.estimated_square_color, false);
-    }
-
-    private float[] adjustEstimation(float[] newPoint){
-        float[] average = new float[2];
-        estimationList.add(new Point(newPoint[0], newPoint[1]));
-        for (Point each : estimationList){
-            average[0] += each.x;
-            average[1] += each.y;
+        Log.d(LOG_TAG, "rightMat");
+        for ( int i=0; i < rightMat.size(); i++){
+            Log.d(LOG_TAG, "("+String.valueOf(rightMat.get(i)[0])+", "+String.valueOf(rightMat.get(i)[1])+")");
         }
-        average[0] = average[0] / estimationList.size();
-        average[1] = average[1] / estimationList.size();
-        return average;
-    }
+        Matrix estMat = new Matrix(estArr);
+        Matrix truMat = new Matrix(truArr);
+        Matrix estMatT = estMat.transpose();
+        Matrix temp1 = estMatT.times(estMat);   // x^T * x
+        Matrix temp1_inv = temp1.inverse3x3();
+        Matrix temp2 = estMatT.times(truMat);   // X^T * y
+        Matrix res = temp1_inv.times(temp2);    // (x^T * x)^-1 * x^T * y
+//        Log.d(LOG_TAG, "EstMat");
+//        estMat.show(LOG_TAG);
+//        Log.d(LOG_TAG, "TruMat");
+//        truMat.show(LOG_TAG);
+//        Log.d(LOG_TAG, "Temp1");
+//        temp1.show(LOG_TAG);
+//        Log.d(LOG_TAG, "Temp1_inv");
+//        temp1_inv.show(LOG_TAG);
+//        Log.d(LOG_TAG, "Temp2");
+//        temp2.show(LOG_TAG);
 
+//        Log.d(LOG_TAG, "Res");
+//        res.show(LOG_TAG);
+        return new float[]{
+                (float) res.get(0,0),
+                (float) res.get(0,1),
+                (float) res.get(1,0),
+                (float) res.get(1,1),
+                (float) res.get(2,0),
+                (float) res.get(2,1)};
+    }
 
 
 }

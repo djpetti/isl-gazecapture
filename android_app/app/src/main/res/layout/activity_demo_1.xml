@@ -3,14 +3,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:gravity="center">
-
     <FrameLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_centerVertical="true"
         android:layout_alignParentLeft="true"
         android:id="@+id/activity_demo_layout_textureview_holder">
-
+    
         <TextureView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
@@ -18,16 +17,18 @@
             android:layout_centerInParent="true"
             android:visibility="visible" />
 
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:id="@+id/activity_demo_layout_background_grid"
-            android:layout_centerInParent="true"
-            >
-            <!--<include layout="@layout/grid4_for_demo" />-->
-        </FrameLayout>
     </FrameLayout>
+
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/activity_demo_layout_background_grid"
+        android:layout_centerInParent="true"
+        >
+        <!--<include layout="@layout/grid4_for_demo" />-->
+    </FrameLayout>
+
 
     <TextView
         android:layout_width="wrap_content"
@@ -49,9 +50,20 @@
         android:layout_alignParentRight="true"
         android:layout_marginTop="60dp"
         android:layout_marginRight="30dp"
-        android:textOff="stabilize"
-        android:textOn="stabilize"
+        android:textOff="Gaze Dot"
+        android:textOn="Gaze Dot"
         android:textSize="10dp" />
+
+    <Spinner
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/activity_demo_spinner_class_number"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentRight="true"
+        android:layout_marginTop="160dp"
+        android:layout_marginRight="30dp"
+        android:textSize="40dp" />
+
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -68,10 +80,11 @@
         android:background="@android:color/transparent" />
 
     <FrameLayout
+        android:id="@+id/activity_demo_layout_bounding_box"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:id="@+id/activity_demo_layout_bounding_box"
-        android:layout_centerInParent="true"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true"
         android:background="@android:color/transparent" />
 
 

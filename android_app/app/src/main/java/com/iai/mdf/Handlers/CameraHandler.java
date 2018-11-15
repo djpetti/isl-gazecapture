@@ -20,6 +20,7 @@ import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.ImageReader;
+import android.media.MediaCodec;
 import android.media.MediaRecorder;
 import android.os.Build;
 import android.os.Environment;
@@ -545,6 +546,9 @@ public class CameraHandler {
         frontCamera = null;
     }
 
+    public void setVideoCollectionFPS(int videoFPS){
+        VIDEO_FPS = videoFPS;
+    }
 
     public void openFrontCameraForVideo() {
         Log.d(LOG_TAG, "Try to open local camera");
@@ -634,12 +638,20 @@ public class CameraHandler {
         mediaRecorder = new MediaRecorder();
 //        mediaRecorder.setAudioSource(MediaRecorder.AudioSource.CAMCORDER);
 //        mediaRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+
+        Surface mSurface = null;
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            mSurface = MediaCodec.createPersistentInputSurface();
+        }
         mediaRecorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
         mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
+//        mediaRecorder.setVideoSource(MediaRecorder.VideoSource.CAMERA);
+//        mediaRecorder.setOutputFormat(MediaRecorder.OutputFormat.WEBM);
         mediaRecorder.setVideoSize(640, 480);// resolution
         mediaRecorder.setVideoFrameRate(VIDEO_FPS);    //frame rate
         mediaRecorder.setVideoEncodingBitRate(24 * 1024 * 1024);//
         mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);//视频编码格式
+//        mediaRecorder.setVideoEncoder(MediaRecorder.VideoEncoder.VP8);//视频编码格式
         mediaRecorder.setOrientationHint(DeviceConfiguration.getInstance(ctxt).getImageRotation());//输出视频播放的方向提示
 //        //设置记录会话的最大持续时间（毫秒）
 //        mediaRecorder.setProfile(CamcorderProfile.get(CamcorderProfile.QUALITY_480P));
@@ -704,7 +716,12 @@ public class CameraHandler {
         Toast.makeText(ctxt, "Video is Saved in " + videoName + ".mp4", Toast.LENGTH_SHORT).show();
         if( mediaRecorder!=null ) {
             isVideoing = false;
-            mediaRecorder.stop();
+            try{
+                mediaRecorder.stop();
+            }catch(RuntimeException stopException){
+                //handle cleanup here
+                Log.d("CameraHandler", "Stopping Error");
+            }
             mediaRecorder.reset();
         }
     }

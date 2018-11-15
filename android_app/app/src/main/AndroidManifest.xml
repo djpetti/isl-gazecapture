@@ -30,8 +30,9 @@
         <activity android:name="com.iai.mdf.Activities.DemoRegrsActivity" android:screenOrientation="portrait"/>
         <activity android:name="com.iai.mdf.Activities.DemoClassActivity" />
         <activity android:name="com.iai.mdf.Activities.DemoiTrackerActivity" android:screenOrientation="portrait"/>
-        <activity android:name="com.iai.mdf.Activities.DemoServerActivity2" android:screenOrientation="portrait"/>
-        <activity android:name="com.iai.mdf.Activities.DemoServerActivity1" android:screenOrientation="portrait" />
+        <activity android:name="com.iai.mdf.Activities.DemoServerActivity2" android:screenOrientation="landscape" />
+        <activity android:name="com.iai.mdf.Activities.DemoServerActivity1" android:screenOrientation="landscape"/>
+        <activity android:name="com.iai.mdf.Activities.CalibrationActivity" android:screenOrientation="landscape"/>
         <activity android:name="com.iai.mdf.Activities.TestPBActivity" />
         <activity android:name="com.iai.mdf.Activities.OpenCVActivity" />
         <activity android:name="com.iai.mdf.Activities.CloudActivity" android:screenOrientation="portrait"/>

@@ -38,6 +38,7 @@ public class GameSettingActivity extends Activity {
     private EditText portInput;
     private SeekBar seekbarSpeed;
     private CheckBox checkBoxAutoTrigger;
+    private CheckBox checkBoxVisualCircle;
     private Button btnYes;
     private Button btnNo;
 
@@ -64,6 +65,8 @@ public class GameSettingActivity extends Activity {
 
         checkBoxAutoTrigger = findViewById(R.id.activity_game_checkbox_gaze_trigger);
         checkBoxAutoTrigger.setChecked(settings.getBoolean(GameMainActivity.KEY_TRIGGER_MODE, true));
+        checkBoxVisualCircle = findViewById(R.id.activity_game_checkbox_additional_circle);
+        checkBoxVisualCircle.setChecked(settings.getBoolean(GameMainActivity.KEY_ADDITIONAL_VISUAL, false));
 
 
         btnYes = findViewById(R.id.activity_game_setting_btn_confirm);
@@ -75,6 +78,7 @@ public class GameSettingActivity extends Activity {
                 editor.putString(GameSettingActivity.BUNDLE_KEY_IP, ipInput.getText().toString());
                 editor.putString(GameSettingActivity.BUNDLE_KEY_PORT, portInput.getText().toString());
                 editor.putBoolean(GameMainActivity.KEY_TRIGGER_MODE, checkBoxAutoTrigger.isChecked());
+                editor.putBoolean(GameMainActivity.KEY_ADDITIONAL_VISUAL, checkBoxVisualCircle.isChecked());
                 editor.commit();
                 finish();
             }

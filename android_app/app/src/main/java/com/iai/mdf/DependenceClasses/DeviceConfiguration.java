@@ -5,7 +5,9 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.util.DisplayMetrics;
+import android.util.Log;
 
+import java.util.StringTokenizer;
 
 
 /**
@@ -25,9 +27,14 @@ public class DeviceConfiguration {
     private static final String KEY_DISPLAY_LONG_CM = "display_size_long_cm";
     private static final String KEY_DISPLAY_SHORT_RESO = "display_reso_short";
     private static final String KEY_DISPLAY_LONG_RESO = "display_reso_long";
+    private static final String KEY_CALIBRAIION_SPEED = "calibration_speed";
+    private static final String KEY_CALIBRAIION_RESULT = "calibration_result";
     private static final String KEY_CAPTURE_SPEED_COLLECTION = "capture_speed_collection";
     private static final String KEY_CAPTURE_SPEED_REALTIME = "capture_speed_realtime";
+    private static final String KEY_VIDEO_COLLECTION_FPS = "video_collection_fps";
     private static final String KEY_CAPTURE_ROTATION = "picture_rotation";
+    private static final String KEY_DOT_CANDIDATE_ROW = "dot_candidate_row";
+    private static final String KEY_DOT_CANDIDATE_COL = "dot_candidate_col";
 
 
 
@@ -45,14 +52,20 @@ public class DeviceConfiguration {
     private float   screenSizePHeight;
     private int     screenResoPWidth;
     private int     screenResoPHeight;
+    private int     calibrationSpeed;
+    private float[] calibrationMatrix;
     private int     collectionCaptureDelayTime;
     private int     demoCaptureDelayTime;
+    private int     videoCollectionFPS;
     private int     imageRotation;
+    private int     dotCandidateRow;
+    private int     dotCandidateCol;
 
 
 
     private DeviceConfiguration(Context context) {
         ctxt = context;
+        calibrationMatrix = new float[6];
     }
 
     public static synchronized DeviceConfiguration getInstance(Context context){
@@ -80,9 +93,19 @@ public class DeviceConfiguration {
             screenResoPWidth = displayMetrics.heightPixels;
             screenResoPHeight = displayMetrics.widthPixels;
         }
+        calibrationSpeed = settings.getInt(this.KEY_CALIBRAIION_SPEED, 500);
+        // 3x2 matrix
+        StringTokenizer st = new StringTokenizer(settings.getString(this.KEY_CALIBRAIION_RESULT, "1,0,0,1,0,0"), ",");
+        for (int i = 0; i < 6; i++) {
+            calibrationMatrix[i] = Float.parseFloat(st.nextToken());
+            Log.d(LOG_TAG, String.valueOf(calibrationMatrix[i]));
+        }
         collectionCaptureDelayTime = settings.getInt(this.KEY_CAPTURE_SPEED_COLLECTION, 700);
         demoCaptureDelayTime = settings.getInt(this.KEY_CAPTURE_SPEED_REALTIME, 300);
+        videoCollectionFPS = settings.getInt(this.KEY_VIDEO_COLLECTION_FPS, 30);
         imageRotation = settings.getInt(this.KEY_CAPTURE_ROTATION, 0);
+        dotCandidateRow = settings.getInt(this.KEY_DOT_CANDIDATE_ROW, 5);
+        dotCandidateCol = settings.getInt(this.KEY_DOT_CANDIDATE_COL, 6);
     }
 
     public void saveConfiguration(){
@@ -92,9 +115,18 @@ public class DeviceConfiguration {
         editor.putFloat(this.KEY_CAMERA_POS_Y, cameraOffsetPHeight);
         editor.putFloat(this.KEY_DISPLAY_SHORT_CM, screenSizePWidth);
         editor.putFloat(this.KEY_DISPLAY_LONG_CM, screenSizePHeight);
+        editor.putInt(this.KEY_CALIBRAIION_SPEED, calibrationSpeed);
+        StringBuilder caliMatStr = new StringBuilder();
+        caliMatStr.append(calibrationMatrix[0]).append(",").append(calibrationMatrix[1]).append(",")
+                .append(calibrationMatrix[2]).append(",").append(calibrationMatrix[3]).append(",")
+                .append(calibrationMatrix[4]).append(",").append(calibrationMatrix[5]);
+        editor.putString(this.KEY_CALIBRAIION_RESULT, caliMatStr.toString());
         editor.putInt(this.KEY_CAPTURE_SPEED_COLLECTION, collectionCaptureDelayTime);
         editor.putInt(this.KEY_CAPTURE_SPEED_REALTIME, demoCaptureDelayTime);
+        editor.putInt(this.KEY_VIDEO_COLLECTION_FPS, videoCollectionFPS);
         editor.putInt(this.KEY_CAPTURE_ROTATION, imageRotation);
+        editor.putInt(this.KEY_DOT_CANDIDATE_ROW, dotCandidateRow);
+        editor.putInt(this.KEY_DOT_CANDIDATE_COL, dotCandidateCol);
         editor.commit();
     }
 
@@ -150,6 +182,22 @@ public class DeviceConfiguration {
         this.screenResoPHeight = screenResoPHeight;
     }
 
+    public int getCalibrationSpeed() {
+        return calibrationSpeed;
+    }
+
+    public void setCalibrationSpeed(int calibrationSpeed) {
+        this.calibrationSpeed = calibrationSpeed;
+    }
+
+    public float[] getCalibrationMatrix() {
+        return calibrationMatrix;
+    }
+
+    public void setCalibrationMatrix(float[] calibrationMatrix) {
+        this.calibrationMatrix = calibrationMatrix;
+    }
+
     public int getCollectionCaptureDelayTime() {
         return collectionCaptureDelayTime;
     }
@@ -166,11 +214,35 @@ public class DeviceConfiguration {
         this.demoCaptureDelayTime = demoCaptureDelayTime;
     }
 
+    public int getVideoCollectionFPS() {
+        return videoCollectionFPS;
+    }
+
+    public void setVideoCollectionFPS(int videoCollectionFPS) {
+        this.videoCollectionFPS = videoCollectionFPS;
+    }
+
     public int getImageRotation() {
         return imageRotation;
     }
 
     public void setImageRotation(int imageRotation) {
         this.imageRotation = imageRotation;
+    }
+
+    public int getDotCandidateRow() {
+        return dotCandidateRow;
+    }
+
+    public void setDotCandidateRow(int dotCandidateRow) {
+        this.dotCandidateRow = dotCandidateRow;
+    }
+
+    public int getDotCandidateCol() {
+        return dotCandidateCol;
+    }
+
+    public void setDotCandidateCol(int dotCandidateCol) {
+        this.dotCandidateCol = dotCandidateCol;
     }
 }

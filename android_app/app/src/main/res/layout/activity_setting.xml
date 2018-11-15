@@ -52,6 +52,43 @@
                     android:hint="cm" />
             </LinearLayout>
 
+            <!--calibration-->
+            <TextView style="@style/SettingActivityTitle"
+                android:id="@+id/setting_activity_txt_calibration_status"
+                android:text="@string/setting_activity_txt_title_calibration" />
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_calibration_speed" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_calibration_speed"
+                    android:inputType="numberDecimal"
+                    android:hint="500" />
+            </LinearLayout>
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <EditText style="@style/SettingActivityItemEditMatrix"
+                    android:id="@+id/setting_activity_editxt_calibration_manual"
+                    android:inputType="text"
+                    android:hint="0.1234, -1.3456, ..." />
+                <Button style="@style/SettingActivityItemButton"
+                    android:id="@+id/setting_activity_btn_item_manu_calibration"
+                    android:text="@string/setting_activity_btn_item_manu_calibration"
+                    android:textAllCaps="false" />
+            </LinearLayout>
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <Button style="@style/SettingActivityItemButton"
+                    android:id="@+id/setting_activity_btn_item_auto_calibration"
+                    android:text="@string/setting_activity_btn_item_auto_calibration"
+                    android:textAllCaps="false" />
+            </LinearLayout>
+
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <Button style="@style/SettingActivityItemButton"
+                    android:id="@+id/setting_activity_btn_calibration_reset"
+                    android:text="@string/setting_activity_btn_item_calibration_reset"
+                    android:textAllCaps="false" />
+            </LinearLayout>
+
+
         </LinearLayout>
 
         <LinearLayout
@@ -79,6 +116,14 @@
                     android:hint=">= 350 ms"
                     android:inputType="number"/>
             </LinearLayout>
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_video_collection_fps" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_video_collection_fps"
+                    android:inputType="number"
+                    android:hint="e.g. ~30" />
+            </LinearLayout>
 
 
             <!--image rotation-->
@@ -91,6 +136,27 @@
                     android:id="@+id/setting_activity_editxt_image_rotation"
                     android:inputType="number"
                     android:hint="{0, 90, 180, 270}" />
+            </LinearLayout>
+
+
+            <!--Dot Candidate Generation-->
+            <TextView style="@style/SettingActivityTitle"
+                android:text="@string/setting_activity_txt_title_dot_candidate" />
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_dot_candidate_row_num" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_dot_candidate_row"
+                    android:inputType="number"
+                    android:hint="5" />
+            </LinearLayout>
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_dot_candidate_col_num" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_dot_candidate_col"
+                    android:inputType="number"
+                    android:hint="6" />
             </LinearLayout>
 
 

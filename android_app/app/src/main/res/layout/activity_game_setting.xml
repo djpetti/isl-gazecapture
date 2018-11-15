@@ -87,7 +87,7 @@
                 android:max="5"
                 android:min="1"/>
 
-
+            <!--Auto Trigger-->
             <RelativeLayout
                 android:orientation="horizontal"
                 android:layout_width="match_parent"
@@ -103,6 +103,26 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:id="@+id/activity_game_checkbox_gaze_trigger"
+                    android:layout_alignParentRight="true"
+                    android:layout_marginRight="30dp" />
+            </RelativeLayout>
+
+            <!--Additional Visual Effect __ circle-->
+            <RelativeLayout
+                android:orientation="horizontal"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="30dp" >
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_alignParentLeft="true"
+                    android:textSize="20dp"
+                    android:text="Additional Circle"/>
+                <CheckBox
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:id="@+id/activity_game_checkbox_additional_circle"
                     android:layout_alignParentRight="true"
                     android:layout_marginRight="30dp" />
             </RelativeLayout>

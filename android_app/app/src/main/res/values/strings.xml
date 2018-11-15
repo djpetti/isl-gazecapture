@@ -18,9 +18,18 @@
     <string name="setting_activity_txt_item_display_long_cm">Short Side(cm)</string>
     <string name="setting_activity_txt_item_display_short_pixel">Long Side Reso</string>
     <string name="setting_activity_txt_item_display_long_pixel">Short Side Reso</string>
+    <string name="setting_activity_txt_title_calibration">Calibration</string>
+    <string name="setting_activity_txt_item_calibration_speed">Dot Interval(ms)</string>
+    <string name="setting_activity_btn_item_auto_calibration">Auto Calibration</string>
+    <string name="setting_activity_btn_item_manu_calibration">set</string>
+    <string name="setting_activity_btn_item_calibration_reset">Reset Calibration</string>
     <string name="setting_activity_txt_title_capture_speed">Picture Capture Delay</string>
     <string name="setting_activity_txt_item_capture_speed_data_collection">Collection(ms)</string>
     <string name="setting_activity_txt_item_capture_speed_real_time">Real Time(ms)</string>
+    <string name="setting_activity_txt_item_video_collection_fps">Video Collection FPS</string>
+    <string name="setting_activity_txt_title_dot_candidate">Dot Candidate Generator</string>
+    <string name="setting_activity_txt_item_dot_candidate_row_num">Row Num in Portrait</string>
+    <string name="setting_activity_txt_item_dot_candidate_col_num">Col Num in Portrait</string>
     <string name="setting_activity_txt_title_roration">Picture Rotation</string>
     <string name="setting_activity_txt_item_landscape_rotation">Rotate by(Deg)</string>
 

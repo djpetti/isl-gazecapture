@@ -108,6 +108,13 @@
                     android:layout_height="match_parent"
                     android:id="@+id/activity_game_main_textureview"
                     android:visibility="visible"/>
+
+                <FrameLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:id="@+id/activity_game_main_layout_circle_holder"
+                    android:layout_centerInParent="true"
+                    android:background="@android:color/transparent" />
             </FrameLayout>
 
 
