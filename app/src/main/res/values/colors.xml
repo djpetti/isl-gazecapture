@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="colorPrimary">#3F51B5</color>
+    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorAccent">#FF4081</color>
+
+
+    <color name="red_dot">#ff8080</color>
+    <color name="red_ring">#ff8080</color>
+    <color name="green_dot">#1f7a1f</color>
+    <color name="translucent_green">#661f7a1f</color>
+    <color name="orange_arc">#bbff6600</color>
+    <color name="desired_square_color">#ff3333</color>
+    <color name="estimated_square_color">#0099ff</color>
+    <color name="editxt_enabled_bg">#f2f2f2</color>
+
+    <color name="setting_title_font_color">#cccccc</color>
+    <color name="setting_item_font_color">#4d4d4d</color>
+
+
+    <color name="game_background">#6db129</color>
+    <color name="game_menu_title">#ff9c00</color>
+    <color name="game_main_top">#ffbf00</color>
+    <color name="game_result_score_text_color">#F0421f</color>
+
+
+</resources>

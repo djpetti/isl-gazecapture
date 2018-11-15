@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" >
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.5">
+
+            <!--camera position-->
+            <TextView style="@style/SettingActivityTitle"
+                android:text="@string/setting_activity_txt_title_camera" />
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_camera_long_side" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_camera_long"
+                    android:hint="cm" />
+            </LinearLayout>
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_camera_short_side" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_camera_short"
+                    android:hint="cm" />
+            </LinearLayout>
+
+            <!--display-->
+            <TextView style="@style/SettingActivityTitle"
+                android:text="@string/setting_activity_txt_title_display" />
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_display_long_cm" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_display_long_cm"
+                    android:inputType="numberDecimal"
+                    android:hint="cm" />
+            </LinearLayout>
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_display_short_cm" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_display_short_cm"
+                    android:inputType="numberDecimal"
+                    android:hint="cm" />
+            </LinearLayout>
+
+        </LinearLayout>
+
+        <LinearLayout
+            android:orientation="vertical"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="0.5">
+
+            <!--Image Capture delay-->
+            <TextView style="@style/SettingActivityTitle"
+                android:text="@string/setting_activity_txt_title_capture_speed" />
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_capture_speed_data_collection" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_capture_speed_collection"
+                    android:hint=">= 350 ms"
+                    android:inputType="number"/>
+            </LinearLayout>
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_capture_speed_real_time" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_capture_speed_realtime"
+                    android:hint=">= 350 ms"
+                    android:inputType="number"/>
+            </LinearLayout>
+
+
+            <!--image rotation-->
+            <TextView style="@style/SettingActivityTitle"
+                android:text="@string/setting_activity_txt_title_roration" />
+            <LinearLayout style="@style/SettingActivityItemBlock">
+                <TextView style="@style/SettingActivityItem"
+                    android:text="@string/setting_activity_txt_item_landscape_rotation" />
+                <EditText style="@style/SettingActivityItemEdit"
+                    android:id="@+id/setting_activity_editxt_image_rotation"
+                    android:inputType="number"
+                    android:hint="{0, 90, 180, 270}" />
+            </LinearLayout>
+
+
+
+
+
+
+        </LinearLayout>
+
+
+
+    </LinearLayout>
+
+
+
+
+</ScrollView>

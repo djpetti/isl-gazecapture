@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/selected" android:oneshot="true">
+    <item android:drawable="@drawable/mole_frame1" android:duration="50" />
+    <item android:drawable="@drawable/mole_frame2" android:duration="50" />
+    <item android:drawable="@drawable/mole_frame3" android:duration="50" />
+    <item android:drawable="@drawable/mole_frame4" android:duration="50" />
+    <item android:drawable="@drawable/mole_frame5" android:duration="50" />
+    <item android:drawable="@drawable/mole_frame6" android:duration="50" />
+</animation-list>

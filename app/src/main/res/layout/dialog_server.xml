@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="horizontal"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:padding="30dp"
+    android:id="@+id/dialog_server_viewgroup">
+
+    <EditText
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:id="@+id/dialog_server_editxt_ip"
+        android:layout_weight="0.8"
+        android:ems="10"
+        android:inputType="textEmailAddress"
+        android:backgroundTint="@android:color/holo_blue_light"
+        android:hint="@string/server_dialog_txt_ip"
+        android:textColorHint="@android:color/darker_gray"
+        android:textColor="@android:color/black"/>
+    <Space
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.05"/>
+    <EditText
+        android:layout_width="20dp"
+        android:layout_height="wrap_content"
+        android:id="@+id/dialog_server_editxt_port"
+        android:layout_weight="0.2"
+        android:ems="10"
+        android:inputType="number"
+        android:backgroundTint="@android:color/holo_blue_light"
+        android:hint="@string/server_dialog_txt_port"
+        android:textColorHint="@android:color/darker_gray"
+        android:textColor="@android:color/black" />
+
+
+
+</LinearLayout>

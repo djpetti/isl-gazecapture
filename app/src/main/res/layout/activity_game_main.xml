@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/game_background">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical">
+        <RelativeLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.12"
+            android:padding="5dp">
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/activity_game_main_img_timer"
+                android:src="@drawable/game_main_timer"
+                android:layout_alignParentLeft="true"
+                android:layout_marginLeft="25dp"
+                />
+            <com.akexorcist.roundcornerprogressbar.RoundCornerProgressBar
+                android:layout_width="150dp"
+                android:layout_height="20dp"
+                android:id="@+id/activity_game_main_progressbar"
+                android:layout_toRightOf="@id/activity_game_main_img_timer"
+                android:layout_marginLeft="25dp"
+                android:layout_centerVertical="true"
+                app:rcProgress="0.5"
+                app:rcSecondaryProgress="0.5"
+                app:rcMax="1"
+                app:rcRadius="10dp"
+                app:rcBackgroundPadding="0dp"
+                app:rcProgressColor="@android:color/holo_red_light"
+                app:rcBackgroundColor="@android:color/darker_gray" />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/activity_game_main_img_server_connect"
+                android:src="@drawable/game_main_visiable"
+                android:layout_centerInParent="true" />
+            <TextView
+                android:layout_width="100dp"
+                android:layout_height="wrap_content"
+                android:id="@+id/activity_game_main_txt_score"
+                android:layout_alignParentRight="true"
+                android:layout_marginRight="35dp"
+                android:layout_centerVertical="true"
+                android:text="320"
+                android:textSize="25dp"
+                android:textAlignment="center"
+                />
+            <ImageView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:id="@+id/activity_game_main_img_score"
+                android:src="@drawable/game_main_score"
+                android:layout_toLeftOf="@id/activity_game_main_txt_score"
+                android:layout_marginRight="15dp"
+                android:layout_centerVertical="true" />
+
+        </RelativeLayout>
+
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="0.88">
+
+            <FrameLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.9">
+                <LinearLayout
+                    android:orientation="vertical"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:background="@color/game_background"
+                    android:layout_weight="0.9"
+                    android:id="@+id/activity_game_main_layout_table">
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:layout_height="0dp"
+                        android:layout_width="match_parent"
+                        android:layout_weight="0.01"
+                        android:id="@+id/activity_game_main_table_row1"/>
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:layout_height="0dp"
+                        android:layout_width="match_parent"
+                        android:layout_weight="0.01"
+                        android:id="@+id/activity_game_main_table_row2" />
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:layout_height="0dp"
+                        android:layout_width="match_parent"
+                        android:layout_weight="0.01"
+                        android:id="@+id/activity_game_main_table_row3" />
+                </LinearLayout>
+
+                <TextureView
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:id="@+id/activity_game_main_textureview"
+                    android:visibility="visible"/>
+            </FrameLayout>
+
+
+            <RelativeLayout
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="0.1"
+                android:layout_alignParentRight="true" >
+
+                <ImageButton
+                    android:layout_width="75dp"
+                    android:layout_height="75dp"
+                    android:id="@+id/activity_game_main_imgbtn_exit"
+                    android:src="@drawable/button_main_exit"
+                    android:scaleType="centerInside"
+                    android:background="@android:color/transparent"
+                    android:layout_alignParentBottom="true"
+                    android:layout_centerHorizontal="true"/>
+
+                <ImageButton
+                    android:layout_width="80dp"
+                    android:layout_height="80dp"
+                    android:id="@+id/activity_game_main_imgbtn_hammer"
+                    android:layout_above="@id/activity_game_main_imgbtn_exit"
+                    android:layout_marginBottom="30dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/hammer_button"
+                    android:background="@android:color/transparent"
+                    android:layout_centerHorizontal="true"/>
+
+                <ImageButton
+                    android:layout_width="65dp"
+                    android:layout_height="65dp"
+                    android:id="@+id/activity_game_main_imgbtn_controller"
+                    android:layout_above="@id/activity_game_main_imgbtn_hammer"
+                    android:layout_marginBottom="30dp"
+                    android:scaleType="centerInside"
+                    android:src="@drawable/button_main_start"
+                    android:background="@android:color/transparent"
+                    android:layout_centerHorizontal="true"/>
+
+            </RelativeLayout>
+
+
+        </LinearLayout>
+
+
+    </LinearLayout>
+
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:id="@+id/activity_game_layout_dotHolder_result"
+        android:layout_centerInParent="true"
+        android:background="@android:color/transparent" />
+
+
+</FrameLayout>
