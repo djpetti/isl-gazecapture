@@ -144,7 +144,7 @@ public class CalibrationActivity extends AppCompatActivity {
                     GroundTruthPoints.clear();
                     view_dot_container.setBackgroundColor(0xFFFFFFFF);   // cover texture with white
                     dotGeneratorHandler.postDelayed(dotGeneratorRunnable, 500);
-                    autoDetectionHandler.postDelayed(takePicRunnable, 500-confHandler.getCalibrationSpeed()/AmountPicForEachPoint/2);
+                    autoDetectionHandler.postDelayed(takePicRunnable, 500+confHandler.getCalibrationSpeed()/AmountPicForEachPoint/2);
                     result_board.setText("");
                 } else {
                     view_dot_container.setBackgroundColor(0x00FFFFFF);   // uncover texture with translucent
@@ -380,19 +380,6 @@ public class CalibrationActivity extends AppCompatActivity {
         Matrix temp1_inv = temp1.inverse3x3();
         Matrix temp2 = estMatT.times(truMat);   // X^T * y
         Matrix res = temp1_inv.times(temp2);    // (x^T * x)^-1 * x^T * y
-//        Log.d(LOG_TAG, "EstMat");
-//        estMat.show(LOG_TAG);
-//        Log.d(LOG_TAG, "TruMat");
-//        truMat.show(LOG_TAG);
-//        Log.d(LOG_TAG, "Temp1");
-//        temp1.show(LOG_TAG);
-//        Log.d(LOG_TAG, "Temp1_inv");
-//        temp1_inv.show(LOG_TAG);
-//        Log.d(LOG_TAG, "Temp2");
-//        temp2.show(LOG_TAG);
-
-//        Log.d(LOG_TAG, "Res");
-//        res.show(LOG_TAG);
         return new float[]{
                 (float) res.get(0,0),
                 (float) res.get(0,1),
