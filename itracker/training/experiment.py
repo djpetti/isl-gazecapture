@@ -208,15 +208,8 @@ class Experiment(experiment.Experiment):
     # Create the model.
     self.__build_model(data_tensors)
 
-    # Create a coordinator and run queues.
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(coord=coord, sess=g_session)
-
     # Train the model.
     super(Experiment, self).train()
-
-    coord.request_stop()
-    coord.join(threads)
 
   def validate(self):
     """ Validates an existing model. """

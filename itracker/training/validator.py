@@ -137,10 +137,6 @@ class Validator(object):
     # Get the underlying TensorFlow session.
     session = K.tensorflow_backend.get_session()
 
-    # Create a coordinator and run queues.
-    coord = tf.train.Coordinator()
-    threads = tf.train.start_queue_runners(coord=coord, sess=session)
-
     total_error = []
     total_coord_error = []
     total_pose = []
@@ -168,9 +164,6 @@ class Validator(object):
       if new_percentage - percentage > 0.01:
         print "Validating. (%.2f%% complete)" % (new_percentage)
         percentage = new_percentage
-
-    coord.request_stop()
-    coord.join(threads)
 
     print "Saving data matrix..."
 
