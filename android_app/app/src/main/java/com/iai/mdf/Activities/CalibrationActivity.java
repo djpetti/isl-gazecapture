@@ -85,7 +85,8 @@ public class CalibrationActivity extends AppCompatActivity {
     private int                     AmountPicForEachPoint = 2;
     private ArrayList<float[]>      GroundTruthPoints = new ArrayList<>();
     private ArrayList<float[]>      EstimatePoints = new ArrayList<>();
-
+    private int  temp_counter = 0;
+    private long    timestamp = 0;
 
 
     @Override
@@ -143,16 +144,25 @@ public class CalibrationActivity extends AppCompatActivity {
                     EstimatePoints.clear();
                     GroundTruthPoints.clear();
                     view_dot_container.setBackgroundColor(0xFFFFFFFF);   // cover texture with white
-                    dotGeneratorHandler.postDelayed(dotGeneratorRunnable, 500);
-                    autoDetectionHandler.postDelayed(takePicRunnable, 500+confHandler.getCalibrationSpeed()/AmountPicForEachPoint/2);
+                    dotGeneratorHandler.postDelayed(dotGeneratorRunnable, 800);
+//                    autoDetectionHandler.postDelayed(takePicRunnable, 500+confHandler.getCalibrationSpeed()/AmountPicForEachPoint/2);
                     result_board.setText("");
                 } else {
                     view_dot_container.setBackgroundColor(0x00FFFFFF);   // uncover texture with translucent
                     cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_PREVIEW);
                     dotGeneratorHandler.removeCallbacks(dotGeneratorRunnable);
                     autoDetectionHandler.removeCallbacks(takePicRunnable);
+                    // trunk to the same size
                     while (GroundTruthPoints.size() != EstimatePoints.size()){
                         GroundTruthPoints.remove(GroundTruthPoints.size()-1);
+                    }
+                    // delete invalid frames first in the list
+                    for (int i=0; i < EstimatePoints.size(); i++) {
+                        if (Math.abs(EstimatePoints.get(i)[0] + 1) < 0.0000001 && Math.abs(EstimatePoints.get(i)[1] + 1) < 0.0000001) {
+                            GroundTruthPoints.remove(i);
+                            EstimatePoints.remove(i);
+                            i--;
+                        }
                     }
                     Toast.makeText(CalibrationActivity.this, "Sample Collected: " + String.valueOf(GroundTruthPoints.size()), Toast.LENGTH_LONG).show();
                     if (GroundTruthPoints.size()<2){
@@ -185,11 +195,14 @@ public class CalibrationActivity extends AppCompatActivity {
             public void run() {
                 drawHandler.clear(view_dot_container);
                 drawHandler.showNextPointInOrder();
+                autoDetectionHandler.removeCallbacks(takePicRunnable);
+                temp_counter = 0;
                 Point curPoint = drawHandler.getCurrDot();
                 for(int i=0; i<AmountPicForEachPoint; i++) {
                     GroundTruthPoints.add(new float[]{(float) curPoint.x / (float) SCREEN_SIZE[0], (float) curPoint.y / (float) SCREEN_SIZE[1]});
                 }
 //                delayCapture(confHandler.getCollectionCaptureDelayTime());
+                autoDetectionHandler.postDelayed(takePicRunnable, (long)(confHandler.getCalibrationSpeed()/(AmountPicForEachPoint+1)*1.5));
                 dotGeneratorHandler.postDelayed(this,confHandler.getCalibrationSpeed());
             }
         };
@@ -198,7 +211,10 @@ public class CalibrationActivity extends AppCompatActivity {
             @Override
             public void run() {
                 cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_STILL_CAPTURE);
-                autoDetectionHandler.postDelayed(this, confHandler.getCalibrationSpeed()/AmountPicForEachPoint);
+                temp_counter++;
+                timestamp = System.currentTimeMillis();
+                Log.d("aaaa", "image No." + String.valueOf(temp_counter));
+                autoDetectionHandler.postDelayed(this, confHandler.getCalibrationSpeed()/(AmountPicForEachPoint+1));
             }
         };
 
@@ -219,6 +235,7 @@ public class CalibrationActivity extends AppCompatActivity {
                 if( cameraHandler.getCameraState()==CameraHandler.CAMERA_STATE_STILL_CAPTURE ) {
                     cameraHandler.setCameraState(CameraHandler.CAMERA_STATE_PREVIEW);
                     Log.d(LOG_TAG, "Take a picture");
+                    Log.d("aaaa", String.valueOf(System.currentTimeMillis() - timestamp));
                     if( Build.MODEL.equalsIgnoreCase("BLU Studio Touch")) {
                         socketHandler.uploadImageOnBLU(image);
                     } else {
@@ -293,6 +310,7 @@ public class CalibrationActivity extends AppCompatActivity {
                             EstimatePoints.add(new float[]{ loc[0], loc[1] } );
                             Log.d(LOG_TAG, object.toString());
                         } else {
+                            EstimatePoints.add(new float[]{ -1, -1 } );
                             Log.d(LOG_TAG, "invalid");
                         }
                     }
@@ -354,10 +372,13 @@ public class CalibrationActivity extends AppCompatActivity {
     private float[] computeTransportationMaxtrix(ArrayList<float[]> leftMat, ArrayList<float[]> rightMat){
         // leftMat * A = rightMat
         // Estimated * A = Ground Truth
+        // form the matrices
         double[][] estArr = new double[leftMat.size()][3];
         double[][] truArr = new double[rightMat.size()][2];
         TextFileHanlder.WriteLogIntoFile(leftMat);
         TextFileHanlder.WriteLogIntoFile(rightMat);
+//        TextFileHanlder.WriteLogIntoFile(leftMatValid);
+//        TextFileHanlder.WriteLogIntoFile(rightMatValid);
         for ( int i=0; i < leftMat.size(); i++){
             estArr[i][0] = leftMat.get(i)[0];
             estArr[i][1] = leftMat.get(i)[1];
