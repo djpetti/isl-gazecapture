@@ -16,7 +16,7 @@ class Network(object):
 
   def __init__(self, input_shape, eye_shape=None, fine_tune=False,
                data_tensors=None, eye_preproc=None, face_preproc=None,
-               **kwargs):
+               l2_reg=0.0005, **kwargs):
     """ Creates a new network.
     Args:
       input_shape: The input shape to the network.
@@ -30,10 +30,12 @@ class Network(object):
                    preprocessed.
       face_preproc: Optional custom layer to use for preprocessing the face
                     data. If not present, it assumes that the input arrives
-                    preprocessed. """
+                    preprocessed.
+      l2_reg: The alpha value to use for l2 regularization. """
     self.__data_tensors = data_tensors
     self.__eye_preproc = eye_preproc
     self.__face_preproc = face_preproc
+    self.__reg_alpha = l2_reg
     self._fine_tune = fine_tune
     self._input_shape = input_shape
 
@@ -73,7 +75,8 @@ class Network(object):
         return layers.Input
 
     # L2 regularizer for weight decay.
-    self._l2 = regularizers.l2(0.0005)
+    logger.debug("Using regularization: %f" % (self.__reg_alpha))
+    self._l2 = regularizers.l2(self.__reg_alpha)
 
     leye = None
     reye = None

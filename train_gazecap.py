@@ -51,6 +51,8 @@ def parse_args():
                       help="How many iterations to validate for.")
   parser.add_argument("--pose", action="store_true",
                       help="Whether the dataset supports head pose.")
+  parser.add_argument("--reg", type=float, default=0.0005,
+                      help="Alpha value to use for l2 regularization.")
 
   return parser
 

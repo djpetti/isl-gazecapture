@@ -141,7 +141,8 @@ class Experiment(experiment.Experiment):
                           data_tensors=data_tensors,
                           fine_tune=self.__args.fine_tune,
                           autoenc_model_file=autoenc_weights,
-                          cluster_data=clusters)
+                          cluster_data=clusters,
+                          l2_reg=self.__args.reg)
     self.__model = net.build()
 
     # Prepare label data.
