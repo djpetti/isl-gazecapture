@@ -73,13 +73,8 @@ class ResNetwork(Network):
                                 kernel_regularizer=self._l2,
                                 trainable=trainable)
 
-    conv_e6 = layers.Conv2D(64, (1, 1), kernel_regularizer=self._l2,
-                            trainable=trainable)
-    norm_e6 = layers.BatchNormalization()
-    act_e6 = layers.Activation("relu")
-
     eye_layers = [conv_e1, act_e1, norm_e1, pool_e1] + res_e2 + res_e3 + \
-                 res_e4 + res_e5 + [conv_e6, norm_e6, act_e6]
+                 res_e4 + res_e5
     # Left eye stack.
     leye_out = self.__apply_all(self._left_eye_node, eye_layers)
     # Right eye stack.
@@ -162,8 +157,7 @@ class ResNetwork(Network):
     all_fc1 = layers.Dense(128, activation="relu",
                            kernel_regularizer=self._l2,
                            trainable=trainable)
-    norm_fc1 = layers.BatchNormalization()
     all_fc2 = layers.Dense(2, kernel_regularizer=self._l2, name="dots")
 
-    all_out = self.__apply_all(all_concat, [all_fc1, norm_fc1, all_fc2])
+    all_out = self.__apply_all(all_concat, [all_fc1, all_fc2])
     return all_out

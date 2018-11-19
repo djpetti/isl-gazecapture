@@ -76,7 +76,7 @@ class Residual(SuperLayer):
     return layers.Activation("relu")(add)
 
 class ResNetBlock(Residual):
-  """ Performs a block of 2 convolution operations, wrapped in a residual
+  """ Performs a block of 3 convolution operations, wrapped in a residual
       module. """
 
   def __init__(self, filters, kernel_size, **kwargs):
