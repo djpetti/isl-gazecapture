@@ -149,7 +149,7 @@ class BranchedNetwork(Network):
 
     # For training, we can now concatenate the output from the two branches back
     # together.
-    all_fc2 = layers.Concatenate(axis=0)([all_fc2_b1, all_fc2_b2])
+    all_fc2 = layers.Concatenate(axis=0, name="dots")([all_fc2_b1, all_fc2_b2])
 
     return all_fc2
 
