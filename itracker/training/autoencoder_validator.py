@@ -1,8 +1,6 @@
 import cPickle as pickle
 import logging
 
-import keras.backend as K
-import keras.losses as losses
 import numpy as np
 
 import tensorflow as tf
@@ -12,6 +10,9 @@ import validator
 
 
 logger = logging.getLogger(__name__)
+
+K = tf.keras.backend
+losses = tf.keras.losses
 
 
 class Validator(validator.Validator):

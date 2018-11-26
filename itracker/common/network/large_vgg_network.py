@@ -1,7 +1,10 @@
-import keras.applications as applications
-import keras.layers as layers
+import tensorflow as tf
 
 from network import Network
+
+
+layers = tf.keras.layers
+applications = tf.keras.applications
 
 
 class LargeVggNetwork(Network):

@@ -432,6 +432,9 @@ class FaceMaskStage(PipelineStage):
     paddings = tf.stack((pad_y, pad_x), axis=0)
     mask = tf.pad(inner, paddings)
 
+    # Explicitly define the shape of the mask.
+    mask = tf.reshape(mask, (25, 25))
+
     return (mask, image)
 
   def get_num_outputs(self):

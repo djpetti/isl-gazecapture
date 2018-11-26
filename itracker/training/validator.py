@@ -2,8 +2,6 @@ import cPickle as pickle
 
 import logging
 
-import keras.backend as K
-
 import numpy as np
 
 import tensorflow as tf
@@ -14,6 +12,8 @@ import metrics
 
 
 logger = logging.getLogger(__name__)
+
+K = tf.keras.backend
 
 
 class Validator(object):

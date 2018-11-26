@@ -1,10 +1,31 @@
 import collections
 import os
+import subprocess
 
 import tensorflow as tf
 
 import preprocess
 
+
+def accessible_path(path):
+  """ Figures out whether a file exists or not. It looks both locally, and in
+  the GCP storage bucket.
+  Args:
+    path: The path to search for.
+  Returns:
+    True if the path exists, false otherwise. """
+  if path.startswith("gs://"):
+    # This is a GCP file.
+    try:
+      subprocess.check_output(["gsutil", "ls", path])
+    except subprocess.CalledProcessError:
+      # Does not exist.
+      return False
+    return True
+
+  else:
+    # Local file.
+    return os.path.exists(path)
 
 class DataPoint(object):
   """ Structure encapsulating an image and associated metadata. """
@@ -115,7 +136,7 @@ class DataLoader(object):
       records_file: The TFRecords file to read data from.
       batch_size: The size of batches to read.
       image_shape: The shape of images to load. """
-    if not os.path.exists(records_file):
+    if not accessible_path(records_file):
       # If we don't check this, TensorFlow gives us a really confusing and
       # hard-to-debug error later on.
       raise ValueError("File '%s' does not exist." % (records_file))
@@ -158,6 +179,7 @@ class DataLoader(object):
     """ Builds the pipeline stages that actually loads data from the disk. """
     # Define a reader and read the next record.
     reader = tf.data.TFRecordDataset(self._records_file) \
+                                    .prefetch(self._batch_size * 30) \
                                     .shuffle(self._batch_size * 15) \
                                     .repeat() \
                                     .batch(self._batch_size,

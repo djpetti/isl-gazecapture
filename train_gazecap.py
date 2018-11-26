@@ -28,6 +28,11 @@ def parse_args():
   parser.add_argument("-f", "--fine_tune", action="store_true",
                       help="Fine-tune the model.")
 
+  parser.add_argument("--tpu", default=None,
+                      help="Name of a TPU to train on. (experimental)")
+  parser.add_argument("--bucket", default=None,
+                      help="Google cloud storage bucket URL when using TPU.")
+
   parser.add_argument("--autoencoder", action="store_true",
       help="Specifies that we want to evaluate the autoencoder.")
   parser.add_argument("--autoencoder_weights",

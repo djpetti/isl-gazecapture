@@ -1,7 +1,6 @@
 import logging
-
-import keras.backend as K
-import keras.optimizers as optimizers
+import os
+import subprocess
 
 import numpy as np
 
@@ -19,11 +18,15 @@ import pipelines
 import validator
 
 
+optimizers = tf.keras.optimizers
+K = tf.keras.backend
+
+
 # Configure GPU VRAM usage.
 tf_config = tf.ConfigProto()
 tf_config.gpu_options.per_process_gpu_memory_fraction = 1.0
 g_session = tf.Session(config=tf_config)
-K.tensorflow_backend.set_session(g_session)
+K.set_session(g_session)
 
 
 logger = logging.getLogger(__name__)
@@ -105,12 +108,18 @@ class Experiment(experiment.Experiment):
       logger.info("Recompiling with LR %f and momentum %f." % \
                   (learning_rate, momentum))
 
+      target_tensors = self.__labels
+      if self.__args.tpu:
+        # For the TPU, don't pass the labels.
+        target_tensors = None
+        logger.debug("Not passing target_tensors to TPU.")
+
       # Set the optimizers.
-      opt = optimizers.SGD(lr=learning_rate, momentum=momentum)
+      opt = tf.train.MomentumOptimizer(learning_rate, momentum)
       self.__model.compile(optimizer=opt,
                            loss={"dots": metrics.distance_metric},
                            metrics=[metrics.distance_metric],
-                           target_tensors=self.__labels)
+                           target_tensors=target_tensors)
 
       # We only need to compile a maximum of one time.
       break
@@ -137,8 +146,13 @@ class Experiment(experiment.Experiment):
     # Create the model.
     if self.__args.fine_tune:
       logger.info("Will now fine-tune model.")
+    use_data_tensors = data_tensors
+    if self.__args.tpu:
+      # Don't pass data tensors.
+      logger.debug("Not passing data tensors to TPU.")
+      use_data_tensors = None
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
-                          data_tensors=data_tensors,
+                          data_tensors=use_data_tensors,
                           fine_tune=self.__args.fine_tune,
                           autoenc_model_file=autoenc_weights,
                           cluster_data=clusters,
@@ -156,17 +170,72 @@ class Experiment(experiment.Experiment):
       # Can't fine-tune without a loaded model.
       raise RuntimeError("Please specify a model with --model to fine-tune.")
 
+  def __init_tpu(self):
+    """ Initializes the TPU configuration. """
+    logger.info("Intializing TPU session...")
+
+    self.__recompile_if_needed()
+
+    # Get the TPU cluster.
+    resolver = tf.contrib.cluster_resolver.TPUClusterResolver( \
+        tpu=self.__args.tpu)
+
+    # Convert Keras model to a TPU model.
+    logger.info("Converting to TPU model...")
+    strategy = tf.contrib.tpu.TPUDistributionStrategy(resolver)
+    self.__model = tf.contrib.tpu.keras_to_tpu_model( \
+        self.__model,
+        strategy=strategy)
+
+    # Because of the TPU hardware, for maximum efficiency, we want a batch size
+    # that is a multiple of 128.
+    batch_size = self.__args.batch_size
+    if batch_size % 128 != 0:
+      message = "Batch size should be a multiple of 128 for efficiency."
+      logger.warning(message)
+
+    logger.info("TPU conversion successful.")
+
+  def __input_generator(self):
+    """ This is a hack to allow us to generate data for the TPU, since the TPU
+    does not yet support datasets. """
+    # TODO (danielp): Get rid of this once TensorFlow supports dataset inputs
+    # for the TPU.
+    input_tensors = self.__data_tensors + [self.__labels["dots"]]
+    session = tf.Session(graph=self.__input_graph)
+
+    while True:
+      next_data = session.run(input_tensors)
+      next_samples = next_data[:4]
+      next_labels = next_data[-1]
+
+      yield (next_samples, next_labels)
+
   def _init_experiment(self):
     """ Initialization code for the experiment. """
-    # Build input pipelines.
-    input_tensors = self.__builder.build_pipeline(self.__args.train_dataset,
-                                                  self.__args.test_dataset)
+    train_data = self.__args.train_dataset
+    test_data = self.__args.test_dataset
+    if self.__args.bucket:
+      train_data = os.path.join(self.__args.bucket, train_data)
+      test_data = os.path.join(self.__args.bucket, test_data)
+
+      logger.info("Bucket train data path: %s" % (train_data))
+      logger.info("Bucket test data path: %s" % (test_data))
+
+    self.__input_graph = tf.Graph()
+    with self.__input_graph.as_default():
+      # Build input pipelines.
+      input_tensors = self.__builder.build_pipeline(train_data, test_data)
     # We don't need the session number for training.
-    data_tensors = input_tensors[:4]
+    self.__data_tensors = input_tensors[:4]
     self.__labels = {"dots": input_tensors[-1]}
 
     # Create the model.
-    self.__build_model(data_tensors)
+    self.__build_model(self.__data_tensors)
+
+    # Initialize TPU configuration if necessary.
+    if self.__args.tpu:
+      self.__init_tpu()
 
   def _run_training_iteration(self):
     """ Runs a single training iteration. """
@@ -176,10 +245,17 @@ class Experiment(experiment.Experiment):
     status = self.get_status()
 
     # First, recompile the model if need be.
-    self.__recompile_if_needed()
+    #self.__recompile_if_needed()
 
     # Run a training iteration.
-    history = self.__model.fit(epochs=1, steps_per_epoch=training_steps)
+    if self.__args.tpu:
+      # Use the hacky TPU solution.
+      history = self.__model.fit_generator(self.__input_generator(),
+                                           epochs=1,
+                                           steps_per_epoch=training_steps)
+    else:
+      # Use the standard fit.
+      history = self.__model.fit(epochs=1, steps_per_epoch=training_steps)
 
     # Update the status parameters.
     loss = history.history["loss"][0]
@@ -198,7 +274,13 @@ class Experiment(experiment.Experiment):
     status = self.get_status()
 
     # Test the model.
-    loss, accuracy = self.__model.evaluate(steps=testing_steps)
+    if self.__args.tpu:
+      # Use the hacky TPU solution.
+      loss, accuracy = self.__model.evaluate_generator(self.__input_generator(),
+                                                       steps=testing_steps)
+    else:
+      # Use the standard evalutation.
+      loss, accuracy = self.__model.evaluate(steps=testing_steps)
 
     # Update the status parameters.
     logger.info("Testing loss: %f, acc: %f" % (loss, accuracy))
@@ -208,7 +290,7 @@ class Experiment(experiment.Experiment):
   def _save_model(self, save_file):
     """ Save the trained model. """
     logger.info("Saving model.")
-    self.__model.save_weights(save_file)
+    self.__model.save_weights(save_file, save_format="h5")
 
   def _load_model(self, save_file):
     """ Load a saved model. """
