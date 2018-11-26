@@ -112,21 +112,27 @@ class ResNetBlock(Residual):
     conv1 = layers.Conv2D(filters, (1, 1), **first_kwargs)
     norm1 = layers.BatchNormalization()
     act1 = layers.Activation("relu")
+    drop1 = layers.Dropout(0.5)
+
     conv2 = layers.Conv2D(filters, kernel_size, **kwargs)
     norm2 = layers.BatchNormalization()
     act2 = layers.Activation("relu")
+    drop2 = layers.Dropout(0.5)
+
     # We don't want activation for the last layer, since it will be added after
     # the addition operation.
     conv3_kwargs = kwargs.copy()
     conv3_kwargs["activation"] = None
     conv3 = layers.Conv2D(expansion_filters, (1, 1), **conv3_kwargs)
     norm3 = layers.BatchNormalization()
+    drop3 = layers.Dropout(0.5)
 
     # Handle downsampling in the residual block.
     proj_strides = (1, 1)
     if downsample:
       proj_strides = (2, 2)
 
-    my_layers = [conv1, norm1, act1, conv2, norm2, act2, conv3, norm3]
+    my_layers = [conv1, norm1, act1, drop1, conv2, norm2, act2, drop2, conv3,
+                 norm3, drop3]
     super(ResNetBlock, self).__init__(my_layers,
                                       projection_strides=proj_strides)

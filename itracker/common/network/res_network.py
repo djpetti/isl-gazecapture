@@ -69,12 +69,17 @@ class ResNetwork(Network):
     res_e4 = self.__build_group(6, 256, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable)
-    res_e5 = self.__build_group(3, 512, (3, 3), activation="relu",
+    res_e5 = self.__build_group(3, 256, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable)
 
+    conv_e6 = layers.Conv2D(64, (1, 1), kernel_regularizer=self._l2,
+                            trainable=trainable)
+    norm_e6 = layers.BatchNormalization()
+    act_e6 = layers.Activation("relu")
+
     eye_layers = [conv_e1, act_e1, norm_e1, pool_e1] + res_e2 + res_e3 + \
-                 res_e4 + res_e5
+                 res_e4 + res_e5 + [conv_e6, norm_e6, act_e6]
     # Left eye stack.
     leye_out = self.__apply_all(self._left_eye_node, eye_layers)
     # Right eye stack.
@@ -119,7 +124,7 @@ class ResNetwork(Network):
     res_f4 = self.__build_group(6, 256, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable)
-    res_f5 = self.__build_group(3, 512, (3, 3), activation="relu",
+    res_f5 = self.__build_group(3, 256, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable)
 
