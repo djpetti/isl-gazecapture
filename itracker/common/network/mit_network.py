@@ -1,6 +1,9 @@
-import keras.layers as layers
+import tensorflow as tf
 
 from network import Network
+
+
+layers = tf.keras.layers
 
 
 class MitNetwork(Network):

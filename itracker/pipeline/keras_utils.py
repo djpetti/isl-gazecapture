@@ -1,5 +1,7 @@
-import keras.backend as K
-import keras.layers as layers
+import tensorflow as tf
+
+
+K = tf.keras.backend
 
 
 def fuse_loaders(train_outputs, test_outputs):
@@ -27,7 +29,7 @@ def pipeline_input(*args, **kwargs):
     raise ValueError("'tensor' argument is required.")
 
   # Create the base layer.
-  input_tensor = layers.Input(*args, **kwargs)
+  input_tensor = tf.keras.Input(*args, **kwargs)
 
   # Hack for ensuring that Keras recognizes that the pipeline system depends
   # on the learning_phase placeholder.

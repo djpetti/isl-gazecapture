@@ -1,4 +1,7 @@
-import keras.backend as K
+import tensorflow as tf
+
+
+K = tf.keras.backend
 
 
 def distance_metric(y_true, y_pred):

@@ -1,14 +1,15 @@
 import logging
 
-from keras.models import Model
-import keras.layers as layers
-import keras.optimizers as optimizers
-import keras.regularizers as regularizers
+import tensorflow as tf
 
 from ...pipeline import keras_utils
 
 
 logger = logging.getLogger(__name__)
+
+
+optimizers = tf.keras.optimizers
+regularizers = tf.keras.regularizers
 
 
 class Network(object):
@@ -72,7 +73,7 @@ class Network(object):
         return keras_utils.pipeline_input
       else:
         # Use the normal creator.
-        return layers.Input
+        return tf.keras.Input
 
     # L2 regularizer for weight decay.
     logger.debug("Using regularization: %f" % (self.__reg_alpha))
@@ -121,8 +122,8 @@ class Network(object):
     the inputs and outputs are initialized.
     Returns:
       The model that it created. """
-    model = Model(inputs=[self._left_eye_input, self._right_eye_input,
-                          self._face_input, self._grid_input],
+    model = tf.keras.Model(inputs=[self._left_eye_input, self._right_eye_input,
+                                   self._face_input, self._grid_input],
                   outputs=self._outputs)
     model.summary()
 
@@ -136,7 +137,7 @@ class Network(object):
       The built model. """
     # Only create new layers if we don't have old ones already.
     if self._outputs is None:
-      logger.debug("Building layers.")
+      logger.debug("Building tf.keras.")
 
       # Build the common parts.
       self._build_common()

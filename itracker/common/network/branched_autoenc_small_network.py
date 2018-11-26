@@ -1,9 +1,6 @@
 import cPickle as pickle
 import logging
 
-import keras.layers as layers
-import keras.applications as applications
-
 import tensorflow as tf
 
 from .. import utils
@@ -12,6 +9,9 @@ import autoencoder
 
 
 logger = logging.getLogger(__name__)
+
+layers = tf.keras.layers
+applications = tf.keras.applications
 
 
 class BranchedAutoencSmallNetwork(Network):

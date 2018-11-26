@@ -1,6 +1,9 @@
-import keras.layers as layers
+import tensorflow as tf
 
 from network import Network
+
+
+layers = tf.keras.layers
 
 
 class LargeNetwork(Network):
@@ -115,7 +118,7 @@ class LargeNetwork(Network):
     all_fc1 = layers.Dense(128, activation="relu",
                           kernel_regularizer=self._l2,
                           trainable=trainable)(all_concat)
-    all_fc2 = layers.Dense(2, kernel_regularizer=self._l2)(all_fc1)
+    all_fc2 = layers.Dense(2, kernel_regularizer=self._l2, name="dots")(all_fc1)
 
     return all_fc2
 
