@@ -223,7 +223,12 @@ class Experiment(experiment.Experiment):
       logger.info("Bucket test data path: %s" % (test_data))
 
     self.__input_graph = tf.Graph()
-    with self.__input_graph.as_default():
+    input_graph = g_session.graph
+    if self.__args.tpu:
+      # For the TPU, we want to build the input stuff in its own separate graph,
+      # so we can run it entirely on the CPU.
+      input_graph = self.__input_graph
+    with input_graph.as_default():
       # Build input pipelines.
       input_tensors = self.__builder.build_pipeline(train_data, test_data)
     # We don't need the session number for training.
@@ -245,7 +250,7 @@ class Experiment(experiment.Experiment):
     status = self.get_status()
 
     # First, recompile the model if need be.
-    #self.__recompile_if_needed()
+    self.__recompile_if_needed()
 
     # Run a training iteration.
     if self.__args.tpu:
