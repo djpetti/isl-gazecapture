@@ -39,6 +39,9 @@ class Experiment(experiment.Experiment):
     """
     Args:
       parser: The CLI argument parser. """
+    self.__input_session = None
+    self.__input_tensors = None
+
     self.__parser = parser
     self.__args = self.__parser.parse_args()
 
@@ -201,11 +204,13 @@ class Experiment(experiment.Experiment):
     does not yet support datasets. """
     # TODO (danielp): Get rid of this once TensorFlow supports dataset inputs
     # for the TPU.
-    input_tensors = self.__data_tensors + [self.__labels["dots"]]
-    session = tf.Session(graph=self.__input_graph)
+    if not self.__input_tensors:
+      self.__input_tensors = self.__data_tensors + [self.__labels["dots"]]
+    if not self.__input_session:
+      self.__input_session = tf.Session(graph=self.__input_graph)
 
     while True:
-      next_data = session.run(input_tensors)
+      next_data = self.__input_session.run(self.__input_tensors)
       next_samples = next_data[:4]
       next_labels = next_data[-1]
 
@@ -256,7 +261,7 @@ class Experiment(experiment.Experiment):
     if self.__args.tpu:
       # Use the hacky TPU solution.
       history = self.__model.fit_generator(self.__input_generator(),
-                                           epochs=1,
+                                           epochs=10,
                                            steps_per_epoch=training_steps)
     else:
       # Use the standard fit.

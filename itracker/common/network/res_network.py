@@ -1,8 +1,11 @@
+import tensorflow as tf
+
 from custom_layers.residual import ResNetBlock
 
-import keras.layers as layers
-
 from network import Network
+
+
+layers = tf.keras.layers
 
 
 class ResNetwork(Network):

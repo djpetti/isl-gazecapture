@@ -1,15 +1,18 @@
-import keras.backend as K
-import keras.layers as layers
+import tensorflow as tf
 
 from super_layer import SuperLayer
+
+
+layers = tf.keras.layers
+K = tf.keras.backend
 
 
 class Residual(SuperLayer):
   """ Implements a residual module as described by He et. al in
   "Deep residual learning for image recognition,"
-	Computer Vision and Pattern Recognition, 2016. A layer wrapped with this class
-	is evaluated as normal, but the original input is then added back to its
-	output. """
+  Computer Vision and Pattern Recognition, 2016. A layer wrapped with this class
+  is evaluated as normal, but the original input is then added back to its
+  output. """
 
   def __init__(self, layers, *args, **kwargs):
     """
@@ -29,8 +32,10 @@ class Residual(SuperLayer):
       The inputs to the module.
     Returns:
       The number of input filters, and the number of output filters. """
-    input_shape = list(inputs._keras_shape)
+    input_shape = list(inputs.get_shape())
+    input_shape = [dim.value for dim in input_shape]
     output_shape = list(self.compute_output_shape(input_shape))
+    output_shape = [dim.value for dim in output_shape]
 
     # Assume order is (batch, h, w, filters) initially.
     input_size = input_shape[1:3]
