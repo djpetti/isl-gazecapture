@@ -1,10 +1,15 @@
 import collections
+import logging
 import os
+import random
 import subprocess
 
 import tensorflow as tf
 
 import preprocess
+
+
+logger = logging.getLogger(__name__)
 
 
 def accessible_path(path):
@@ -177,13 +182,16 @@ class DataLoader(object):
 
   def __build_loader_stage(self):
     """ Builds the pipeline stages that actually loads data from the disk. """
-    # Define a reader and read the next record.
-    reader = tf.data.TFRecordDataset(self._records_file) \
-                                    .prefetch(self._batch_size * 30) \
-                                    .shuffle(self._batch_size * 15) \
-                                    .repeat() \
-                                    .batch(self._batch_size,
-                                           drop_remainder=True)
+    # Define a dataset.
+    common_reader = tf.data.TFRecordDataset(self._records_file) \
+                                    .shuffle(self._batch_size * 15)
+
+    # Initially, we want to start at a random point.
+    start_at = random.randint(0, self._batch_size * 100)
+    logger.debug("Starting at example %s." % (start_at))
+    first_reader = common_reader.skip(start_at)
+    reader = first_reader.concatenate(common_reader.repeat())
+    reader = reader.prefetch(self._batch_size * 30).batch(self._batch_size)
 
     # Create the iterator for producing actual examples.
     batch_iter = reader.make_one_shot_iterator()
