@@ -75,11 +75,11 @@ class FeatureSet(object):
 
     self.__feature_names[full_name] = name
 
-  def parse_from(self, batch):
+  def parse_from(self, example):
     """ Parses all the features that were added.
     Args:
-      batch: The batch input to parse features from. """
-    self.__features = tf.parse_example(batch, features=self.__feature_specs)
+      example: The serialized example to parse features from. """
+    self.__features = tf.parse_single_example(example, features=self.__feature_specs)
 
   def get_features(self):
     """
@@ -135,6 +135,9 @@ class FeatureSet(object):
 class DataLoader(object):
   """ Class that is responsible for loading and pre-processing data. """
 
+  # Unique instance number.
+  _INSTANCE_NUM = 0
+
   def __init__(self, records_file, batch_size, image_shape):
     """
     Args:
@@ -151,6 +154,10 @@ class DataLoader(object):
     self._image_shape = image_shape
     self._records_file = records_file
     self._batch_size = batch_size
+
+    # Set unique instance number.
+    self.__id = DataLoader._INSTANCE_NUM
+    DataLoader._INSTANCE_NUM += 1
 
     # Create a default preprocessing pipeline.
     self.__pipeline = preprocess.Pipeline()
@@ -180,25 +187,52 @@ class DataLoader(object):
     # Pre-process the image.
     return self._build_preprocessing_stage(data_point)
 
+  def __preprocess_one(self, serialized):
+    """ Decodes and preprocesses and single serialized example.
+    Args:
+      serialized: The serialized example.
+    Returns:
+      The preprocessed tensors. """
+    # Deserialize the example.
+    self._features.parse_from(serialized)
+
+    # Decode and pre-process in parallel.
+    feature_tensors = self._features.get_feature_tensors()
+    images = self.__decode_and_preprocess(feature_tensors)
+
+    # Create the batches.
+    labels = self._features.get_feature_by_name("dots")
+    data = self.__associate_with_pipelines(images)
+
+    return data, labels
+
   def __build_loader_stage(self):
     """ Builds the pipeline stages that actually loads data from the disk. """
     # Define a dataset.
     common_reader = tf.data.TFRecordDataset(self._records_file) \
-                                    .shuffle(self._batch_size * 15)
+                                    .shuffle(int(self._batch_size * 1.5))
 
     # Initially, we want to start at a random point.
     start_at = random.randint(0, self._batch_size * 100)
     logger.debug("Starting at example %s." % (start_at))
     first_reader = common_reader.skip(start_at)
     reader = first_reader.concatenate(common_reader.repeat())
-    reader = reader.prefetch(self._batch_size * 30).batch(self._batch_size)
+    # Cache the compressed data to disk to avoid GCP latency.
+    reader = reader.cache(filename=".tf_cache_%d/" % (self.__id))
+    # Fused mapping and batching operation for performance.
+    reader = reader.apply(tf.data.experimental.map_and_batch( \
+        map_func=self.__preprocess_one, batch_size=self._batch_size))
+
+    # Prefetch data. Since we've already batched, the argument is the number of
+    # batches.
+    reader = reader.prefetch(10)
 
     # Create the iterator for producing actual examples.
     batch_iter = reader.make_one_shot_iterator()
     batch = batch_iter.get_next()
 
-    # Deserialize the example.
-    self._features.parse_from(batch)
+    # Separate out the data and labels.
+    self.__x, self.__y = batch
 
   def __associate_with_pipelines(self, out_nodes):
     """ Associates map_fn output nodes with their respective pipelines.
@@ -250,22 +284,8 @@ class DataLoader(object):
       prefix: The prefix that is used for the feature names. """
     # Initialize the feature set.
     self._features = self._init_feature_set(prefix)
-
     # Build the loader stage.
     self.__build_loader_stage()
-
-    # Tensorflow expects us to tell it the shape of the output beforehand, so we
-    # need to compute that.
-    dtype = [tf.float32] * self.__pipeline.get_num_outputs()
-    # Decode and pre-process in parallel.
-    feature_tensors = self._features.get_feature_tensors()
-    images = tf.map_fn(self.__decode_and_preprocess, feature_tensors,
-                       dtype=dtype, back_prop=False, parallel_iterations=16)
-
-    # Create the batches.
-    dots = self._features.get_feature_by_name("dots")
-    self.__x = self.__associate_with_pipelines(images)
-    self.__y = dots
 
   def get_data(self):
     """

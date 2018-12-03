@@ -261,7 +261,7 @@ class Experiment(experiment.Experiment):
     if self.__args.tpu:
       # Use the hacky TPU solution.
       history = self.__model.fit_generator(self.__input_generator(),
-                                           epochs=10,
+                                           epochs=1,
                                            steps_per_epoch=training_steps)
     else:
       # Use the standard fit.
