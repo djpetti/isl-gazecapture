@@ -4,8 +4,6 @@ import time
 
 import cv2
 
-import keras.layers as layers
-
 import numpy as np
 
 import tensorflow as tf
@@ -15,6 +13,9 @@ from ..common.eye_cropper import EyeCropper
 
 
 logger = logging.getLogger(__name__)
+
+
+layers = tf.keras.layers
 
 
 def _is_stale(timestamp):
