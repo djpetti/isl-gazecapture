@@ -122,9 +122,10 @@ class Network(object):
     the inputs and outputs are initialized.
     Returns:
       The model that it created. """
-    model = tf.keras.Model(inputs=[self._left_eye_input, self._right_eye_input,
-                                   self._face_input, self._grid_input],
-                  outputs=self._outputs)
+    #model = tf.keras.Model(inputs=[self._left_eye_input, self._right_eye_input,
+    #                               self._face_input, self._grid_input],
+    #              outputs=self._outputs)
+    model = tf.keras.Model(inputs=self._left_eye_input, outputs=self._outputs)
     model.summary()
 
     return model

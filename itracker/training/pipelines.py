@@ -214,8 +214,9 @@ class PipelineBuilder(object):
     train_pipelines = self.__add_train_stages(train_loader, has_pose)
     test_pipelines = self.__add_test_stages(test_loader, has_pose)
 
-    return self.__fuse_loaders(train_loader, train_pipelines,
-                               test_loader, test_pipelines)
+    return train_loader.get_data()
+    #return self.__fuse_loaders(train_loader, train_pipelines,
+    #                           test_loader, test_pipelines)
 
   def build_valid_pipeline(self, valid_data, has_pose=False):
     """ Builds the preprocessing pipeline for the validation split.

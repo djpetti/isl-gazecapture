@@ -111,7 +111,8 @@ class Experiment(experiment.Experiment):
       logger.info("Recompiling with LR %f and momentum %f." % \
                   (learning_rate, momentum))
 
-      target_tensors = self.__labels
+      #target_tensors = self.__labels
+      target_tensors = None
       if self.__args.tpu:
         # For the TPU, don't pass the labels.
         target_tensors = None
@@ -163,7 +164,7 @@ class Experiment(experiment.Experiment):
     self.__model = net.build()
 
     # Prepare label data.
-    self.__labels = net.prepare_labels(self.__labels)
+    #self.__labels = net.prepare_labels(self.__labels)
 
     load_model = self.__args.model
     if load_model:
@@ -177,8 +178,6 @@ class Experiment(experiment.Experiment):
     """ Initializes the TPU configuration. """
     logger.info("Intializing TPU session...")
 
-    self.__recompile_if_needed()
-
     # Get the TPU cluster.
     resolver = tf.contrib.cluster_resolver.TPUClusterResolver( \
         tpu=self.__args.tpu)
@@ -186,9 +185,8 @@ class Experiment(experiment.Experiment):
     # Convert Keras model to a TPU model.
     logger.info("Converting to TPU model...")
     strategy = tf.contrib.tpu.TPUDistributionStrategy(resolver)
-    self.__model = tf.contrib.tpu.keras_to_tpu_model( \
-        self.__model,
-        strategy=strategy)
+    self.__model = tf.contrib.tpu.keras_to_tpu_model(self.__model,
+                                                     strategy=strategy)
 
     # Because of the TPU hardware, for maximum efficiency, we want a batch size
     # that is a multiple of 128.
@@ -229,16 +227,17 @@ class Experiment(experiment.Experiment):
 
     self.__input_graph = tf.Graph()
     input_graph = g_session.graph
-    if self.__args.tpu:
-      # For the TPU, we want to build the input stuff in its own separate graph,
-      # so we can run it entirely on the CPU.
-      input_graph = self.__input_graph
+    #if self.__args.tpu:
+    #  # For the TPU, we want to build the input stuff in its own separate graph,
+    #  # so we can run it entirely on the CPU.
+    #  input_graph = self.__input_graph
     with input_graph.as_default():
       # Build input pipelines.
       input_tensors = self.__builder.build_pipeline(train_data, test_data)
     # We don't need the session number for training.
-    self.__data_tensors = input_tensors[:4]
-    self.__labels = {"dots": input_tensors[-1]}
+    #self.__data_tensors = input_tensors[:4]
+    #self.__labels = {"dots": input_tensors[-1]}
+    self.__data_tensors = input_tensors
 
     # Create the model.
     self.__build_model(self.__data_tensors)
@@ -246,6 +245,9 @@ class Experiment(experiment.Experiment):
     # Initialize TPU configuration if necessary.
     if self.__args.tpu:
       self.__init_tpu()
+
+  def __input_func(self):
+    return self.__data_tensors
 
   def _run_training_iteration(self):
     """ Runs a single training iteration. """
@@ -260,7 +262,7 @@ class Experiment(experiment.Experiment):
     # Run a training iteration.
     if self.__args.tpu:
       # Use the hacky TPU solution.
-      history = self.__model.fit_generator(self.__input_generator(),
+      history = self.__model.fit(self.__input_func,
                                            epochs=1,
                                            steps_per_epoch=training_steps)
     else:

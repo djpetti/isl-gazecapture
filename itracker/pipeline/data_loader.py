@@ -204,7 +204,7 @@ class DataLoader(object):
     labels = self._features.get_feature_by_name("dots")
     data = self.__associate_with_pipelines(images)
 
-    return data, labels
+    return (images[0], labels)
 
   def __build_loader_stage(self):
     """ Builds the pipeline stages that actually loads data from the disk. """
@@ -218,21 +218,24 @@ class DataLoader(object):
     first_reader = common_reader.skip(start_at)
     reader = first_reader.concatenate(common_reader.repeat())
     # Cache the compressed data to disk to avoid GCP latency.
-    reader = reader.cache(filename=".tf_cache_%d/" % (self.__id))
+    #reader = reader.cache(filename=".tf_cache_%d/" % (self.__id))
     # Fused mapping and batching operation for performance.
     reader = reader.apply(tf.data.experimental.map_and_batch( \
-        map_func=self.__preprocess_one, batch_size=self._batch_size))
+        map_func=self.__preprocess_one, batch_size=self._batch_size,
+        num_parallel_batches=16,
+        drop_remainder=True))
 
     # Prefetch data. Since we've already batched, the argument is the number of
     # batches.
-    reader = reader.prefetch(10)
+    reader = reader.prefetch(tf.contrib.data.AUTOTUNE)
 
     # Create the iterator for producing actual examples.
-    batch_iter = reader.make_one_shot_iterator()
-    batch = batch_iter.get_next()
+    #batch_iter = reader.make_one_shot_iterator()
+    #batch = batch_iter.get_next()
 
     # Separate out the data and labels.
-    self.__x, self.__y = batch
+    #self.__x, self.__y = batch
+    self.__x = reader
 
   def __associate_with_pipelines(self, out_nodes):
     """ Associates map_fn output nodes with their respective pipelines.

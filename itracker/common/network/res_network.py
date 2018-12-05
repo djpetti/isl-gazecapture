@@ -86,10 +86,11 @@ class ResNetwork(Network):
     # Left eye stack.
     leye_out = self.__apply_all(self._left_eye_node, eye_layers)
     # Right eye stack.
-    reye_out = self.__apply_all(self._right_eye_node, eye_layers)
+    #reye_out = self.__apply_all(self._right_eye_node, eye_layers)
 
     # Concatenate eyes.
-    eye_concat = layers.Concatenate()([leye_out, reye_out])
+    #eye_concat = layers.Concatenate()([leye_out, reye_out])
+    eye_concat = leye_out
 
     # Operate on combined eyes.
     res_ec1 = self.__build_group(3, 128, (3, 3), activation="relu",
@@ -139,7 +140,7 @@ class ResNetwork(Network):
     # Face stack.
     face_layers = [conv_f1, norm_f1, act_f1, pool_f1] + res_f2 + res_f3 + \
                   res_f4 + res_f5 + [conv_f6, norm_f6, act_f6]
-    face_out = self.__apply_all(self._face_node, face_layers)
+    #face_out = self.__apply_all(self._face_node, face_layers)
 
     # Face grid.
     grid_flat = layers.Flatten()
@@ -152,15 +153,16 @@ class ResNetwork(Network):
                             trainable=trainable)
     norm_fg2 = layers.BatchNormalization()
 
-    grid_out = self.__apply_all(self._grid_input,
-                                [grid_flat, grid_fg1, norm_fg1,
-                                 grid_fg2, norm_fg2])
+    #grid_out = self.__apply_all(self._grid_input,
+    #                            [grid_flat, grid_fg1, norm_fg1,
+    #                             grid_fg2, norm_fg2])
 
     # Concat everything and put it through a final dense stack.
     eye_out_flat = layers.Flatten()(eye_comb_out)
-    face_out_flat = layers.Flatten()(face_out)
+    #face_out_flat = layers.Flatten()(face_out)
 
-    all_concat = layers.Concatenate()([eye_out_flat, face_out_flat, grid_out])
+    #all_concat = layers.Concatenate()([eye_out_flat, face_out_flat, grid_out])
+    all_concat = eye_out_flat
 
     all_fc1 = layers.Dense(128, activation="relu",
                            kernel_regularizer=self._l2,
