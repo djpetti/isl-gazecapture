@@ -62,7 +62,7 @@ public class GameGrid {
                 if( new Random().nextFloat()>GAME_SPEED_VARIATION_PROB ){
                     generator_interval = (int)(2-(float)GAME_SPEED/10)*1000;
                 } else {
-                    generator_interval = (int)(2-(float)GAME_SPEED/10)*500;
+                    generator_interval = (int)(2-(float)GAME_SPEED/10)*1500;
                 }
                 gameProcHandler.postDelayed(this, generator_interval);
             }
