@@ -138,12 +138,18 @@ class DataLoader(object):
   # Unique instance number.
   _INSTANCE_NUM = 0
 
-  def __init__(self, records_file, batch_size, image_shape):
+  def __init__(self, records_file, batch_size, image_shape, tpu_flatten=False):
     """
     Args:
       records_file: The TFRecords file to read data from.
       batch_size: The size of batches to read.
-      image_shape: The shape of images to load. """
+      image_shape: The shape of images to load.
+      tpu_flatten: Another irritating limitation of the TensorFlow TPU API is
+                   that it only supports a single input. If this parameter is
+                   True, it will automatically flatten all the inputs to R1
+                   tensors, concatenate them together, and produce that as a
+                   single input. Note that the inputs must be manually
+                   un-flattened by the model training code. """
     if not accessible_path(records_file):
       # If we don't check this, TensorFlow gives us a really confusing and
       # hard-to-debug error later on.
@@ -154,6 +160,7 @@ class DataLoader(object):
     self._image_shape = image_shape
     self._records_file = records_file
     self._batch_size = batch_size
+    self.__tpu_flatten = tpu_flatten
 
     # Set unique instance number.
     self.__id = DataLoader._INSTANCE_NUM
@@ -202,9 +209,15 @@ class DataLoader(object):
 
     # Create the batches.
     labels = self._features.get_feature_by_name("dots")
-    data = self.__associate_with_pipelines(images)
+    data = None
+    if self.__tpu_flatten:
+      # Produce a single output, flattened for the TPU.
+      data = self.__flatten_for_tpu(images)
+    else:
+      # Produce a dictionary mapping input names to tensors.
+      data = self.__associate_with_inputs(images)
 
-    return (images[0], labels)
+    return data, labels
 
   def __build_loader_stage(self):
     """ Builds the pipeline stages that actually loads data from the disk. """
@@ -217,8 +230,6 @@ class DataLoader(object):
     logger.debug("Starting at example %s." % (start_at))
     first_reader = common_reader.skip(start_at)
     reader = first_reader.concatenate(common_reader.repeat())
-    # Cache the compressed data to disk to avoid GCP latency.
-    #reader = reader.cache(filename=".tf_cache_%d/" % (self.__id))
     # Fused mapping and batching operation for performance.
     reader = reader.apply(tf.data.experimental.map_and_batch( \
         map_func=self.__preprocess_one, batch_size=self._batch_size,
@@ -228,26 +239,40 @@ class DataLoader(object):
     # Prefetch data. Since we've already batched, the argument is the number of
     # batches.
     reader = reader.prefetch(tf.contrib.data.AUTOTUNE)
+    logger.info("Dataset: %s" % (str(reader)))
 
-    # Create the iterator for producing actual examples.
-    #batch_iter = reader.make_one_shot_iterator()
-    #batch = batch_iter.get_next()
+    self.__dataset = reader
 
-    # Separate out the data and labels.
-    #self.__x, self.__y = batch
-    self.__x = reader
-
-  def __associate_with_pipelines(self, out_nodes):
-    """ Associates map_fn output nodes with their respective pipelines.
+  def __flatten_for_tpu(self, out_nodes):
+    """ Flattens map output nodes into a single R1 output for the TPU.
     Args:
-      out_nodes: The output nodes from the map_fn call.
+      out_nodes: The output nodes from the map call.
+    Returns:
+      A single R1 tensor containing all the nodes. """
+    flat_list = []
+    for node in out_nodes:
+      flat_node = tf.reshape(node, [-1])
+      flat_list.append(flat_node)
+
+    # Concatenate them all end-to-end.
+    return tf.concat(flat_list, 0)
+
+  def __associate_with_inputs(self, out_nodes):
+    """ Associates map output nodes with their respective named inputs.
+    Args:
+      out_nodes: The output nodes from the map call.
     Returns:
       A dictionary mapping pipelines to nodes. """
     pipelines = self.__pipeline.get_leaf_pipelines()
 
     mapping = {}
     for pipeline, node in zip(pipelines, out_nodes):
-      mapping[pipeline] = node
+      # Get the associated input name.
+      input_name = pipeline.get_associated_input_name()
+      if input_name is None:
+        raise ValueError("All leaf pipelines must be associated with inputs.")
+
+      mapping[input_name] = node
 
     return mapping
 
@@ -293,14 +318,8 @@ class DataLoader(object):
   def get_data(self):
     """
     Returns:
-      The loaded data, as a dict indexed by pipelines. """
-    return self.__x
-
-  def get_labels(self):
-    """
-    Returns:
-      The node for the loaded labels. """
-    return self.__y
+      The loaded data, as a Dataset. """
+    return self.__dataset
 
   def get_pipeline(self):
     """ Gets the preprocessing pipeline object so that preprocessing stages can

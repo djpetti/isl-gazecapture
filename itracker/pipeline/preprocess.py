@@ -24,6 +24,8 @@ class Pipeline(object):
     self.__instance_number = Pipeline._instance_number
     Pipeline._instance_number += 1
 
+    self.__name = None
+
   def __copy__(self):
     # We choose not to allow copying pipeline, because invariably this isn't
     # going to work the way you want it to.
@@ -73,6 +75,12 @@ class Pipeline(object):
     if self.__is_leaf():
       # This is the easy case. We just have ourselves to worry about.
       return (self.__output, [self])
+
+    if self.__name is not None:
+      # Intermediate pipelines should not be associated with inputs.
+      raise ValueError( \
+          "Detected non-leaf pipeline associated with input '%s'." + \
+          " This is usually indicative of a programming error." % (self.__name))
 
     # In this case, we have to collect the output and leaves from every
     # sub-pipeline.
@@ -163,6 +171,20 @@ class Pipeline(object):
       in the list returned by get_outputs(). """
     _, leaves = self.__get_outputs_and_leaves()
     return leaves
+
+  def associate_with_input(self, name):
+    """ Associates this pipeline with a named model input. The output from this
+    pipeline will then be used to feed that input. """
+    if not self.__is_leaf():
+      raise ValueError("Can only associate leaf pipelines with named inputs.")
+
+    self.__name = name
+
+  def get_associated_input_name(self):
+    """ Gets the input associated with this pipeline.
+    Will return None if no input is associated. """
+    assert self.__is_leaf()
+    return self.__name
 
 class PipelineStage(object):
   """ Defines a stage in the preprocessing pipeline. These can be added

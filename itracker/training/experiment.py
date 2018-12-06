@@ -54,8 +54,14 @@ class Experiment(experiment.Experiment):
     face_size = config.FACE_SHAPE[:2]
     eye_size = config.EYE_SHAPE[:2]
     batch_size = self.__args.batch_size
+    tpu_flatten = self.__args.tpu is not None
+    if self.__args.tpu:
+      # We need to set the per-core batch size on the TPU.
+      batch_size /= 8
+      logger.debug("TPU: Setting per-core batch size: %d" % (batch_size))
     self.__builder = pipelines.PipelineBuilder(config.RAW_SHAPE, face_size,
-                                               batch_size, eye_size=eye_size)
+                                               batch_size, eye_size=eye_size,
+                                               tpu_flatten=tpu_flatten)
 
     super(Experiment, self).__init__(self.__args.testing_interval,
                                      hyperparams=my_params,
@@ -150,17 +156,12 @@ class Experiment(experiment.Experiment):
     # Create the model.
     if self.__args.fine_tune:
       logger.info("Will now fine-tune model.")
-    use_data_tensors = data_tensors
-    if self.__args.tpu:
-      # Don't pass data tensors.
-      logger.debug("Not passing data tensors to TPU.")
-      use_data_tensors = None
     net = config.NET_ARCH(config.FACE_SHAPE, eye_shape=config.EYE_SHAPE,
-                          data_tensors=use_data_tensors,
                           fine_tune=self.__args.fine_tune,
                           autoenc_model_file=autoenc_weights,
                           cluster_data=clusters,
-                          l2_reg=self.__args.reg)
+                          l2_reg=self.__args.reg,
+                          flat_inputs=(self.__args.tpu is not None))
     self.__model = net.build()
 
     # Prepare label data.
@@ -197,23 +198,6 @@ class Experiment(experiment.Experiment):
 
     logger.info("TPU conversion successful.")
 
-  def __input_generator(self):
-    """ This is a hack to allow us to generate data for the TPU, since the TPU
-    does not yet support datasets. """
-    # TODO (danielp): Get rid of this once TensorFlow supports dataset inputs
-    # for the TPU.
-    if not self.__input_tensors:
-      self.__input_tensors = self.__data_tensors + [self.__labels["dots"]]
-    if not self.__input_session:
-      self.__input_session = tf.Session(graph=self.__input_graph)
-
-    while True:
-      next_data = self.__input_session.run(self.__input_tensors)
-      next_samples = next_data[:4]
-      next_labels = next_data[-1]
-
-      yield (next_samples, next_labels)
-
   def _init_experiment(self):
     """ Initialization code for the experiment. """
     train_data = self.__args.train_dataset
@@ -246,9 +230,6 @@ class Experiment(experiment.Experiment):
     if self.__args.tpu:
       self.__init_tpu()
 
-  def __input_func(self):
-    return self.__data_tensors
-
   def _run_training_iteration(self):
     """ Runs a single training iteration. """
     my_params = self.get_params()
@@ -259,15 +240,16 @@ class Experiment(experiment.Experiment):
     # First, recompile the model if need be.
     self.__recompile_if_needed()
 
-    # Run a training iteration.
+    # There seems to be an annoying inconsistency in the TensorFlow API where
+    # the normal model requires a Dataset input, and the TPU model requires a
+    # function that returns a Dataset as input.
+    data_input = self.__data_tensors
     if self.__args.tpu:
-      # Use the hacky TPU solution.
-      history = self.__model.fit(self.__input_func,
-                                           epochs=1,
-                                           steps_per_epoch=training_steps)
-    else:
-      # Use the standard fit.
-      history = self.__model.fit(epochs=1, steps_per_epoch=training_steps)
+      data_input = lambda: self.__data_tensors
+    # Run a training iteration.
+    history = self.__model.fit(data_input,
+                               epochs=1,
+                               steps_per_epoch=training_steps)
 
     # Update the status parameters.
     loss = history.history["loss"][0]

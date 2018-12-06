@@ -4,7 +4,8 @@ from ..pipeline import keras_utils, preprocess
 class PipelineBuilder(object):
   """ Responsible for building and configuring input pipelines. """
 
-  def __init__(self, raw_shape, image_size, batch_size, eye_size=None):
+  def __init__(self, raw_shape, image_size, batch_size, eye_size=None,
+               tpu_flatten=False):
     """
     Args:
       raw_shape: The original shape we expect for images loaded from the disk.
@@ -12,10 +13,12 @@ class PipelineBuilder(object):
                   tuple of (h, w).
       batch_size: The size of the batches to load.
       eye_size: The size to use for output eye images, if this is different from
-                the one for face images. """
+                the one for face images.
+      tpu_flatten: Whether to use the flat outputs for the TPU. """
     self.__image_size = image_size
     self.__raw_shape = raw_shape
     self.__batch_size = batch_size
+    self.__tpu_flatten = tpu_flatten
 
     self.__eye_size = self.__image_size
     if eye_size is not None:
@@ -52,13 +55,12 @@ class PipelineBuilder(object):
     # Fuse the outputs.
     return keras_utils.fuse_loaders(train_outputs, test_outputs)
 
-  def __add_train_stages(self, loader, has_pose):
+  def __add_train_stages(self, loader, has_pose, has_session_num):
     """ Convenience function to configure train loader.
     Args:
       loader: The DataLoader to configure.
       has_pose: Whether our dataset contains head pose data.
-    Returns:
-      A tuple of the pipelines created for the loader. """
+      has_session_num: Whether we have a session number input. """
     pipeline = loader.get_pipeline()
 
     # Extract eye crops.
@@ -110,32 +112,34 @@ class PipelineBuilder(object):
     face.add(face_resize_stage)
 
     # Session number stage.
-    session_num_stage = preprocess.SessionNumStage()
-    session_num, face = face.add(session_num_stage)
+    if has_session_num:
+      session_num_stage = preprocess.SessionNumStage()
+      session_num, face = face.add(session_num_stage)
 
-    ret = (leye, reye, face, mask, session_num)
+      session_num.associate_with_input("session_num_input")
 
     if has_pose:
       # Pose extraction.
       pose_stage = preprocess.HeadPoseStage()
       pose, face = face.add(pose_stage)
 
-      # Have to redo the whole tuple because the face pipeline changes.
-      ret = (leye, reye, face, mask, session_num, pose)
+      pose.associate_with_input("pose_input")
 
+    # Name the pipelines.
+    leye.associate_with_input("left_eye_input")
+    reye.associate_with_input("right_eye_input")
+    face.associate_with_input("face_input")
+    mask.associate_with_input("grid_input")
 
     # Build the loader graph.
     loader.build()
 
-    return ret
-
-  def __add_test_stages(self, loader, has_pose):
+  def __add_test_stages(self, loader, has_pose, has_session_num):
     """ Convenience function to configure test and validation loaders.
     Args:
       loader: The DataLoader to configure.
       has_pose: Whether our dataset contains head pose data.
-    Returns:
-      A tuple of the pipelines created for the loader. """
+      has_session_num: Whether our model has a session number input. """
     pipeline = loader.get_pipeline()
 
     # Extract eye crops.
@@ -172,30 +176,36 @@ class PipelineBuilder(object):
     face.add(face_resize_stage)
 
     # Session number stage.
-    session_num_stage = preprocess.SessionNumStage()
-    session_num, face = face.add(session_num_stage)
+    if has_session_num:
+      session_num_stage = preprocess.SessionNumStage()
+      session_num, face = face.add(session_num_stage)
 
-    ret = (leye, reye, face, mask, session_num)
+      session_num.associate_with_input("session_num_input")
 
     if has_pose:
       # Pose extraction.
       pose_stage = preprocess.HeadPoseStage()
       pose, face = face.add(pose_stage)
 
-      # Have to redo the whole tuple because the face pipeline changes.
-      ret = (leye, reye, face, mask, session_num, pose)
+      pose.associate_with_input("pose_input")
+
+    # Name the pipelines.
+    leye.associate_with_input("left_eye_input")
+    reye.associate_with_input("right_eye_input")
+    face.associate_with_input("face_input")
+    mask.associate_with_input("grid_input")
 
     # Build the loader graph.
     loader.build()
 
-    return ret
-
-  def build_pipeline(self, train_data, test_data, has_pose=False):
+  def build_pipeline(self, train_data, test_data, has_pose=False,
+                     has_session_num=False):
     """ Builds the preprocessing pipeline.
     Args:
       train_data: The training data TFRecords file.
       test_data: The testing data TFRecords file.
-      has_pose: Whether or not a head pose attribute is included in the data.
+      has_pose: Whether or not the model has a head pose input.
+      has_session_num: Whether or not the model has a session number input.
     Returns:
       The fused output nodes from the loaders, in order: leye, reye, face, grid,
       dots. """
@@ -207,22 +217,28 @@ class PipelineBuilder(object):
       test_loader_class = custom_data_loader.TestDataLoaderWithPose
 
     train_loader = train_loader_class(train_data, self.__batch_size,
-                                      self.__raw_shape)
+                                      self.__raw_shape,
+                                      tpu_flatten=self.__tpu_flatten)
     test_loader = test_loader_class(test_data, self.__batch_size,
-                                    self.__raw_shape)
+                                    self.__raw_shape,
+                                    tpu_flatten=self.__tpu_flatten)
 
-    train_pipelines = self.__add_train_stages(train_loader, has_pose)
-    test_pipelines = self.__add_test_stages(test_loader, has_pose)
+    train_pipelines = self.__add_train_stages(train_loader, has_pose,
+                                              has_session_num)
+    test_pipelines = self.__add_test_stages(test_loader, has_pose,
+                                            has_session_num)
 
     return train_loader.get_data()
     #return self.__fuse_loaders(train_loader, train_pipelines,
     #                           test_loader, test_pipelines)
 
-  def build_valid_pipeline(self, valid_data, has_pose=False):
+  def build_valid_pipeline(self, valid_data, has_pose=False,
+                           has_session_num=False):
     """ Builds the preprocessing pipeline for the validation split.
     Args:
       valid_data: The validation data TFRecords file.
       has_pose: Whether or not a head pose attribute is included in the data.
+      has_session_num: Whether or not the model has a session number input.
     Returns:
       The leye, reye, face, grid, and dots nodes for the validation loader. """
     valid_loader_class = custom_data_loader.ValidDataLoader
@@ -231,10 +247,12 @@ class PipelineBuilder(object):
       valid_loader_class = custom_data_loader.ValidDataLoaderWithPose
 
     valid_loader = valid_loader_class(valid_data, self.__batch_size,
-                                      self.__raw_shape)
+                                      self.__raw_shape,
+                                      tpu_flatten=self.__tpu_flatten)
 
     # Use the same pipeline for validation as we do for testing.
-    valid_pipelines = self.__add_test_stages(valid_loader, has_pose)
+    valid_pipelines = self.__add_test_stages(valid_loader, has_pose,
+                                             has_session_num)
 
     # Extract the associated output nodes.
     data = valid_loader.get_data()
