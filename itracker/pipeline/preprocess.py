@@ -345,7 +345,9 @@ class ResizeStage(PipelineStage):
 
   def build(self, data_point):
     image = data_point.image
-    return tf.image.resize_images(image, self.__size, align_corners=True)
+    return tf.image.resize_images(image, self.__size,
+                                  method=tf.image.ResizeMethod.NEAREST_NEIGHBOR,
+                                  align_corners=True)
 
   def get_num_outputs(self):
     return 1

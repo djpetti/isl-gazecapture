@@ -78,6 +78,14 @@ class PipelineBuilder(object):
     reye.add(crop_stage)
     face.add(face_crop_stage)
 
+    # Resizing.
+    face_resize_stage = preprocess.ResizeStage(self.__image_size)
+    eye_resize_stage = preprocess.ResizeStage(self.__eye_size)
+
+    leye.add(eye_resize_stage)
+    reye.add(eye_resize_stage)
+    face.add(face_resize_stage)
+
     # Random adjustments.
     brightness_stage = preprocess.RandomBrightnessStage(50)
     contrast_stage = preprocess.RandomContrastStage(0.9, 1.4)
@@ -85,31 +93,25 @@ class PipelineBuilder(object):
     saturation_stage = preprocess.RandomSaturationStage(0.9, 1.1)
     grayscale_stage = preprocess.GrayscaleStage()
 
-    leye.add(brightness_stage)
-    leye.add(contrast_stage)
+    #leye.add(brightness_stage)
+    #leye.add(contrast_stage)
     leye.add(grayscale_stage)
 
-    reye.add(brightness_stage)
-    reye.add(contrast_stage)
+    #reye.add(brightness_stage)
+    #reye.add(contrast_stage)
     reye.add(grayscale_stage)
 
-    face.add(brightness_stage)
-    face.add(contrast_stage)
-    face.add(hue_stage)
-    face.add(saturation_stage)
+    #face.add(brightness_stage)
+    #face.add(contrast_stage)
+    #face.add(hue_stage)
+    #face.add(saturation_stage)
 
-    # Normalization and final sizing.
+    # Normalization.
     norm_stage = preprocess.NormalizationStage()
-    face_resize_stage = preprocess.ResizeStage(self.__image_size)
-    eye_resize_stage = preprocess.ResizeStage(self.__eye_size)
 
     leye.add(norm_stage)
     reye.add(norm_stage)
     face.add(norm_stage)
-
-    leye.add(eye_resize_stage)
-    reye.add(eye_resize_stage)
-    face.add(face_resize_stage)
 
     # Session number stage.
     if has_session_num:
