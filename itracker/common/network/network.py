@@ -75,7 +75,10 @@ class Network(object):
       face = tf.reshape(face, (-1,) + self._input_shape)
       grid = tf.reshape(grid, (-1, 25, 25))
 
-      #return left_eye, right_eye, face, grid
+      print left_eye
+      print right_eye
+      print face
+      print grid
       return left_eye, right_eye, face, grid
 
 
@@ -150,6 +153,9 @@ class Network(object):
     return next_input
 
   def _build_common(self):
+    def to_grayscale(image):
+      return tf.image.rgb_to_grayscale(image)
+
     """ Build the network components that are common to all. """
     if self.__flat_inputs:
       logger.info("Using flattened input.")
@@ -168,6 +174,10 @@ class Network(object):
     if self.__eye_preproc is not None:
       self._left_eye_node = self.__eye_preproc(self._left_eye_input)
       self._right_eye_node = self.__eye_preproc(self._right_eye_input)
+
+    # Perform grayscale conversion.
+    self._left_eye_node = layers.Lambda(to_grayscale)(self._left_eye_node)
+    self._right_eye_node = layers.Lambda(to_grayscale)(self._right_eye_node)
 
     self._face_node = self._face_input
     if self.__face_preproc is not None:

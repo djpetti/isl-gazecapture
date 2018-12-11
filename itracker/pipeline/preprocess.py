@@ -369,6 +369,13 @@ class EyeExtractionStage(PipelineStage):
   images, in order: The left eye crop, the right eye crop, and the face crop.
   """
 
+  def __init__(self, eye_size=None):
+    """
+    Args:
+      eye_size: Specify a specific size to resize the eye images to. Defaults to
+                the same size as the input. """
+    self.__eye_size = eye_size
+
   def __convert_box(self, box):
     """ Converts a bounding box from the x, y, w, h format to the y1, x1, y2, x2
     format.
@@ -403,8 +410,12 @@ class EyeExtractionStage(PipelineStage):
 
     # Extract the crops using the bounding boxes.
     indices = tf.constant([0, 1])
-    # The crops should be resized to the same size as the image.
+
+    # By default, the crops should be resized to the same size as the image.
     crop_size = image.shape[0:2]
+    if self.__eye_size:
+      # The crops should be resized to something specific.
+      crop_size = self.__eye_size
     crops = tf.image.crop_and_resize(image_dup, boxes, indices, crop_size)
 
     leye_crop = crops[0]

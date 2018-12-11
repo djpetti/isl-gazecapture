@@ -125,7 +125,7 @@ class Experiment(experiment.Experiment):
         logger.debug("Not passing target_tensors to TPU.")
 
       # Set the optimizers.
-      opt = tf.train.MomentumOptimizer(learning_rate, momentum)
+      opt = optimizers.SGD(lr=learning_rate, momentum=momentum)
       self.__model.compile(optimizer=opt,
                            loss={"dots": metrics.distance_metric},
                            metrics=[metrics.distance_metric],

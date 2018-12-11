@@ -15,7 +15,7 @@ RAW_SHAPE = (400, 400, 3)
 # The shape of the input face images to the network.
 FACE_SHAPE = (224, 224, 3)
 # The shape of the input eye images to the network.
-EYE_SHAPE = (224, 224, 1)
+EYE_SHAPE = (224, 224, 3)
 # Time in seconds that an image gets to live in the pipeline before we consider
 # it stale.
 STALE_THRESHOLD = 0.1

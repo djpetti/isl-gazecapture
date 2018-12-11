@@ -1,5 +1,11 @@
+import logging
+
 from ..common import custom_data_loader
 from ..pipeline import keras_utils, preprocess
+
+
+logger = logging.getLogger(__name__)
+
 
 class PipelineBuilder(object):
   """ Responsible for building and configuring input pipelines. """
@@ -19,6 +25,12 @@ class PipelineBuilder(object):
     self.__raw_shape = raw_shape
     self.__batch_size = batch_size
     self.__tpu_flatten = tpu_flatten
+
+    # Calculate sizes for cropping and resizing.
+    self.__face_resize_to = [int(dim / 0.975) for dim in self.__image_size]
+    self.__eye_resize_to = [int(dim / 0.9) for dim in self.__image_size]
+    logger.debug("Initial face resize: %s" % (str(self.__face_resize_to)))
+    logger.debug("Initial eye resize: %s" % (str(self.__eye_resize_to)))
 
     self.__eye_size = self.__image_size
     if eye_size is not None:
@@ -64,27 +76,23 @@ class PipelineBuilder(object):
     pipeline = loader.get_pipeline()
 
     # Extract eye crops.
-    extract_stage = preprocess.EyeExtractionStage()
+    extract_stage = preprocess.EyeExtractionStage(eye_size=self.__eye_resize_to)
     leye, reye, face = pipeline.add(extract_stage)
 
     # Extract face mask.
     mask_stage = preprocess.FaceMaskStage()
     mask, face = face.add(mask_stage)
 
+    # Resizing.
+    face_resize_stage = preprocess.ResizeStage(self.__face_resize_to)
+    face.add(face_resize_stage)
+
     # Random cropping.
-    crop_stage = preprocess.RandomCropStage((390, 390))
-    face_crop_stage = preprocess.RandomCropStage((360, 360))
+    crop_stage = preprocess.RandomCropStage(self.__eye_size)
+    face_crop_stage = preprocess.RandomCropStage(self.__image_size)
     leye.add(crop_stage)
     reye.add(crop_stage)
     face.add(face_crop_stage)
-
-    # Resizing.
-    face_resize_stage = preprocess.ResizeStage(self.__image_size)
-    eye_resize_stage = preprocess.ResizeStage(self.__eye_size)
-
-    leye.add(eye_resize_stage)
-    reye.add(eye_resize_stage)
-    face.add(face_resize_stage)
 
     # Random adjustments.
     brightness_stage = preprocess.RandomBrightnessStage(50)
@@ -95,11 +103,11 @@ class PipelineBuilder(object):
 
     #leye.add(brightness_stage)
     #leye.add(contrast_stage)
-    leye.add(grayscale_stage)
+    #leye.add(grayscale_stage)
 
     #reye.add(brightness_stage)
     #reye.add(contrast_stage)
-    reye.add(grayscale_stage)
+    #reye.add(grayscale_stage)
 
     #face.add(brightness_stage)
     #face.add(contrast_stage)
@@ -109,9 +117,9 @@ class PipelineBuilder(object):
     # Normalization.
     norm_stage = preprocess.NormalizationStage()
 
-    leye.add(norm_stage)
-    reye.add(norm_stage)
-    face.add(norm_stage)
+    #leye.add(norm_stage)
+    #reye.add(norm_stage)
+    #face.add(norm_stage)
 
     # Session number stage.
     if has_session_num:

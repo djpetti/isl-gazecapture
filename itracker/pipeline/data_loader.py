@@ -221,8 +221,11 @@ class DataLoader(object):
 
   def __build_loader_stage(self):
     """ Builds the pipeline stages that actually loads data from the disk. """
+    # 256 MB buffer for reading from the dataset.
+    buffer_size = 256 * 1024 * 1024
     # Define a dataset.
-    common_reader = tf.data.TFRecordDataset(self._records_file) \
+    common_reader = tf.data.TFRecordDataset(self._records_file,
+                                            buffer_size=buffer_size) \
                                     .shuffle(int(self._batch_size * 1.5))
 
     # Initially, we want to start at a random point.
@@ -233,7 +236,7 @@ class DataLoader(object):
     # Fused mapping and batching operation for performance.
     reader = reader.apply(tf.data.experimental.map_and_batch( \
         map_func=self.__preprocess_one, batch_size=self._batch_size,
-        num_parallel_batches=16,
+        num_parallel_batches=2,
         drop_remainder=True))
 
     # Prefetch data. Since we've already batched, the argument is the number of
