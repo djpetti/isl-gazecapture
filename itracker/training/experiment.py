@@ -18,6 +18,7 @@ import pipelines
 import validator
 
 
+layers = tf.keras.layers
 optimizers = tf.keras.optimizers
 K = tf.keras.backend
 
@@ -34,6 +35,15 @@ logger = logging.getLogger(__name__)
 
 class Experiment(experiment.Experiment):
   """ Experiment for training the gaze predictor model. """
+
+  @staticmethod
+  def _tpu_preprocess_eye(eye_images):
+    """ Preprocessing operations to be run on the TPU for eye inputs.
+    Args:
+      eye_images: The input eye images.
+    Returns:
+      The preprocessed eye images. """
+    return tf.image.rgb_to_grayscale(eye_images)
 
   def __init__(self, parser):
     """
@@ -54,14 +64,17 @@ class Experiment(experiment.Experiment):
     face_size = config.FACE_SHAPE[:2]
     eye_size = config.EYE_SHAPE[:2]
     batch_size = self.__args.batch_size
-    tpu_flatten = self.__args.tpu is not None
+
+    builder_class = pipelines.PipelineBuilder
     if self.__args.tpu:
       # We need to set the per-core batch size on the TPU.
       batch_size /= 8
       logger.debug("TPU: Setting per-core batch size: %d" % (batch_size))
-    self.__builder = pipelines.PipelineBuilder(config.RAW_SHAPE, face_size,
-                                               batch_size, eye_size=eye_size,
-                                               tpu_flatten=tpu_flatten)
+      # Use the pipeline builder for the TPU.
+      builder_class = pipelines.TpuPipelineBuilder
+
+    self.__builder = builder_class(config.RAW_SHAPE, face_size,
+                                   batch_size, eye_size=eye_size)
 
     super(Experiment, self).__init__(self.__args.testing_interval,
                                      hyperparams=my_params,
@@ -153,6 +166,11 @@ class Experiment(experiment.Experiment):
       autoenc_weights = self.__args.autoencoder_weights
       clusters = self.__args.clusters
 
+    eye_preproc = None
+    if self.__args.tpu:
+      # We defer some pre-processing onto the TPU.
+      eye_preproc = layers.Lambda(Experiment._tpu_preprocess_eye)
+
     # Create the model.
     if self.__args.fine_tune:
       logger.info("Will now fine-tune model.")
@@ -161,11 +179,9 @@ class Experiment(experiment.Experiment):
                           autoenc_model_file=autoenc_weights,
                           cluster_data=clusters,
                           l2_reg=self.__args.reg,
-                          flat_inputs=(self.__args.tpu is not None))
+                          flat_inputs=(self.__args.tpu is not None),
+                          eye_preproc=eye_preproc)
     self.__model = net.build()
-
-    # Prepare label data.
-    #self.__labels = net.prepare_labels(self.__labels)
 
     load_model = self.__args.model
     if load_model:
@@ -210,21 +226,12 @@ class Experiment(experiment.Experiment):
       logger.info("Bucket test data path: %s" % (test_data))
 
     self.__input_graph = tf.Graph()
-    input_graph = g_session.graph
-    #if self.__args.tpu:
-    #  # For the TPU, we want to build the input stuff in its own separate graph,
-    #  # so we can run it entirely on the CPU.
-    #  input_graph = self.__input_graph
-    with input_graph.as_default():
-      # Build input pipelines.
-      input_tensors = self.__builder.build_pipeline(train_data, test_data)
-    # We don't need the session number for training.
-    #self.__data_tensors = input_tensors[:4]
-    #self.__labels = {"dots": input_tensors[-1]}
-    self.__data_tensors = input_tensors
+    # Build input pipelines.
+    datasets = self.__builder.build_pipeline(train_data, test_data)
+    self.__train_dataset, self.__test_dataset = datasets
 
     # Create the model.
-    self.__build_model(self.__data_tensors)
+    self.__build_model(self.__train_dataset)
 
     # Initialize TPU configuration if necessary.
     if self.__args.tpu:
@@ -234,6 +241,7 @@ class Experiment(experiment.Experiment):
     """ Runs a single training iteration. """
     my_params = self.get_params()
     training_steps = my_params.get_value("training_steps")
+    testing_steps = my_params.get_value("testing_steps")
 
     status = self.get_status()
 
@@ -243,15 +251,20 @@ class Experiment(experiment.Experiment):
     # There seems to be an annoying inconsistency in the TensorFlow API where
     # the normal model requires a Dataset input, and the TPU model requires a
     # function that returns a Dataset as input.
-    data_input = self.__data_tensors
+    train_input = self.__train_dataset
+    test_input = self.__test_dataset
     if self.__args.tpu:
-      data_input = lambda: self.__data_tensors
+      train_input = lambda: self.__train_dataset
+      test_input = lambda: self.__test_dataset
     # Run a training iteration.
-    history = self.__model.fit(data_input,
-                               epochs=1,
-                               steps_per_epoch=training_steps)
+    history = self.__model.fit(train_input,
+                               validation_data=test_input,
+                               epochs=self.__args.testing_interval,
+                               steps_per_epoch=training_steps,
+                               validation_steps=testing_steps)
 
     # Update the status parameters.
+    print history.history
     loss = history.history["loss"][0]
     accuracy = history.history["distance_metric"][0]
     logger.debug("Training loss: %f, acc: %f" % (loss, accuracy))
@@ -260,6 +273,10 @@ class Experiment(experiment.Experiment):
 
   def _run_testing_iteration(self):
     """ Runs a single testing iteration. """
+    # Doesn't do anything by default, since our testing is included in the fit
+    # function.
+    return
+
     logger.info("Running test iteration.")
 
     my_params = self.get_params()
