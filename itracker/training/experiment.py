@@ -18,6 +18,7 @@ import pipelines
 import validator
 
 
+callbacks = tf.keras.callbacks
 layers = tf.keras.layers
 optimizers = tf.keras.optimizers
 K = tf.keras.backend
@@ -76,7 +77,20 @@ class Experiment(experiment.Experiment):
     self.__builder = builder_class(config.RAW_SHAPE, face_size,
                                    batch_size, eye_size=eye_size)
 
+    # Set up automatic saving.
+    save_path = self.__args.model
+    # Add the format.
+    save_path += ".{val_distance_metric:.2f}.h5"
+    logger.info("Using model save path: %s" % (save_path))
+    save_callback = callbacks.ModelCheckpoint(save_path,
+                                              monitor="val_distance_metric",
+                                              verbose=1, save_best_only=True,
+                                              save_weights_only=True,
+                                              mode="min")
+    self.__callbacks = [save_callback]
+
     super(Experiment, self).__init__(self.__args.testing_interval,
+                                     save_file=self.__args.model,
                                      hyperparams=my_params,
                                      status=my_status)
 
@@ -184,10 +198,7 @@ class Experiment(experiment.Experiment):
     self.__model = net.build()
 
     load_model = self.__args.model
-    if load_model:
-      logging.info("Loading pretrained model '%s'." % (load_model))
-      self.__model.load_weights(load_model)
-    elif self.__args.fine_tune:
+    if (not load_model and self.__args.fine_tune):
       # Can't fine-tune without a loaded model.
       raise RuntimeError("Please specify a model with --model to fine-tune.")
 
@@ -256,15 +267,16 @@ class Experiment(experiment.Experiment):
     if self.__args.tpu:
       train_input = lambda: self.__train_dataset
       test_input = lambda: self.__test_dataset
+
     # Run a training iteration.
     history = self.__model.fit(train_input,
                                validation_data=test_input,
                                epochs=self.__args.testing_interval,
                                steps_per_epoch=training_steps,
-                               validation_steps=testing_steps)
+                               validation_steps=testing_steps,
+                               callbacks=self.__callbacks)
 
     # Update the status parameters.
-    print history.history
     loss = history.history["loss"][0]
     accuracy = history.history["distance_metric"][0]
     logger.debug("Training loss: %f, acc: %f" % (loss, accuracy))
@@ -305,8 +317,26 @@ class Experiment(experiment.Experiment):
 
   def _load_model(self, save_file):
     """ Load a saved model. """
-    logging.info("Loading pretrained model '%s'." % (save_file))
-    self.__model.load_weights(save_file)
+    # Find the best model.
+    model_dir = os.path.dirname(save_file)
+    weight_files = os.listdir(model_dir)
+    weight_files.sort()
+    best = weight_files[0]
+    best_path = os.path.join(model_dir, best)
+
+    logging.info("Loading pretrained model '%s'." % (best_path))
+    self.__model.load_weights(best_path)
+
+  def _model_exists(self, save_file):
+    """ Check if a saved checkpoint exists.
+    Returns:
+      True if it does, false otherwise. """
+    model_dir = os.path.dirname(save_file)
+    if os.listdir(model_dir):
+      logger.debug("Found saved checkpoints.")
+      return True
+
+    return False
 
   def validate(self):
     """ Validates an existing model. """
