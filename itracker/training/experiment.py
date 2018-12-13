@@ -79,15 +79,17 @@ class Experiment(experiment.Experiment):
 
     # Set up automatic saving.
     save_path = self.__args.model
+    self.__callbacks = []
     # Add the format.
-    save_path += ".{val_distance_metric:.2f}.h5"
-    logger.info("Using model save path: %s" % (save_path))
-    save_callback = callbacks.ModelCheckpoint(save_path,
-                                              monitor="val_distance_metric",
-                                              verbose=1, save_best_only=True,
-                                              save_weights_only=True,
-                                              mode="min")
-    self.__callbacks = [save_callback]
+    if save_path:
+      save_path += ".{val_distance_metric:.2f}.h5"
+      logger.info("Using model save path: %s" % (save_path))
+      save_callback = callbacks.ModelCheckpoint(save_path,
+                                                monitor="val_distance_metric",
+                                                verbose=1, save_best_only=True,
+                                                save_weights_only=True,
+                                                mode="min")
+      self.__callbacks = [save_callback]
 
     super(Experiment, self).__init__(self.__args.testing_interval,
                                      save_file=self.__args.model,

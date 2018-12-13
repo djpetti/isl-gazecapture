@@ -117,12 +117,12 @@ class ResNetBlock(Residual):
     conv1 = layers.Conv2D(filters, (1, 1), **first_kwargs)
     norm1 = layers.BatchNormalization()
     act1 = layers.Activation("relu")
-    drop1 = layers.Dropout(0.5)
+    drop1 = layers.Dropout(0.2)
 
     conv2 = layers.Conv2D(filters, kernel_size, **kwargs)
     norm2 = layers.BatchNormalization()
     act2 = layers.Activation("relu")
-    drop2 = layers.Dropout(0.5)
+    drop2 = layers.Dropout(0.2)
 
     # We don't want activation for the last layer, since it will be added after
     # the addition operation.

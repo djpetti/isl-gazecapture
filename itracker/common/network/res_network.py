@@ -55,34 +55,31 @@ class ResNetwork(Network):
     trainable = not self._fine_tune
 
     # Shared eye layers.
-    conv_e1 = layers.Conv2D(64, (7, 7), strides=(2, 2),
+    conv_e1 = layers.Conv2D(128, (7, 7), strides=(2, 2),
                             padding="same", kernel_regularizer=self._l2,
                             trainable=trainable)
     norm_e1 = layers.BatchNormalization()
     act_e1 = layers.Activation("relu")
     pool_e1 = layers.MaxPooling2D((3, 3), strides=(2, 2), padding="same")
 
-    res_e2 = self.__build_group(3, 64, (3, 3), activation="relu",
+    res_e2 = self.__build_group(3, 128, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable,
                                 no_downsample=True)
-    res_e3 = self.__build_group(4, 128, (3, 3), activation="relu",
+    res_e3 = self.__build_group(7, 128, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable)
-    res_e4 = self.__build_group(6, 256, (3, 3), activation="relu",
-                                kernel_regularizer=self._l2,
-                                trainable=trainable)
-    res_e5 = self.__build_group(3, 256, (3, 3), activation="relu",
+    res_e5 = self.__build_group(6, 256, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable)
 
-    conv_e6 = layers.Conv2D(64, (1, 1), kernel_regularizer=self._l2,
+    conv_e6 = layers.Conv2D(128, (1, 1), kernel_regularizer=self._l2,
                             trainable=trainable)
     norm_e6 = layers.BatchNormalization()
     act_e6 = layers.Activation("relu")
 
     eye_layers = [conv_e1, act_e1, norm_e1, pool_e1] + res_e2 + res_e3 + \
-                 res_e4 + res_e5 + [conv_e6, norm_e6, act_e6]
+                 res_e5 + [conv_e6, norm_e6, act_e6]
     # Left eye stack.
     leye_out = self.__apply_all(self._left_eye_node, eye_layers)
     # Right eye stack.
@@ -111,34 +108,31 @@ class ResNetwork(Network):
     eye_comb_out = self.__apply_all(eye_concat, combined_eye_layers)
 
     # Face layers.
-    conv_f1 = layers.Conv2D(64, (7, 7), strides=(2, 2), padding="same",
+    conv_f1 = layers.Conv2D(128, (7, 7), strides=(2, 2), padding="same",
                             kernel_regularizer=self._l2, trainable=trainable)
     norm_f1 = layers.BatchNormalization()
     act_f1 = layers.Activation("relu")
     pool_f1 = layers.MaxPooling2D((3, 3), strides=(2, 2), padding="same")
 
-    res_f2 = self.__build_group(3, 64, (3, 3), activation="relu",
+    res_f2 = self.__build_group(3, 128, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable,
                                 no_downsample=True)
-    res_f3 = self.__build_group(4, 128, (3, 3), activation="relu",
+    res_f3 = self.__build_group(7, 128, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable)
-    res_f4 = self.__build_group(6, 256, (3, 3), activation="relu",
-                                kernel_regularizer=self._l2,
-                                trainable=trainable)
-    res_f5 = self.__build_group(3, 256, (3, 3), activation="relu",
+    res_f5 = self.__build_group(6, 256, (3, 3), activation="relu",
                                 kernel_regularizer=self._l2,
                                 trainable=trainable)
 
-    conv_f6 = layers.Conv2D(64, (1, 1),
+    conv_f6 = layers.Conv2D(128, (1, 1),
                             kernel_regularizer=self._l2, trainable=trainable)
     norm_f6 = layers.BatchNormalization()
     act_f6 = layers.Activation("relu")
 
     # Face stack.
     face_layers = [conv_f1, norm_f1, act_f1, pool_f1] + res_f2 + res_f3 + \
-                  res_f4 + res_f5 + [conv_f6, norm_f6, act_f6]
+                  res_f5 + [conv_f6, norm_f6, act_f6]
     face_out = self.__apply_all(self._face_node, face_layers)
 
     # Face grid.
