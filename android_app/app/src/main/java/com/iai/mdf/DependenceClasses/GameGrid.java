@@ -9,6 +9,7 @@ import android.os.Handler;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v4.content.ContextCompat;
+import android.util.Log;
 import android.util.Pair;
 import android.widget.ImageButton;
 import android.widget.ImageView;
@@ -25,10 +26,10 @@ import java.util.Random;
 public class GameGrid {
 
     private final String LOG_TAG = "GameGrid";
-    static final int    MOLE_LIFE_NORMAL = 1500;
+    static final int    MOLE_LIFE_NORMAL = 2000;
     static final int    WRONG_WHACK_PENALTY = 0;
     static final double GAME_SPEED_VARIATION_PROB = 0.90;
-    static final int    GAME_MAX_MOLES = 3;
+    static final int    GAME_MAX_MOLES = 2;
 
     private Activity ctxt;
     private ArrayList<ImageButton>  holes;
@@ -60,9 +61,9 @@ public class GameGrid {
                 }
                 int generator_interval;
                 if( new Random().nextFloat()>GAME_SPEED_VARIATION_PROB ){
-                    generator_interval = (int)(2-(float)GAME_SPEED/10)*1000;
+                    generator_interval = (int)(3-(float)GAME_SPEED/10)*1000;
                 } else {
-                    generator_interval = (int)(2-(float)GAME_SPEED/10)*1500;
+                    generator_interval = (int)(3-(float)GAME_SPEED/10)*1500;
                 }
                 gameProcHandler.postDelayed(this, generator_interval);
             }
@@ -77,6 +78,10 @@ public class GameGrid {
     }
 
     public ImageButton getHole(int idx){
+        Log.d(LOG_TAG, "Holes = " + String.valueOf(holes.size()) + ", idx = " + String.valueOf(idx));
+        if (idx==-1){
+            return null;
+        }
         return holes.get(idx);
     }
 
@@ -113,7 +118,7 @@ public class GameGrid {
                     break;
                 }
             }
-            // regenerate again if id doesn't exist
+            // regenerate again if id already exists
             if(i==moles.size()){
                 break;
             }

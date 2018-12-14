@@ -50,7 +50,13 @@ import org.opencv.core.Mat;
 import org.opencv.core.Point;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map;
+import java.util.Queue;
 
 /**
  * Created by mou on 3/23/18.
@@ -60,6 +66,7 @@ public class GameMainActivity extends Activity {
 
     private final String LOG_TAG = "GameMainActivity";
     public static final String  KEY_GRID_SIZE = "grid_size";
+    public static final String  KEY_AUTO_TRIGGER_THRESHOLD = "auto_trigger_common_sequence_size";
     public static final String  KEY_SPEED = "speed";
     public static final String  KEY_MODE = "game_mode";
     public static final int     VALUE_MODE_TIMER = 1;
@@ -71,6 +78,7 @@ public class GameMainActivity extends Activity {
     private SharedPreferences settings;
     private int GRID_SIZE;
     private int GAME_SPEED;
+    private int GAME_AUTO_TRIGGER_THRESHOLD;
     private int GAME_MODE;
     private int GAME_MAX_SCORE;
     private boolean GAME_GAZE_AUTO_TRIGGER;
@@ -93,6 +101,7 @@ public class GameMainActivity extends Activity {
 
     private int         curScore;
 
+    private boolean     isTakingPicture = false;
     private boolean     isGameStarted = false;
     private boolean     isPreviewMode = false;
 
@@ -132,7 +141,10 @@ public class GameMainActivity extends Activity {
                     isPreviewMode = !isPreviewMode;
                     if( isPreviewMode ){
                         textureView.bringToFront();
-                        takeImageHandler.post(takeImageRunnable);
+                        if (!isTakingPicture) {
+                            isTakingPicture = true;
+                            takeImageHandler.post(takeImageRunnable);
+                        }
                         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                                 table.getHeight(),
                                 table.getWidth()
@@ -142,7 +154,6 @@ public class GameMainActivity extends Activity {
                     } else {
                         table.bringToFront();
                         classifiedCircleHolder.bringToFront();
-                        takeImageHandler.removeCallbacks(takeImageRunnable);
                     }
                 }
             }
@@ -152,10 +163,13 @@ public class GameMainActivity extends Activity {
         btnController.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (!isTakingPicture) {
+                    isTakingPicture = true;
+                    takeImageHandler.post(takeImageRunnable);
+                }
                 if( isPreviewMode ){
                     table.bringToFront();
                     classifiedCircleHolder.bringToFront();
-                    takeImageHandler.removeCallbacks(takeImageRunnable);
                     isPreviewMode = !isPreviewMode;
                 }
                 if(isGameStarted){
@@ -172,11 +186,14 @@ public class GameMainActivity extends Activity {
             @Override
             public void onClick(View v) {
                 if( isGameStarted && !GAME_GAZE_AUTO_TRIGGER ){
-                    clickTriggle(optimalGaze);
+                    ImageButton lastHole = gameHandler.getHole(GAZE_POS_QUEUE.get(GAZE_POS_QUEUE.size()-1));
+                    if (lastHole!=null){
+                        lastHole.performClick();
+                    }
                 }
             }
         });
-        if( !GAME_GAZE_AUTO_TRIGGER ){
+        if( GAME_GAZE_AUTO_TRIGGER ){
             btnHammer.setVisibility(View.INVISIBLE);
         }
         // exit button
@@ -184,6 +201,10 @@ public class GameMainActivity extends Activity {
         btnExit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+                if (isTakingPicture) {
+                    isTakingPicture = false;
+                    takeImageHandler.removeCallbacks(takeImageRunnable);
+                }
                 if( !isGameStarted ) {
                     finish();
                 }
@@ -250,6 +271,7 @@ public class GameMainActivity extends Activity {
         GAME_MODE = extras.getInt(this.KEY_MODE, this.VALUE_MODE_TIMER);
         settings = getSharedPreferences(MainActivity.PREFERENCE_NAME, Context.MODE_PRIVATE);
         GAME_SPEED = settings.getInt(this.KEY_SPEED, 5);
+        GAME_AUTO_TRIGGER_THRESHOLD = settings.getInt(this.KEY_AUTO_TRIGGER_THRESHOLD, 4);
         GAME_MAX_SCORE = settings.getInt(this.KEY_MAX_SCORE, 0);
         GAME_GAZE_AUTO_TRIGGER = settings.getBoolean(this.KEY_TRIGGER_MODE, true);
         GAME_ADDITIONAL_VISUAL = settings.getBoolean(this.KEY_ADDITIONAL_VISUAL, false);
@@ -353,7 +375,10 @@ public class GameMainActivity extends Activity {
         }
         gameCounterDownTimer.start();
         gameHandler.startGame();
-        takeImageHandler.post(takeImageRunnable);
+        if (!isTakingPicture) {
+            isTakingPicture = true;
+            takeImageHandler.post(takeImageRunnable);
+        }
     }
 
     private void stopGame(){
@@ -364,6 +389,8 @@ public class GameMainActivity extends Activity {
         gameHandler.stopGame();
         showGameResult();
         takeImageHandler.removeCallbacks(takeImageRunnable);
+        drawHandler.clear(classifiedCircleHolder);
+        isTakingPicture = false;
     }
 
     private void showGameResult(){
@@ -387,6 +414,7 @@ public class GameMainActivity extends Activity {
     private SocketHandler serverConnector;
     private Toast toast;
     private double[]    optimalGaze = new double[]{1000,0,0};
+    private int    optimalGazePosition = -1;
 
     private void connectServer(){
         SharedPreferences settings = getSharedPreferences(MainActivity.PREFERENCE_NAME, Context.MODE_PRIVATE);
@@ -398,18 +426,19 @@ public class GameMainActivity extends Activity {
             public void onResponse(String str) {
                 imgServerConnect.setImageResource(R.drawable.game_main_server_valid);
                 try {
-                    if (str.equalsIgnoreCase(SocketHandler.SUCCESS_CONNECT_MSG) && isGameStarted){
-                        takeImageHandler.post(takeImageRunnable);
+                    if (str.equalsIgnoreCase(SocketHandler.SUCCESS_CONNECT_MSG)){
+                        if (isGameStarted) {
+                            // if the connection comes back during the game
+                            takeImageHandler.post(takeImageRunnable);
+                        }
                         return;
                     }
                     if( str!=null ) {
                         JSONObject object = new JSONObject(str);
                         if (object != null ){
                             if (object.getBoolean("Valid")) {
-                                optimalGaze = analyzeGaze(object);
-                                if( GAME_GAZE_AUTO_TRIGGER ) {
-                                    clickTriggle(optimalGaze);
-                                }
+                                optimalGazePosition = analyzeGaze(object);
+                                clickTriggle(optimalGazePosition);
                                 Log.d(LOG_TAG, object.toString());
                             } else {
                                 Log.d(LOG_TAG, "inValid");
@@ -427,8 +456,9 @@ public class GameMainActivity extends Activity {
                 if( str.equalsIgnoreCase(GameServerConnector.ERROR_DISCONNECTED) ){
                     imgServerConnect.setImageResource(R.drawable.game_main_server_invalid);
                     takeImageHandler.removeCallbacks(takeImageRunnable);
-                } else if (str.equalsIgnoreCase(GameServerConnector.ERROR_TIMEOUT)) {
-                    imgServerConnect.setImageResource(R.drawable.game_main_server_timeout);
+                    isTakingPicture = false;
+//                } else if (str.equalsIgnoreCase(GameServerConnector.ERROR_TIMEOUT)) {
+//                    imgServerConnect.setImageResource(R.drawable.game_main_server_timeout);
                 } else if (str.equalsIgnoreCase(SocketHandler.ERROR_SETTING)) {
                     Toast.makeText(GameMainActivity.this, "Please check the address and the port to use eye controller", Toast.LENGTH_SHORT).show();
                     imgServerConnect.setImageResource(R.drawable.game_main_server_invalid);
@@ -515,16 +545,21 @@ public class GameMainActivity extends Activity {
     /***** Gaze Control *****/
 //    private ArrayList<Pair<Float,Float>> pointHistory = new ArrayList<>();
     private LinkedList<Pair<Float,Float>> pointHistory = new LinkedList<>();
+    private ArrayList<Integer> GAZE_POS_QUEUE = new ArrayList<>();
     private final double     CLICK_THRESHOLD = 0.1;
     private final int       NUM_OF_PRE_POINTS = 1;
 
-    private double[] analyzeGaze(JSONObject object){
+    private int analyzeGaze(JSONObject object){
         try {
             double portraitHori = object.getDouble(SocketHandler.JSON_KEY_PREDICT_Y);
             double portraitVert = object.getDouble(SocketHandler.JSON_KEY_PREDICT_X);
             float[] loc = new float[2];
-            loc[0] = (float)((portraitHori + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePWidth());
-            loc[1] = (float)((portraitVert + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePHeight());
+            loc[1] = 1 - (float)((portraitHori + confHandler.getCameraOffsetPWidth())/confHandler.getScreenSizePWidth());
+            loc[0] = (float)((portraitVert + confHandler.getCameraOffsetPHeight())/confHandler.getScreenSizePHeight());
+            // linear calibration
+            float[] mat = confHandler.getCalibrationMatrix();
+            loc[0] = loc[0] * mat[0]  + loc[1] * mat[2] + mat[4];
+            loc[1] = loc[0] * mat[1]  + loc[1] * mat[3] + mat[5];
             pointHistory.add(new Pair(loc[0], loc[1]));
             if (pointHistory.size()>NUM_OF_PRE_POINTS) {
                 pointHistory.remove(0);
@@ -540,23 +575,25 @@ public class GameMainActivity extends Activity {
             }
             avePX /= pointHistory.size();
             avePY /= pointHistory.size();
+            int gridPos = -1;
             if( isPreviewMode ) {
                 drawExactResult(new float[]{(float) avePX, (float) avePY}, true, R.color.desired_square_color);
+            } else if( GAME_ADDITIONAL_VISUAL ){
+                gridPos = drawClassifiedResult(new float[]{(float) avePX, (float) avePY});
             }
-            if( isGameStarted && GAME_ADDITIONAL_VISUAL ){
-                drawClassifiedResult(new float[]{(float) avePX, (float) avePY});
-            }
-            double diff = 0;
-            for(Pair<Float, Float> eachPoint : pointHistory){
-                diff += Math.sqrt((eachPoint.first - avePX)*(eachPoint.first - avePX)
-                        + (eachPoint.second - avePY)*(eachPoint.second - avePY));
-            }
-            diff /= pointHistory.size();
-            Log.d(LOG_TAG, String.valueOf(diff));
-            return new double[]{diff, avePX, avePY};
+            Log.d(LOG_TAG, String.valueOf(gridPos));
+            return gridPos;
+//            double diff = 0;
+//            for(Pair<Float, Float> eachPoint : pointHistory){
+//                diff += Math.sqrt((eachPoint.first - avePX)*(eachPoint.first - avePX)
+//                        + (eachPoint.second - avePY)*(eachPoint.second - avePY));
+//            }
+//            diff /= pointHistory.size();
+//            Log.d(LOG_TAG, String.valueOf(diff));
+//            return new double[]{diff, avePX, avePY};
         } catch (JSONException e) {
             e.printStackTrace();
-            return null;
+            return -1;
         }
     }
 
@@ -584,6 +621,81 @@ public class GameMainActivity extends Activity {
         }
     }
 
+    private void clickTriggle(int gazePosition){
+        GAZE_POS_QUEUE.add(gazePosition);
+        if (GAZE_POS_QUEUE.size() > GAME_AUTO_TRIGGER_THRESHOLD){
+            GAZE_POS_QUEUE.remove(0);
+        }
+//        // percentage
+//        Collections.sort(GAZE_POS_QUEUE);
+//        int maxNum = -1, maxCount = 0, tempNum = -1, tempCount = 0;
+//        for (int i =0; i < GAZE_POS_QUEUE.size(); ++i) {
+//            if (GAZE_POS_QUEUE.get(i) == tempNum){
+//                tempCount++;
+//            } else {
+//                if (tempCount > maxCount){
+//                    maxCount = tempCount;
+//                    maxNum = tempNum;
+//                }
+//                tempCount = 1;
+//                tempNum = GAZE_POS_QUEUE.get(i);
+//            }
+//        }
+//        if (maxCount > 3){
+//
+//        }
+        if (!GAME_GAZE_AUTO_TRIGGER){
+            return;
+        }
+        boolean theSame = true;
+        for (int i=0; i < GAZE_POS_QUEUE.size()-1; ++i){
+            if( GAZE_POS_QUEUE.get(i) != GAZE_POS_QUEUE.get(i+1)){
+                theSame = false;
+                break;
+            }
+        }
+        if( theSame && GAZE_POS_QUEUE.size() >= 2){
+            ImageButton gazedHole = gameHandler.getHole(0);
+            if (gazedHole!=null){
+                gazedHole.performClick();
+            }
+        } else {
+            Log.d(LOG_TAG, "Moving");
+        }
+    }
+
+
+    private int[] getMostFrequent(int arr[]) {
+        // Insert all elements in hash
+        Map<Integer, Integer> hp = new HashMap();
+        for(int i = 0; i < arr.length; i++)
+        {
+            int key = arr[i];
+            if(hp.containsKey(key))
+            {
+                int freq = hp.get(key);
+                freq++;
+                hp.put(key, freq);
+            }
+            else
+            {
+                hp.put(key, 1);
+            }
+        }
+        // find max frequency.
+        int max_count = 0, res = -1;
+        for(Map.Entry<Integer, Integer> val : hp.entrySet())
+        {
+            if (max_count < val.getValue())
+            {
+                res = val.getKey();
+                max_count = val.getValue();
+            }
+        }
+        return new int[]{res, max_count};
+    }
+
+
     /***** Drawing *****/
     private FrameLayout frame_gaze_result;
     private FrameLayout classifiedCircleHolder;
@@ -603,34 +715,33 @@ public class GameMainActivity extends Activity {
     }
 
     private void drawExactResult(float[] estimateGaze, boolean isHoldOn, int color){
-        float temp = estimateGaze[0];
-        estimateGaze[0] = estimateGaze[1];
-        estimateGaze[1] = 1 - temp;
         int portraitX = (int)(confHandler.getScreenResoPHeight() * estimateGaze[0]);
         int portraitY = (int)(confHandler.getScreenResoPWidth() * estimateGaze[1]);
         drawHandler.fillRect(portraitX, portraitY, 80,80, frame_gaze_result, color, isHoldOn);
     }
 
-    private void drawClassifiedResult(float[] estimateGaze){
+    private int drawClassifiedResult(float[] estimateGaze){
         int holderWidth     = classifiedCircleHolder.getWidth();
         int holderHeight    = classifiedCircleHolder.getHeight();
         float gazeToLeft    = confHandler.getScreenResoPHeight() * estimateGaze[0];
-        float gazeToBottom  = confHandler.getScreenResoPWidth() * estimateGaze[1];
+        float gazeToBottom  = confHandler.getScreenResoPWidth() * (1 - estimateGaze[1]);
         float[] relPos = new float[2];
         relPos[0] = gazeToLeft / holderWidth;
         relPos[1] = 1 - gazeToBottom / holderHeight;
+        int gridPos = -1;
         if( estimateGaze!=null ){
             switch (GRID_SIZE){
                 case 22:
-                    drawHandler.draw22ClassifiedResult(relPos, new int[]{holderWidth, holderHeight}, classifiedCircleHolder); break;
+                    gridPos = drawHandler.draw22ClassifiedResult(relPos, new int[]{holderWidth, holderHeight}, classifiedCircleHolder); break;
                 case 33:
-                    drawHandler.draw33ClassifiedResult(relPos, new int[]{holderWidth, holderHeight}, classifiedCircleHolder); break;
+                    gridPos = drawHandler.draw33ClassifiedResult(relPos, new int[]{holderWidth, holderHeight}, classifiedCircleHolder); break;
                 case 34:
-                    drawHandler.draw34ClassifiedResult(relPos, new int[]{holderWidth, holderHeight}, classifiedCircleHolder); break;
+                    gridPos = drawHandler.draw34ClassifiedResult(relPos, new int[]{holderWidth, holderHeight}, classifiedCircleHolder); break;
             }
         } else {
             classifiedCircleHolder.removeAllViews();
         }
+        return gridPos;
     }
 
 
