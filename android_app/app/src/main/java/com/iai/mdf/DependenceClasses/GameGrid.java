@@ -134,10 +134,11 @@ public class GameGrid {
         mole.startLifeCycle();
     }
 
-    public int  whack(ImageButton btn){
+    public int  whack(final ImageButton btn){
         int earnCash = WRONG_WHACK_PENALTY;
         int cellPos = btn.getId();
         int coverIdx = (cellPos / 10) * GRID_SIZE_COL + cellPos % 10;
+        btn.setEnabled(false);
         holeCovers.get(coverIdx).setImageResource(R.drawable.anim_hammer);
         AnimationDrawable frameAnimation = (AnimationDrawable) holeCovers.get(coverIdx).getDrawable();
         for (Mole eachMole: moles) {
@@ -147,6 +148,12 @@ public class GameGrid {
         }
         frameAnimation.addFrame(ContextCompat.getDrawable(ctxt, android.R.color.transparent), 10);
         frameAnimation.start();
+        new Handler().postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                btn.setEnabled(true);
+            }
+        }, 500);
         return earnCash;
     }
 

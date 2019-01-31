@@ -720,124 +720,155 @@ public class DrawHandler {
 
     // draw classified results for Game
 
-    public void draw22ClassifiedResult(float[] loc, int[] textureSize, FrameLayout panel){
+    public int draw22ClassifiedResult(float[] loc, int[] textureSize, FrameLayout panel){
         int x;
         int y;
+        int gridPos = -1;
         int width = textureSize[0] / 2;
         int height = textureSize[1] / 2;
         if( 0 <= loc[0] && loc[0] < 0.5 && 0 <= loc[1] && loc[1] < 0.5 ){
             x = 0;
             y = 0;
+            gridPos = 0;
         } else if (1 >= loc[0] && loc[0] >= 0.5 && 0 <= loc[1] && loc[1] < 0.5){
             x = width;
             y = 0;
+            gridPos = 1;
         } else if (0 <= loc[0] && loc[0] < 0.5 && 1 >= loc[1] && loc[1] >= 0.5){
             x = 0;
             y = height;
+            gridPos = 2;
         } else if (1 >= loc[0] && loc[0] >= 0.5 && 1 >= loc[1] && loc[1] >= 0.5){
             x = width;
             y = height;
+            gridPos = 3;
         } else {
             panel.removeAllViews();
-            return;
+            return gridPos;
         }
         int size = (int)(Math.min(width, height) * 0.95);
         int cx = x + width/2 - size/2;
         int cy = y + height/2 - size/2;
         showCircle(cx, cy, size, size, R.drawable.ring_orange_10, panel,false);
+        return gridPos;
     }
 
-    public void draw33ClassifiedResult(float[] loc, int[] textureSize, FrameLayout panel){
+    public int draw33ClassifiedResult(float[] loc, int[] textureSize, FrameLayout panel){
         int x;
         int y;
+        int gridPos = -1;
         int width = textureSize[0] / 3;
         int height = textureSize[1] / 3;
         if (0 <= loc[0] && loc[0] < 0.3333 && 0 <= loc[1] && loc[1] < 0.3333) {
             x = 0;
             y = 0;
+            gridPos = 0;
         } else if (0 <= loc[0] && loc[0] < 0.3333 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
             x = 0;
             y = height;
+            gridPos = 3;
         } else if (0 <= loc[0] && loc[0] < 0.3333 && 1 >= loc[1] && loc[1] >= 0.6666) {
             x = 0;
             y = 2 * height;
+            gridPos = 6;
         } else if (loc[0] >= 0.3333 && loc[0] < 0.6666 && 0 <= loc[1] && loc[1] < 0.3333) {
             x = width;
             y = 0;
+            gridPos = 1;
         } else if (loc[0] >= 0.3333 && loc[0] < 0.6666 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
             x = width;
             y = height;
+            gridPos = 4;
         } else if (loc[0] >= 0.3333 && loc[0] < 0.6666 && 1 >= loc[1] && loc[1] >= 0.6666) {
             x = width;
             y = 2 * height;
+            gridPos = 7;
         } else if (1 >= loc[0] && loc[0] >= 0.6666 && 0 <= loc[1] && loc[1] < 0.3333) {
             x = 2 * width;
             y = 0;
+            gridPos = 2;
         } else if (1 >= loc[0] && loc[0] >= 0.6666 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
             x = 2 * width;
             y = height;
+            gridPos = 5;
         } else if (1 >= loc[0] && loc[0] >= 0.6666 && 1 >= loc[1] && loc[1] >= 0.6666){
             x = 2 * width;
             y = 2 * height;
+            gridPos = 8;
         } else {
             panel.removeAllViews();
-            return;
+            return gridPos;
         }
         int size = (int)(Math.min(width, height) * 0.95);
         int cx = x + width/2 - size/2;
         int cy = y + height/2 - size/2;
         showCircle(cx, cy, size, size, R.drawable.ring_orange_10, panel,false);
+        return gridPos;
     }
 
-    public void draw34ClassifiedResult(float[] loc, int[] textureSize, FrameLayout panel){
+    public int draw34ClassifiedResult(float[] loc, int[] textureSize, FrameLayout panel){
         int x;
         int y;
+        int gridPos = -1;
         int width = textureSize[0] / 4;
         int height = textureSize[1] / 3;
         if (0 <= loc[0] && loc[0] < 0.25 && 0 <= loc[1] && loc[1] < 0.3333) {
             x = 0;
             y = 0;
+            gridPos = 0;
         } else if (0 <= loc[0] && loc[0] < 0.25 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
             x = 0;
             y = height;
+            gridPos = 4;
         } else if (0 <= loc[0] && loc[0] < 0.25 && 1 >= loc[1] && loc[1] >= 0.6666) {
             x = 0;
             y = 2 * height;
+            gridPos = 8;
         } else if (loc[0] >= 0.25 && loc[0] < 0.5 && 0 <= loc[1] && loc[1] < 0.3333) {
             x = width;
             y = 0;
+            gridPos = 1;
         } else if (loc[0] >= 0.25 && loc[0] < 0.5 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
             x = width;
             y = height;
+            gridPos = 5;
         } else if (loc[0] >= 0.25 && loc[0] < 0.5 && 1 >= loc[1] && loc[1] >= 0.6666) {
             x = width;
             y = 2 * height;
+            gridPos = 9;
         } else if (loc[0] >= 0.5 && loc[0] < 0.75 && 0 <= loc[1] && loc[1] < 0.3333) {
             x = 2 * width;
             y = 0;
+            gridPos = 2;
         } else if (loc[0] >= 0.5 && loc[0] < 0.75 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
             x = 2 * width;
             y = height;
+            gridPos = 6;
         } else if (loc[0] >= 0.5 && loc[0] < 0.75 && 1 >= loc[1] && loc[1] >= 0.6666){
             x = 2 * width;
             y = 2 * height;
+            gridPos = 10;
         }  else if (1 >= loc[0] && loc[0] >= 0.75 && 0 <= loc[1] && loc[1] < 0.3333) {
             x = 3 * width;
             y = 0;
+            gridPos = 3;
         } else if (1 >= loc[0] && loc[0] >= 0.75 && loc[1] >= 0.3333 && loc[1] < 0.6666) {
             x = 3 * width;
             y = height;
+            gridPos = 7;
         } else if (1 >= loc[0] && loc[0] >= 0.75 && 1 >= loc[1] && loc[1] >= 0.6666){
             x = 3 * width;
             y = 2 * height;
+            gridPos = 11;
         } else {
             panel.removeAllViews();
-            return;
+            return gridPos;
         }
         int size = (int)(Math.min(width, height) * 0.95);
         int cx = x + width/2 - size/2;
         int cy = y + height/2 - size/2;
         showCircle(cx, cy, size, size, R.drawable.ring_orange_10, panel,false);
+        return gridPos;
     }
 
 

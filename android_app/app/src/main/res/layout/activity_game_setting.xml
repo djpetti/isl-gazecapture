@@ -57,6 +57,38 @@
                     android:textColorHint="@android:color/darker_gray"
                     android:textColor="@android:color/black" />
             </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="AutoTrigger Sequence Length"
+                android:textSize="20dp" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+                <SeekBar
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0.85"
+                    android:id="@+id/activity_game_setting_seekbar_auto_trigger"
+                    android:layout_marginLeft="10dp"
+                    android:layout_marginRight="10dp"
+                    android:layout_gravity="center"
+                    android:textSize="15dp"
+                    android:max="8"
+                    android:min="2"/>
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0.15"
+                    android:id="@+id/activity_game_setting_txtview_auto_trigger"
+                    android:gravity="center"
+                    android:text="0"
+                    android:textSize="15dp"/>
+            </LinearLayout>
+
+
         </LinearLayout>
 
 
@@ -77,15 +109,31 @@
                 android:layout_height="wrap_content"
                 android:text="Game Difficulty"
                 android:textSize="20dp" />
-            <SeekBar
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:id="@+id/activity_game_setting_seekbar_speed"
-                android:layout_marginTop="10dp"
-                android:layout_gravity="center_horizontal"
-                android:textSize="15dp"
-                android:max="5"
-                android:min="1"/>
+                android:orientation="horizontal">
+                <SeekBar
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0.85"
+                    android:id="@+id/activity_game_setting_seekbar_speed"
+                    android:layout_marginLeft="10dp"
+                    android:layout_marginRight="10dp"
+                    android:layout_gravity="center"
+                    android:textSize="15dp"
+                    android:max="10"
+                    android:min="0"/>
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="0.15"
+                    android:id="@+id/activity_game_setting_txtview_speed"
+                    android:gravity="center"
+                    android:text="0"
+                    android:textSize="15dp"/>
+            </LinearLayout>
+
 
             <!--Auto Trigger-->
             <RelativeLayout
