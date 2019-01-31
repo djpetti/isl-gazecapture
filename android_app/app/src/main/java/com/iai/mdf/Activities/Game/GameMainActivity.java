@@ -658,6 +658,8 @@ public class GameMainActivity extends Activity {
             ImageButton gazedHole = gameHandler.getHole(0);
             if (gazedHole!=null){
                 gazedHole.performClick();
+                GAZE_POS_QUEUE.remove(0);
+                GAZE_POS_QUEUE.remove(0);
             }
         } else {
             Log.d(LOG_TAG, "Moving");

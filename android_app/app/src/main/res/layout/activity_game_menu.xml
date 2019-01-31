@@ -41,6 +41,18 @@
             android:layout_width="40dp"
             android:layout_height="1dp" />
         <Button
+            android:id="@+id/activity_game_mole_btn_start_23"
+            android:layout_width="120dp"
+            android:layout_height="60dp"
+            android:text="2x3"
+            android:textSize="35dp"
+            android:textColor="@color/blue"
+            android:textAllCaps="false"
+            android:background="@drawable/button_menu_options"/>
+        <View
+            android:layout_width="40dp"
+            android:layout_height="1dp" />
+        <Button
             android:id="@+id/activity_game_mole_btn_start_33"
             android:layout_width="120dp"
             android:layout_height="60dp"
