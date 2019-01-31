@@ -14,6 +14,7 @@ import android.widget.CheckBox;
 import android.widget.CompoundButton;
 import android.widget.EditText;
 import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.iai.mdf.Activities.MainActivity;
@@ -36,7 +37,10 @@ public class GameSettingActivity extends Activity {
     private SharedPreferences settings;
     private EditText ipInput;
     private EditText portInput;
+    private SeekBar seekbarAutoTrigger;
     private SeekBar seekbarSpeed;
+    private TextView txtAutoTrigger;
+    private TextView txtSpeed;
     private CheckBox checkBoxAutoTrigger;
     private CheckBox checkBoxVisualCircle;
     private Button btnYes;
@@ -61,7 +65,50 @@ public class GameSettingActivity extends Activity {
         ipInput.setText(lastIp);
         portInput.setText(lastPort);
 
+        int autoTriggerThreshold = settings.getInt(GameMainActivity.KEY_AUTO_TRIGGER_THRESHOLD, 4);
+        txtAutoTrigger = findViewById(R.id.activity_game_setting_txtview_auto_trigger);
+        txtAutoTrigger.setText(String.valueOf(autoTriggerThreshold));
+        seekbarAutoTrigger = findViewById(R.id.activity_game_setting_seekbar_auto_trigger);
+        seekbarAutoTrigger.setProgress(autoTriggerThreshold);
+        seekbarAutoTrigger.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                txtAutoTrigger.setText(String.valueOf(progress));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+
+        int speed = settings.getInt(GameMainActivity.KEY_SPEED, 5);
+        txtSpeed = findViewById(R.id.activity_game_setting_txtview_speed);
+        txtSpeed.setText(String.valueOf(speed));
         seekbarSpeed = findViewById(R.id.activity_game_setting_seekbar_speed);
+        seekbarSpeed.setProgress(speed);
+        seekbarSpeed.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+            @Override
+            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
+                txtSpeed.setText(String.valueOf(progress));
+            }
+
+            @Override
+            public void onStartTrackingTouch(SeekBar seekBar) {
+
+            }
+
+            @Override
+            public void onStopTrackingTouch(SeekBar seekBar) {
+
+            }
+        });
+
 
         checkBoxAutoTrigger = findViewById(R.id.activity_game_checkbox_gaze_trigger);
         checkBoxAutoTrigger.setChecked(settings.getBoolean(GameMainActivity.KEY_TRIGGER_MODE, true));
@@ -79,6 +126,8 @@ public class GameSettingActivity extends Activity {
                 editor.putString(GameSettingActivity.BUNDLE_KEY_PORT, portInput.getText().toString());
                 editor.putBoolean(GameMainActivity.KEY_TRIGGER_MODE, checkBoxAutoTrigger.isChecked());
                 editor.putBoolean(GameMainActivity.KEY_ADDITIONAL_VISUAL, checkBoxVisualCircle.isChecked());
+                editor.putInt(GameMainActivity.KEY_AUTO_TRIGGER_THRESHOLD, seekbarAutoTrigger.getProgress());
+                editor.putInt(GameMainActivity.KEY_SPEED, seekbarSpeed.getProgress());
                 editor.commit();
                 finish();
             }

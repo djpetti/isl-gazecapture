@@ -33,6 +33,7 @@ public class GameMenuActivity extends Activity {
 
 
     private Button btnStart22;
+    private Button btnStart23;
     private Button btnStart33;
     private Button btnStart34;
     private ImageButton  btnSetting;
@@ -55,6 +56,21 @@ public class GameMenuActivity extends Activity {
                 Intent intent = new Intent(GameMenuActivity.this, GameMainActivity.class);
                 Bundle extras = new Bundle();
                 extras.putInt(GameMainActivity.KEY_GRID_SIZE, 22);
+                extras.putInt(GameMainActivity.KEY_MODE, GameMainActivity.VALUE_MODE_TIMER);
+                intent.putExtras(extras);
+                overridePendingTransition(0, 0);
+                startActivity(intent);
+            }
+        });
+
+        btnStart23 = findViewById(R.id.activity_game_mole_btn_start_23);
+        btnStart23.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Log.d(LOG_TAG, "Game Begin");
+                Intent intent = new Intent(GameMenuActivity.this, GameMainActivity.class);
+                Bundle extras = new Bundle();
+                extras.putInt(GameMainActivity.KEY_GRID_SIZE, 23);
                 extras.putInt(GameMainActivity.KEY_MODE, GameMainActivity.VALUE_MODE_TIMER);
                 intent.putExtras(extras);
                 overridePendingTransition(0, 0);
